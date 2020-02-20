@@ -1,3 +1,19 @@
+
+script.py
+labels_map.txt
+
+weights/
+logs/
+images/
+results/
+
+.vscode
+.DS_Store
+*.json
+*.sh
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
