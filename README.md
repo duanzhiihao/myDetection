@@ -1,2 +1,7 @@
 # myDetection
-A personal repository for image object detection using pytorch.
+
+
+- [x] YOLO v3
+- [ ] YOLO v3 + EfficentNet backbone
+- [ ] EfficientDet
+- [ ] EfficientDet + FCOS
