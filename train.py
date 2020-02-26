@@ -76,6 +76,7 @@ if __name__ == '__main__':
     # print('Only train on person images and object:', only_person)
     if args.dataset == 'COCO':
         import sys
+        import json
         from io import StringIO
         from pycocotools.coco import COCO
         from pycocotools.cocoeval import COCOeval
@@ -84,9 +85,10 @@ if __name__ == '__main__':
         val_img_dir = '../COCO/val2017/'
         valjson = '../COCO/annotations/instances_val2017.json'
         def evaluate_json(dts_json):
+            json.dump(dts_json, open('./tmp.json','w'), indent=1)
             print('Initialing validation set...')
             cocoGt = COCO(valjson)
-            cocoDt = cocoGt.loadRes(dts_json)
+            cocoDt = cocoGt.loadRes('./tmp.json')
             cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
             cocoEval.evaluate()
             cocoEval.accumulate()

@@ -1,6 +1,6 @@
 
 script.py
-labels_map.txt
+run?.log
 
 weights/
 logs/
@@ -11,6 +11,7 @@ results/
 .DS_Store
 *.json
 *.sh
+*.txt
 
 
 
