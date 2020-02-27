@@ -92,7 +92,7 @@ class Detector():
             input_size: int, default: 640
             conf_thres: float, confidence threshold
         '''
-        test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
+        # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
         input_size = kwargs['input_size'] if 'input_size' in kwargs else 640
         conf_thres = kwargs['conf_thres'] if 'conf_thres' in kwargs else self.conf_thres
         assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
@@ -101,33 +101,22 @@ class Detector():
         input_img, _, pad_info = Utils.rect_to_square(pil_img, None, input_size)
         
         input_ori = tvf.to_tensor(input_img)
-        if not test_aug:
-            input_ = input_ori.unsqueeze(0)
-        elif test_aug == 'h':
-            raise Exception('Deprecated')
-            # horizontal flip
-            input_hflip = input_ori.flip(2)
-            input_ = torch.stack([input_ori, input_hflip], dim=0)
-        else:
-            raise Exception('Invalid test-time augmentation')
+        input_ = input_ori.unsqueeze(0)
         
         assert input_.dim() == 4
         with torch.no_grad():
             dts = self.model(input_.cuda()).cpu()
 
-        if not test_aug:
-            dts = dts.squeeze()
-            # post-processing
-            dts = dts[dts[:,5] >= conf_thres]
-            if len(dts) > 1000:
-                _, idx = torch.topk(dts[:,5], k=1000)
-                dts = dts[idx, :]
-            dts = Utils.nms(dts, bb_format='cxcywh', nms_thres=0.45)
-            # np_img = np.array(tvf.to_pil_image(input_.squeeze()))
-            # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
-            # plt.imshow(np_img)
-            # plt.show()
-            dts = Utils.detection2original(dts, pad_info.squeeze())
-            return dts
-        
-        raise NotImplementedError()
+        dts = dts.squeeze() # rows of [class, cx, cy, w, h, conf]
+        # post-processing
+        dts = dts[dts[:,5] >= conf_thres]
+        if len(dts) > 1000:
+            _, idx = torch.topk(dts[:,5], k=1000)
+            dts = dts[idx, :]
+        dts = Utils.nms(dts, bb_format='cxcywh', nms_thres=0.45)
+        # np_img = np.array(tvf.to_pil_image(input_.squeeze()))
+        # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
+        # plt.imshow(np_img)
+        # plt.show()
+        dts = Utils.detection2original(dts, pad_info.squeeze())
+        return dts
