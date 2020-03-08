@@ -60,7 +60,7 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
         x1, y1 = x - w/2, y - h/2
         text = cat_name if 'gt' in bb_type else f'{cat_name}, {conf:.2f}'
         cv2.putText(im, text, (int(x1),int(y1)), font, 1,
-                    cat_color, font_bold, cv2.LINE_AA)
+                    (255,255,255), font_bold, cv2.LINE_AA)
     # plt.imshow(im)
     # plt.show()
 

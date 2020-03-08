@@ -15,41 +15,41 @@ def test_training():
     
     dataset = Dataset4ObjDet(img_dir=img_dir, json_path=ann_json, bb_format='x1y1wh',
                              img_size=512, augmentation=True,
-                             debug_mode=False)
+                             debug_mode=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, shuffle=True, 
                             num_workers=0, pin_memory=True, drop_last=False)
     dataiterator = iter(dataloader)
 
-    # for _ in range(100):
-    #     try:
-    #         img, labels, img_id, _ = next(dataiterator)
-    #     except StopIteration:
-    #         dataiterator = iter(dataloader)
-    #         img, labels, img_id, _ = next(dataiterator)  # load a batch
-    #     print(img_id)
-    #     img, labels = img.squeeze(), labels.squeeze(0)
-    #     # img = visUtils.tensor_to_npimg(img)
-    #     img = tvf.to_pil_image(img)
-    #     img = np.array(img)
-    #     plt.figure()
-    #     plt.imshow(img)
-    #     labels[:,1:5] *= img.shape[0]
-    #     gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
-    #     visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
-    #                                print_dt=False)
-    #     plt.figure()
-    #     plt.imshow(img)
-    #     plt.show()
+    for _ in range(100):
+        try:
+            img, labels, img_id, _ = next(dataiterator)
+        except StopIteration:
+            dataiterator = iter(dataloader)
+            img, labels, img_id, _ = next(dataiterator)  # load a batch
+        print(img_id)
+        img, labels = img.squeeze(), labels.squeeze(0)
+        # img = visUtils.tensor_to_npimg(img)
+        img = tvf.to_pil_image(img)
+        img = np.array(img)
+        plt.figure()
+        plt.imshow(img)
+        labels[:,1:5] *= img.shape[0]
+        gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
+        visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
+                                   print_dt=False)
+        plt.figure()
+        plt.imshow(img)
+        plt.show()
 
     debug = 1
     
-    from models.yolov3 import YOLOv3
-    model = YOLOv3(80, 'dark53', img_norm=False)
+    # from models.yolov3 import YOLOv3
+    # model = YOLOv3(80, 'dark53', img_norm=False)
 
-    # torch.cuda.reset_max_memory_allocated()
-    img, labels, _, _ = next(dataiterator)
-    oupu = model(img, labels)
-    oupu.backward()
+    # # torch.cuda.reset_max_memory_allocated()
+    # img, labels, _, _ = next(dataiterator)
+    # oupu = model(img, labels)
+    # oupu.backward()
 
     debug = 1
 
@@ -272,11 +272,11 @@ def adversarial():
 
 
 if __name__ == "__main__":
-    # test_training()
+    test_training()
     # test_iou()
     # print_model()
     # test_official()
-    cpuvsgpu()
+    # cpuvsgpu()
     # adversarial()
     # test_efficient()
     # test_hist_equal()

@@ -241,7 +241,7 @@ class YOLOLayer(nn.Module):
 
         # tic = time()
         nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
-        assert (labels >= 0).all() and (labels[...,1:5] <= 1).all()
+        # assert (labels >= 0).all() and (labels[...,1:5] <= 1).all()
 
         tcls_all = labels[:,:,0].long()
         tx_all, ty_all = labels[:,:,1] * nG, labels[:,:,2] * nG # 0-nG
@@ -338,7 +338,8 @@ class YOLOLayer(nn.Module):
         loss_wh = tnf.mse_loss(wh_pred, wh_target, reduction='sum')
         loss_obj = self.loss4obj(conf[penalty_mask], target[...,4][penalty_mask])
         if self.n_cls > 0:
-            loss_cls = tnf.binary_cross_entropy(classes[obj_mask], target[...,5:][obj_mask])
+            loss_cls = tnf.binary_cross_entropy(classes[obj_mask], target[...,5:][obj_mask],
+                                                reduction='sum')
         else:
             loss_cls = 0
 
@@ -350,6 +351,6 @@ class YOLOLayer(nn.Module):
         ngt = valid_gt_num + 1e-16
         self.loss_str = f'yolo_{nG} total {int(ngt)} objects: ' \
                         f'xy/gt {loss_xy/ngt:.3f}, wh/gt {loss_wh/ngt:.3f}' \
-                        f', conf {loss_obj:.3f}'
+                        f', conf {loss_obj:.3f}, class {loss_cls:.3f}'
         self.gt_num = valid_gt_num
         return None, loss

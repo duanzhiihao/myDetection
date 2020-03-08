@@ -106,7 +106,7 @@ if __name__ == '__main__':
     
     print('Initialing training set...')
     dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=args.res_max, 
-                             augmentation=True, debug_mode=args.debug)
+                             augmentation=enable_aug, debug_mode=args.debug)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
                             num_workers=num_cpu, pin_memory=True, drop_last=False)
     dataiterator = iter(dataloader)
@@ -237,9 +237,8 @@ if __name__ == '__main__':
                 eval_img = Image.open(impath)
                 dts = model_eval.detect_one(pil_img=eval_img, input_size=target_size,
                                             conf_thres=0.1, visualize=False)
-
                 np_img = np.array(eval_img)
                 visualization.draw_cocobb_on_np(np_img, dts)
-                np_img = cv2.resize(np_img, (416,416))
+                np_img = cv2.resize(np_img, (608,608))
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
