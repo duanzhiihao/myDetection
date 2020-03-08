@@ -5,7 +5,7 @@ import numpy as np
 from collections import defaultdict, OrderedDict
 
 import torch
-from torchvision import transforms
+import torchvision.transforms.functional as tvf
 
 import utils.utils as Utils
 import utils.augmentation as augUtils
@@ -135,8 +135,8 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img, labels[:gt_num], pad_info = Utils.rect_to_square(img, labels[:gt_num],
                             self.img_size, pad_value=0, aug=self.enable_aug)
 
+        img = tvf.to_tensor(img)
         if self.enable_aug:
-            img = self.pil_aug_to_tensor(img)
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
             #         augUtils.random_gaussian_filter]
             # if np.random.rand() > 0.7:
@@ -145,9 +145,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             if np.random.rand() > 0.6:
                 img = augUtils.add_gaussian(img, max_var=0.03)
             if np.random.rand() > 0.6:
-                img = augUtils.add_saltpepper(img, max_p=0.03)
-        else:
-            img = transforms.functional.to_tensor(img)
+                img = augUtils.add_saltpepper(img, max_p=0.02)
 
         labels[:gt_num] = Utils.normalize_bbox(labels[:gt_num], self.img_size)
 
@@ -156,7 +154,25 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return img, labels, img_id, pad_info
 
     def augment_PIL(self, img, labels):
+        if np.random.rand() > 0.4:
+            img = tvf.adjust_brightness(img, uniform(0.3,1.5))
+        if np.random.rand() > 0.7:
+            factor = 2 ** uniform(-1, 1)
+            img = tvf.adjust_contrast(img, factor) # 0.5 ~ 2
+        if np.random.rand() > 0.7:
+            img = tvf.adjust_hue(img, uniform(-0.1,0.1))
+        if np.random.rand() > 0.6:
+            factor = uniform(0,2)
+            if factor > 1:
+                factor = 1 + uniform(0, 2)
+            img = tvf.adjust_saturation(img, factor) # 0 ~ 3
+        if np.random.rand() > 0.5:
+            img = tvf.adjust_gamma(img, uniform(0.5, 3))
         # horizontal flip
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
         return img, labels
+
+
+def uniform(a, b):
+    return a + np.random.rand() * (b-a)
