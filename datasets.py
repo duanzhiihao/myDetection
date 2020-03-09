@@ -46,12 +46,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             self.img_ids = [383384]
             print(f"debug mode..., only train on one image: {self.img_ids[0]}")
 
-        # transform and data augmentation
-        self.pil_aug_to_tensor = transforms.Compose([
-            transforms.ColorJitter(brightness=0.3,contrast=0.3,saturation=1,hue=0.1),
-            transforms.ToTensor(),
-        ])
-
     def load_json(self, json_path, bb_format):
         '''
         laod json file to self.img_ids, self.imgid2anns
