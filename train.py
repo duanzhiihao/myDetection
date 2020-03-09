@@ -238,7 +238,8 @@ if __name__ == '__main__':
                 dts = model_eval.detect_one(pil_img=eval_img, input_size=target_size,
                                             conf_thres=0.1, visualize=False)
                 np_img = np.array(eval_img)
-                visualization.draw_cocobb_on_np(np_img, dts)
-                np_img = cv2.resize(np_img, (608,608))
+                dts.draw_on_np(np_img, class_map='COCO')
+                # visualization.draw_cocobb_on_np(np_img, dts)
+                np_img = cv2.resize(np_img, (512,512))
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()

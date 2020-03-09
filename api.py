@@ -24,8 +24,8 @@ class Detector():
             model = YOLOv3(class_num=80, backbone='dark53', img_norm=False)
         else:
             raise Exception('Unknown model name')
-        # total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        # print('Number of parameters:', total_params)
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print('Number of parameters:', total_params)
         if weights_path:
             model.load_state_dict(torch.load(weights_path)['model'])
         self.model = model.cuda()
@@ -52,7 +52,7 @@ class Detector():
 
         if kwargs.get('visualize', True):
             np_img = np.array(img)
-            visUtils.draw_cocobb_on_np(np_img, detections, 'pbb', print_dt=True)
+            detections.draw_on_np(np_img, class_map='COCO', print_dt=True)
             plt.imshow(np_img)
             plt.show()
         return detections
@@ -75,13 +75,7 @@ class Detector():
             img = Utils.imread_pil(impath)
 
             detections = self._predict_pil(img, **kwargs)
-            for dt in detections:
-                cls_idx, cx, cy, w, h, conf = [float(t) for t in dt]
-                bbox = [cx-w/2, cy-h/2, w, h]
-                cat_id = Utils.COCO_CATEGORY_LIST[int(cls_idx)]['id']
-                dt_dict = {'image_id': img_id, 'category_id': cat_id,
-                           'bbox': bbox, 'score': conf}
-                detection_json.append(dt_dict)
+            detection_json += detections.to_coco_json(img_id=img_id)
 
         return detection_json
     
@@ -105,18 +99,18 @@ class Detector():
         
         assert input_.dim() == 4
         with torch.no_grad():
-            dts = self.model(input_.cuda()).cpu()
+            dts = self.model(input_.cuda())
 
-        dts = dts.squeeze() # rows of [class, cx, cy, w, h, conf]
         # post-processing
-        dts = dts[dts[:,5] >= conf_thres]
+        dts._cpu()
+        dts = dts[dts.scores >= conf_thres]
         if len(dts) > 1000:
-            _, idx = torch.topk(dts[:,5], k=1000)
-            dts = dts[idx, :]
-        dts = Utils.nms(dts, bb_format='cxcywh', nms_thres=0.45)
+            _, idx = torch.topk(dts.scores, k=1000)
+            dts = dts[idx]
+        dts = dts.nms(nms_thres=0.45)
         # np_img = np.array(tvf.to_pil_image(input_.squeeze()))
         # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
         # plt.imshow(np_img)
         # plt.show()
-        dts = Utils.detection2original(dts, pad_info.squeeze())
+        dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
         return dts

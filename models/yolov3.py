@@ -8,6 +8,7 @@ import torchvision.transforms.functional as tvf
 
 import models.backbones, models.fpns, models.losses
 from utils.iou_funcs import bboxes_iou
+from utils.structures import ImageObjects
 # from utils.timer import contexttimer
 
 
@@ -100,12 +101,14 @@ class YOLOv3(nn.Module):
             # tic = time()
             # assert boxes_L.dim() == 3
             boxes = torch.cat((boxes_L,boxes_M,boxes_S), dim=1)
-            cls_score, cls_idx = boxes[...,5:].max(dim=2, keepdim=True)
-            boxes = torch.cat([cls_idx.float(),boxes[...,0:5]], dim=2)
-            boxes[:,:,4] *= cls_score.squeeze(-1)
+            bbs, confs, clss = boxes[...,:4], boxes[...,4], boxes[...,5:]
+            cls_score, cls_idx = clss.max(dim=2, keepdim=False)
+            # boxes = torch.cat([cls_idx.float(),boxes[...,0:5]], dim=2)
+            # boxes[:,:,4] *= cls_score.squeeze(-1)
             # debug = boxes[boxes[...,5]>0.5]
             # self.time_dic['cat_box'] += time() - tic
-            return boxes
+            bb = ImageObjects(bboxes=bbs, cats=cls_idx, scores=confs*cls_score)
+            return bb
         else:
             # check all the gt objects are assigned
             gt_num = (labels[:,:,0:4].sum(dim=2) > 0).sum()

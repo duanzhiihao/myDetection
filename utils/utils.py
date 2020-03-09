@@ -1,9 +1,7 @@
 import numpy as np
 import PIL.Image
 import random
-from collections import defaultdict
 import torch
-import torchvision
 import torchvision.transforms.functional as tnf
 
 
@@ -115,101 +113,17 @@ def detection2original(boxes, pad_info):
     '''
     recover the bbox labels from in square to in original rectangle
     Args:
-        boxes: tensor, not normalized, rows of [class,x,y,w,h,...]
+        boxes: tensor, not normalized, rows of [x,y,w,h]
         pad_info: (ori w, ori h, tl x, tl y, imw, imh)
     '''
-    assert boxes.dim() == 2 and boxes.shape[1] >= 5
+    assert boxes.dim() == 2 and boxes.shape[1] == 4
     ori_w, ori_h, tl_x, tl_y, imw, imh = pad_info
-    boxes[:,1] = (boxes[:,1] - tl_x) / imw * ori_w
-    boxes[:,2] = (boxes[:,2] - tl_y) / imh * ori_h
-    boxes[:,3] = boxes[:,3] / imw * ori_w
-    boxes[:,4] = boxes[:,4] / imh * ori_h
+    boxes[:,0] = (boxes[:,0] - tl_x) / imw * ori_w
+    boxes[:,1] = (boxes[:,1] - tl_y) / imh * ori_h
+    boxes[:,2] = boxes[:,2] / imw * ori_w
+    boxes[:,3] = boxes[:,3] / imh * ori_h
 
     return boxes
-
-
-def nms_func(boxes, scores, iou_threshold):
-    return torchvision.ops.nms(boxes, scores, iou_threshold)
-
-
-def nms(detections, bb_format, nms_thres=0.45, majority=None):
-    '''
-    Non-maximum suppression for bounding boxes with angle AND without category
-    
-    Args:
-        detections: 2-d tensor, rows of bounding boxes
-        bb_format: str, can be:
-                    'cxcywh': (class,cx,cy,w,h,score)
-                    'x1y1x2y2': (class,x1,y1,x2,y2,score)
-                    'cxcywhd': (class,cx,cy,w,h,degree,score)
-                    'cxcywhr': (class,cx,cy,w,h,radian,score)
-        majority (optional): int, a BB is suppresssed if the number of votes \
-        less than majority. default: None
-    '''
-    assert detections.dim() == 2
-    device = detections.device
-    if detections.shape[0] == 0:
-        return detections
-
-    if bb_format == 'cxcywh':
-        assert (detections.dim() == 2) and (detections.shape[1] >= 6)
-        # convert to x1y1x2y2
-        dts_xyxy = detections.clone()
-        dts_xyxy[:,1] = detections[:,1] - detections[:,3]/2
-        dts_xyxy[:,2] = detections[:,2] - detections[:,4]/2
-        dts_xyxy[:,3] = detections[:,1] + detections[:,3]/2
-        dts_xyxy[:,4] = detections[:,2] + detections[:,4]/2
-    elif bb_format == 'x1y1x2y2':
-        assert (detections.dim() == 2) and (detections.shape[1] >= 6)
-        dts_xyxy = detections
-    else:
-        raise NotImplementedError()
-    
-    out_dts = []
-    unique_labels = dts_xyxy[:,0].unique()
-    for cat_idx in unique_labels:
-        class_dts = dts_xyxy[dts_xyxy[:,0]==cat_idx, :]
-        keep_indices = nms_func(class_dts[:,1:5], class_dts[:,5], nms_thres)
-        
-        class_dts = detections[detections[:,0]==cat_idx, :][keep_indices, :]
-        out_dts.append(class_dts)
-    
-    out_dts = torch.cat(out_dts, dim=0)
-    return out_dts
-
-    # sort by confidence
-    # idx = torch.argsort(detections[:,5], descending=True)
-    # detections = detections[idx,:]
-
-    # boxes = detections[:,0:5] # only [x,y,w,h,a]
-    # valid = torch.zeros(boxes.shape[0], dtype=torch.bool, device=device)
-    # # the first one is always valid
-    # valid[0] = True
-    # # only one candidate at the beginning. Its votes number is 1 (it self)
-    # votes = [1]
-    # for i in range(1, boxes.shape[0]):
-    #     # compute IoU with valid boxes
-    #     # ious = iou_mask(boxes[i], boxes[valid,:], True, 32, is_degree=is_degree)
-    #     ious = iou_rle(boxes[i], boxes[valid,:], xywha=True, is_degree=is_degree,
-    #                   img_size=2048)
-    #     # the i'th BB is invalid if it is similar to any valid BB
-    #     if (ious >= nms_thres).any():
-    #         # if majority is not None:
-    #         #     # take down the votes for majority voting
-    #         #     vote_idx = torch.argmax(ious).item()
-    #         #     votes[vote_idx] += 1
-    #         continue
-    #     # else, this box is valid
-    #     valid[i] = True
-    #     # the votes number of the new candidate BB is 1 (it self)
-    #     votes.append(1)
-
-    # selected = detections[valid,:]
-    # if majority is None:
-    #     # standard NMS
-    #     return selected
-    # votes_valid = (torch.Tensor(votes) >= majority)
-    # return selected[votes_valid,:]
 
 
 def weights_init_normal(m):

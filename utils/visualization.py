@@ -64,39 +64,6 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
     # plt.imshow(im)
     # plt.show()
 
-# def draw_anns_on_np(im, annotations, draw_angle=False, color=(0,0,255)):
-#     '''
-#     im: image numpy array, shape(h,w,3), RGB
-#     annotations: list of dict, json format
-#     '''
-#     line_width = im.shape[0] // 500
-#     for ann in annotations:
-#         x, y, w, h, a = ann['bbox']
-#         _draw_xywha(im, x, y, w, h, a, color=color, linewidth=line_width)
-
-
-# def flow_to_rgb(flow, plt_show=False):
-#     '''
-#     Visualizing optical flow using a RGB image
-
-#     Args:
-#         flow: 2xHxW tensor, flow[0,...] is horizontal motion
-#     '''
-#     assert torch.is_tensor(flow) and flow.dim() == 3 and flow.shape[0] == 2
-
-#     flow = flow.cpu().numpy()
-#     mag, ang = cv2.cartToPolar(flow[0, ...], flow[1, ...], angleInDegrees=True)
-#     hsv = np.zeros((flow.shape[1],flow.shape[2],3), dtype=np.uint8)
-#     hsv[..., 0] = ang / 2
-#     hsv[..., 1] = mag
-#     hsv[..., 2] = 255
-#     rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-
-#     if plt_show:
-#         plt.imshow(rgb)
-#         plt.show()
-#     return rgb
-
 
 def tensor_to_npimg(tensor_img):
     tensor_img = tensor_img.squeeze()
