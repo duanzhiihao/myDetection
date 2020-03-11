@@ -240,6 +240,6 @@ if __name__ == '__main__':
                 np_img = np.array(eval_img)
                 dts.draw_on_np(np_img, class_map='COCO')
                 # visualization.draw_cocobb_on_np(np_img, dts)
-                np_img = cv2.resize(np_img, (512,512))
+                # np_img = cv2.resize(np_img, (512,512))
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()

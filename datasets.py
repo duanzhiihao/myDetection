@@ -149,7 +149,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         labels[:gt_num] = Utils.normalize_bbox(labels[:gt_num], self.img_size)
         if (labels[:,1:3] >= 1).any():
             print('Warning: some x,y in ground truth are greater than 1')
-            labels[:,1:3].clamp_(max=1-1e-8)
+        if (labels[:,1:3] < 0).any():
+            print('Warning: some x,y in ground truth are smaller than 0')
+        labels[:,1:3].clamp_(min=0, max=1-1e-8)
 
         # x,y,w,h: 0~1, angle: -90~90 degrees
         assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all()
