@@ -28,7 +28,7 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
     bboxes: rows of [class,x,y,w,h,conf]
     '''
     assert bboxes.dim() == 2 and bboxes.shape[1] >= 5
-    line_width = round(im.shape[0] / 200)
+    line_width = round(im.shape[0] / 300)
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_bold = im.shape[0] // 300
     for bb in bboxes:

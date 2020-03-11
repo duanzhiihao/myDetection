@@ -22,11 +22,11 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=1)
     # parser.add_argument('--img_norm', action='store_true')
 
+    parser.add_argument('--checkpoint', type=str)
+
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
     parser.add_argument('--res_max', type=int, default=640)
-
-    parser.add_argument('--checkpoint', type=str)
 
     parser.add_argument('--eval_interval', type=int, default=1000)
     parser.add_argument('--img_interval', type=int, default=500)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
             factor = 1.0
         elif i < 80000:
             factor = 0.5
-        elif i < 100000:
+        elif i < 160000:
             factor = 0.2
         elif i < 200000:
             factor = 0.1

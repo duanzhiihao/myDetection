@@ -15,31 +15,29 @@ def test_training():
     
     dataset = Dataset4ObjDet(img_dir=img_dir, json_path=ann_json, bb_format='x1y1wh',
                              img_size=512, augmentation=True,
-                             debug_mode=True)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, shuffle=True, 
+                             debug_mode=False)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, 
                             num_workers=0, pin_memory=True, drop_last=False)
     dataiterator = iter(dataloader)
 
-    for _ in range(100):
+    for _ in range(10):
         try:
             img, labels, img_id, _ = next(dataiterator)
         except StopIteration:
             dataiterator = iter(dataloader)
             img, labels, img_id, _ = next(dataiterator)  # load a batch
-        print(img_id)
-        img, labels = img.squeeze(), labels.squeeze(0)
-        # img = visUtils.tensor_to_npimg(img)
-        img = tvf.to_pil_image(img)
-        img = np.array(img)
-        plt.figure()
-        plt.imshow(img)
-        labels[:,1:5] *= img.shape[0]
-        gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
-        visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
-                                   print_dt=False)
-        plt.figure()
-        plt.imshow(img)
-        plt.show()
+        # print(img_id)
+        # img, labels = img.squeeze(), labels.squeeze(0)
+        # img = tvf.to_pil_image(img)
+        # img = np.array(img)
+        # labels[:,1:5] *= img.shape[0]
+        # gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
+        # visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
+        #                            print_dt=False)
+        # plt.figure(figsize=(8,8))
+        # plt.imshow(img)
+        # plt.show()
+        debug = 1
 
     debug = 1
     

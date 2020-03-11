@@ -2,7 +2,7 @@ import numpy as np
 import PIL.Image
 import random
 import torch
-import torchvision.transforms.functional as tnf
+import torchvision.transforms.functional as tvf
 
 
 def imread_pil(img_path):
@@ -24,15 +24,15 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
     pad_value: int
     aug: bool
     '''
-    assert isinstance(img, PIL.Image.Image)
+    assert isinstance(img, PIL.Image.Image) and img.mode == 'RGB'
     ori_h, ori_w = img.height, img.width
 
     # resize to target input size (usually smaller)
     resize_scale = target_size / max(ori_w,ori_h)
     if aug:
-        resize_scale = resize_scale * (0.8 + torch.rand(1).item()*0.2)
+        resize_scale = resize_scale * (0.75 + torch.rand(1).item()*0.2)
     nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
-    img = tnf.resize(img, (nopad_h,nopad_w))
+    img = tvf.resize(img, (nopad_h,nopad_w))
 
     # pad to square
     if aug:
@@ -45,7 +45,8 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
     right = target_size - nopad_w - left
     bottom = target_size - nopad_h - top
 
-    img = tnf.pad(img, padding=(left,top,right,bottom), fill=0)
+    fill_value = tuple([random.randint(0,255) for _ in range(3)]) if aug else 0
+    img = tvf.pad(img, padding=(left,top,right,bottom), fill=fill_value)
     # record the padding info
     img_tl = (left, top) # start of the true image
     img_wh = (nopad_w, nopad_h)

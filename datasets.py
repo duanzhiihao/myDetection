@@ -116,6 +116,11 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         for li, ann in enumerate(annotations):
             # if self.only_person and ann['category_id'] != 1:
             #     continue
+            if ann['bbox'][2]*ann['bbox'][3] <= 100:
+                # import matplotlib.pyplot as plt
+                # plt.imshow(np.array(img))
+                # plt.show()
+                continue
             labels[li,0] = self.catid2idx[ann['category_id']]
             labels[li,1:] = ann['bbox']
         # if self.only_person:
@@ -136,32 +141,35 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             # if np.random.rand() > 0.7:
             #     blur_func = random.choice(blur)
             #     img = blur_func(img)
-            if np.random.rand() > 0.6:
-                img = augUtils.add_gaussian(img, max_var=0.03)
+            # if np.random.rand() > 0.6:
+                # img = augUtils.add_gaussian(img, max_var=0.002)
             if np.random.rand() > 0.6:
                 img = augUtils.add_saltpepper(img, max_p=0.02)
 
         labels[:gt_num] = Utils.normalize_bbox(labels[:gt_num], self.img_size)
+        if (labels[:,1:3] >= 1).any():
+            print('Warning: some x,y in ground truth are greater than 1')
+            labels[:,1:3].clamp_(max=1-1e-8)
 
         # x,y,w,h: 0~1, angle: -90~90 degrees
+        assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all()
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
     def augment_PIL(self, img, labels):
-        if np.random.rand() > 0.4:
-            img = tvf.adjust_brightness(img, uniform(0.3,1.5))
-        if np.random.rand() > 0.7:
-            factor = 2 ** uniform(-1, 1)
-            img = tvf.adjust_contrast(img, factor) # 0.5 ~ 2
-        if np.random.rand() > 0.7:
-            img = tvf.adjust_hue(img, uniform(-0.1,0.1))
-        if np.random.rand() > 0.6:
+        if np.random.rand() > 0.5:
+            img = tvf.adjust_brightness(img, uniform(0.6, 1.4))
+        if np.random.rand() > 0.5:
+            img = tvf.adjust_contrast(img, uniform(0.5, 1.5))
+        if np.random.rand() > 0.5:
+            img = tvf.adjust_hue(img, uniform(-0.1, 0.1))
+        if np.random.rand() > 0.5:
             factor = uniform(0,2)
             if factor > 1:
                 factor = 1 + uniform(0, 2)
             img = tvf.adjust_saturation(img, factor) # 0 ~ 3
-        if np.random.rand() > 0.5:
-            img = tvf.adjust_gamma(img, uniform(0.5, 3))
+        # if np.random.rand() > 0.5:
+        #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
         # horizontal flip
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
