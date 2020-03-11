@@ -42,7 +42,7 @@ class ImageObjects():
     def __len__(self):
         return self.bboxes.shape[0]
     
-    def _cpu(self):
+    def cpu_(self):
         self.bboxes = self.bboxes.cpu()
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu()

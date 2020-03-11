@@ -102,7 +102,7 @@ class Detector():
             dts = self.model(input_.cuda())
 
         # post-processing
-        dts._cpu()
+        dts.cpu_()
         dts = dts[dts.scores >= conf_thres]
         if len(dts) > 1000:
             _, idx = torch.topk(dts.scores, k=1000)

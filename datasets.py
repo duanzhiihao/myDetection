@@ -154,7 +154,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         labels[:,1:3].clamp_(min=0, max=1-1e-8)
 
         # x,y,w,h: 0~1, angle: -90~90 degrees
-        assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all()
+        assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all(), print(labels)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
