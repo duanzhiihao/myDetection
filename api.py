@@ -10,6 +10,7 @@ from random import randint
 import torch
 import torchvision.transforms.functional as tvf
 
+from models.registry import name_to_model
 import utils.utils as Utils
 import utils.visualization as visUtils
 
@@ -17,45 +18,19 @@ import utils.visualization as visUtils
 class Detector():
     def __init__(self, model_name=None, weights_path=None, model=None, conf_thres=0.5):
         assert torch.cuda.is_available()
+
+        self.conf_thres = conf_thres
+
         if model:
             self.model = model
-        elif model_name == 'yolov3':
-            from models.yolov3 import YOLOv3
-            model = YOLOv3(class_num=80, backbone='dark53', img_norm=False)
+            return
         else:
-            raise Exception('Unknown model name')
+            model = name_to_model(model_name)
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print('Number of parameters:', total_params)
         if weights_path:
             model.load_state_dict(torch.load(weights_path)['model'])
         self.model = model.cuda()
-
-        self.conf_thres = conf_thres
-    
-    def detect_one(self, **kwargs): # img_path, test_aug=None, input_size=1024):
-        '''
-        object detection in one single image. Predict and show the results
-
-        Args:
-            (img_path: str) or (pil_img: PIL.Image)
-            visualize: bool, default: True
-            See _predict_pil() for optinal arguments
-        '''
-        self.model.eval()
-        if 'img_path' in kwargs:
-            img = Utils.imread_pil(kwargs['img_path'])
-        else:
-            assert 'pil_img' in kwargs
-            img = kwargs.pop('pil_img')
-
-        detections = self._predict_pil(img, **kwargs)
-
-        if kwargs.get('visualize', True):
-            np_img = np.array(img)
-            detections.draw_on_np(np_img, class_map='COCO', print_dt=True)
-            plt.imshow(np_img)
-            plt.show()
-        return detections
         
     def predict_imgDir(self, img_dir, **kwargs):
         '''
@@ -69,16 +44,45 @@ class Detector():
         img_names = os.listdir(img_dir)
         detection_json = []
         for imname in tqdm(img_names):
+            impath = os.path.join(img_dir, imname)
+            detections = self.detect_one(img_path=impath, **kwargs)
+
             assert imname[-4] == '.'
             img_id = int(imname[:-4]) if imname[:-4].isdigit() else imname[:-4]
-            impath = os.path.join(img_dir, imname)
-            img = Utils.imread_pil(impath)
-
-            detections = self._predict_pil(img, **kwargs)
             detection_json += detections.to_coco_json(img_id=img_id)
 
         return detection_json
-    
+
+    def detect_one(self, **kwargs): # img_path, test_aug=None, input_size=1024):
+        '''
+        object detection in one single image. Predict and show the results
+
+        Args:
+            (img_path: str) or (pil_img: PIL.Image)
+            return_img (default: False): bool
+            show_img (default: False): bool
+            See _predict_pil() for more optinal arguments
+        '''
+        self.model.eval()
+        if 'img_path' in kwargs:
+            img = Utils.imread_pil(kwargs['img_path'])
+        else:
+            assert 'pil_img' in kwargs
+            img = kwargs.pop('pil_img')
+
+        detections = self._predict_pil(img, **kwargs)
+
+        if kwargs.get('return_img', False):
+            np_img = np.array(img)
+            detections.draw_on_np(np_img, class_map='COCO', print_dt=False)
+            return np_img
+        if kwargs.get('show_img', False):
+            np_img = np.array(img)
+            detections.draw_on_np(np_img, class_map='COCO', print_dt=True)
+            plt.imshow(np_img)
+            plt.show()
+        return detections
+
     def _predict_pil(self, pil_img, **kwargs):
         '''
         Args:

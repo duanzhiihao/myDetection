@@ -43,7 +43,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
         if debug_mode:
             # self.img_ids = self.img_ids[0:1]
-            self.img_ids = [383384]
+            self.img_ids = [222639]
             print(f"debug mode..., only train on one image: {self.img_ids[0]}")
 
     def load_json(self, json_path, bb_format):
@@ -110,10 +110,10 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
         # load the annotations for this image
         annotations = self.imgid2anns[img_id]
-        gt_num = len(annotations)
         # labels shape(100, 5), 5 = [category, x, y, w, h]
         labels = torch.zeros(self.max_obj_per_img, 5)
-        for li, ann in enumerate(annotations):
+        gt_num = 0
+        for _, ann in enumerate(annotations):
             # if self.only_person and ann['category_id'] != 1:
             #     continue
             if ann['bbox'][2]*ann['bbox'][3] <= 100:
@@ -121,8 +121,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # plt.imshow(np.array(img))
                 # plt.show()
                 continue
-            labels[li,0] = self.catid2idx[ann['category_id']]
-            labels[li,1:] = ann['bbox']
+            labels[gt_num,0] = self.catid2idx[ann['category_id']]
+            labels[gt_num,1:] = ann['bbox']
+            gt_num += 1
         # if self.only_person:
         #     assert (labels[:,0] == 0).all()
 
@@ -147,11 +148,13 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 img = augUtils.add_saltpepper(img, max_p=0.02)
 
         labels[:gt_num] = Utils.normalize_bbox(labels[:gt_num], self.img_size)
-        if (labels[:,1:3] >= 1).any():
+        if (labels[:,1:5] >= 1).any():
             print('Warning: some x,y in ground truth are greater than 1')
-        if (labels[:,1:3] < 0).any():
+            print('image path:', img_path)
+        if (labels[:,1:5] < 0).any():
             print('Warning: some x,y in ground truth are smaller than 0')
-        labels[:,1:3].clamp_(min=0, max=1-1e-8)
+            print('image path:', img_path)
+        labels[:,1:5].clamp_(min=0, max=1-1e-8)
 
         # x,y,w,h: 0~1, angle: -90~90 degrees
         assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all(), print(labels)

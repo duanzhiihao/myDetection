@@ -9,24 +9,42 @@ from PIL import Image
 import numpy as np
 import cv2
 
+from models.registry import name_to_model
 from datasets import Dataset4ObjDet
 from utils import timer, visualization
 import api
 
 
-def parse_args():
+# Learning rate setup
+def lr_schedule_func(i):
+    warm_up = 1000
+    if i < warm_up:
+        factor = i / warm_up
+    elif i < 40000:
+        factor = 1.0
+    elif i < 80000:
+        factor = 0.5
+    elif i < 160000:
+        factor = 0.2
+    elif i < 200000:
+        factor = 0.1
+    else:
+        factor = 0.01
+    return factor
+
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='yolov3')
-    parser.add_argument('--backbone', type=str, default='dark53')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
     # parser.add_argument('--img_norm', action='store_true')
 
     parser.add_argument('--checkpoint', type=str)
 
-    parser.add_argument('--resolution', type=int, default=512)
-    parser.add_argument('--res_min', type=int, default=384)
-    parser.add_argument('--res_max', type=int, default=640)
+    parser.add_argument('--resolution', type=int, default=320)
+    parser.add_argument('--res_min', type=int, default=320)
+    parser.add_argument('--res_max', type=int, default=320)
 
     parser.add_argument('--eval_interval', type=int, default=1000)
     parser.add_argument('--img_interval', type=int, default=500)
@@ -34,15 +52,11 @@ def parse_args():
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     
     parser.add_argument('--debug', action='store_true') # default=True)
-    return parser.parse_args()
-
-
-if __name__ == '__main__':
-    args = parse_args()
+    args = parser.parse_args()
     assert torch.cuda.is_available()
     # -------------------------- settings ---------------------------
     target_size = round(args.resolution / 128) * 128
-    job_name = f'{args.model}_{args.backbone}_{args.dataset}{target_size}'
+    job_name = f'{args.model}_{args.dataset}{target_size}'
     # multi-scale training setting
     enable_aug = True
     multiscale = True
@@ -55,25 +69,7 @@ if __name__ == '__main__':
     # optimizer setting
     decay_SGD = 0.0005 * batch_size * subdivision
     lr_SGD = 0.001 / batch_size / subdivision
-    # Learning rate setup
-    def lr_schedule_func(i):
-        warm_up = 1000
-        if i < warm_up:
-            factor = i / warm_up
-        elif i < 40000:
-            factor = 1.0
-        elif i < 80000:
-            factor = 0.5
-        elif i < 160000:
-            factor = 0.2
-        elif i < 200000:
-            factor = 0.1
-        else:
-            factor = 0.01
-        return factor
-    # dataset setting
-    # only_person = False if args.model == 'Hitachi80' else True
-    # print('Only train on person images and object:', only_person)
+    # Dataset setting
     if args.dataset == 'COCO':
         import sys
         import json
@@ -111,16 +107,11 @@ if __name__ == '__main__':
                             num_workers=num_cpu, pin_memory=True, drop_last=False)
     dataiterator = iter(dataloader)
     
-    eval_img_names = os.listdir('./images/')
+    eval_img_names = [s for s in os.listdir('./images/') if s.endswith('.jpg')]
     eval_img_paths = [os.path.join('./images/',s) for s in eval_img_names]
 
     print('Initialing model...')
-    if args.model == 'yolov3':
-        from models.yolov3 import YOLOv3
-        model = YOLOv3(backbone=args.backbone, img_norm=False)
-    else:
-        raise Exception('Unknown madel name')
-    
+    model = name_to_model(args.model)
     model = model.cuda()
     model.train()
 
@@ -133,6 +124,7 @@ if __name__ == '__main__':
         start_iter = previous_state['iter'] + 1
         print(f'Start from iteration: {start_iter}')
 
+    print('Initialing tensorboard SummaryWriter...')
     logger = SummaryWriter(f'./logs/{job_name}')
 
     # optimizer setup
@@ -234,12 +226,7 @@ if __name__ == '__main__':
         if iter_i > 0 and iter_i % args.img_interval == 0:
             for impath in eval_img_paths:
                 model_eval = api.Detector(model=model)
-                eval_img = Image.open(impath)
-                dts = model_eval.detect_one(pil_img=eval_img, input_size=target_size,
-                                            conf_thres=0.1, visualize=False)
-                np_img = np.array(eval_img)
-                dts.draw_on_np(np_img, class_map='COCO')
-                # visualization.draw_cocobb_on_np(np_img, dts)
-                # np_img = cv2.resize(np_img, (512,512))
+                np_img = model_eval.detect_one(img_path=impath, return_img=True,
+                                            input_size=target_size, conf_thres=0.3)
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()

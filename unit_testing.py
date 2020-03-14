@@ -8,14 +8,14 @@ def test_training():
     import utils.visualization as visUtils
     from datasets import Dataset4ObjDet
     import torchvision.transforms.functional as tvf
-    # img_dir = '../COCO/train2017'
-    # ann_json = '../COCO/annotations/instances_train2017.json'
-    img_dir = '../COCO/val2017'
-    ann_json = '../COCO/annotations/instances_val2017.json'
+    img_dir = '../COCO/train2017'
+    ann_json = '../COCO/annotations/instances_train2017.json'
+    # img_dir = '../COCO/val2017'
+    # ann_json = '../COCO/annotations/instances_val2017.json'
     
     dataset = Dataset4ObjDet(img_dir=img_dir, json_path=ann_json, bb_format='x1y1wh',
                              img_size=512, augmentation=True,
-                             debug_mode=False)
+                             debug_mode=True)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, 
                             num_workers=0, pin_memory=True, drop_last=False)
     dataiterator = iter(dataloader)
@@ -27,16 +27,16 @@ def test_training():
             dataiterator = iter(dataloader)
             img, labels, img_id, _ = next(dataiterator)  # load a batch
         # print(img_id)
-        # img, labels = img.squeeze(), labels.squeeze(0)
-        # img = tvf.to_pil_image(img)
-        # img = np.array(img)
-        # labels[:,1:5] *= img.shape[0]
-        # gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
-        # visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
-        #                            print_dt=False)
-        # plt.figure(figsize=(8,8))
-        # plt.imshow(img)
-        # plt.show()
+        img, labels = img.squeeze(), labels.squeeze(0)
+        img = tvf.to_pil_image(img)
+        img = np.array(img)
+        labels[:,1:5] *= img.shape[0]
+        gt_num = (labels[:,:4].squeeze().sum(dim=1) > 0).sum().item()
+        visUtils.draw_cocobb_on_np(img, labels[:gt_num,:], bb_type='gtbb',
+                                   print_dt=False)
+        plt.figure(figsize=(8,8))
+        plt.imshow(img)
+        plt.show()
         debug = 1
 
     debug = 1
