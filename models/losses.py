@@ -122,7 +122,7 @@ class FocalBCE(nn.Module):
         return focal_loss
 
 
-def smooth_L1_loss(pred, target, beta, weight=None, reduction='mean'):
+def smooth_L1_loss(pred, target, beta=1, weight=None, reduction='none'):
     '''
     Smooth L1 Loss. Original: https://github.com/facebookresearch/fvcore
     '''
@@ -145,6 +145,8 @@ def smooth_L1_loss(pred, target, beta, weight=None, reduction='mean'):
 
 def iou_loss(pred, target, iou_type='giou', reduction='mean'):
     '''
+    Original: https://github.com/tianzhi0549/FCOS
+
     Args:
         iou_type: str, default: 'giou'
     '''
@@ -203,38 +205,40 @@ def reduction_none(loss):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     
-    lossfunc = FocalBCE(reduction='none')
+    # lossfunc = FocalBCE(reduction='none')
     # lossfunc = bcel2bce(reduction='none')
+    lossfunc = smooth_L1_loss
 
     x = torch.linspace(-10, 10, steps=10001, requires_grad=True)
-    out = torch.sigmoid(x)
-    # x = torch.linspace(0, 1, steps=1001, requires_grad=True)
+    # out = torch.sigmoid(x)
+    out = x
+    
     loss = lossfunc(out,torch.zeros_like(x))
     loss.sum().backward()
     dx = x.grad.detach().numpy()
 
-    x2 = torch.linspace(-10, 10, steps=10001, requires_grad=True)
-    out2 = torch.sigmoid(x2)
-    # x = torch.linspace(0, 1, steps=1001, requires_grad=True)
-    loss_bce = F.binary_cross_entropy(out2,torch.zeros_like(x), reduction='none')
-    loss_bce.sum().backward()
-    dx_bce = x2.grad.detach().numpy()
+    # x2 = torch.linspace(-10, 10, steps=10001, requires_grad=True)
+    # out2 = torch.sigmoid(x2)
+    # # x = torch.linspace(0, 1, steps=1001, requires_grad=True)
+    # loss_bce = F.binary_cross_entropy(out2,torch.zeros_like(x), reduction='none')
+    # loss_bce.sum().backward()
+    # dx_bce = x2.grad.detach().numpy()
 
     # dx[dx >= (np.pi/2)**2] = np.inf
     x = x.detach().numpy()
     plt.figure()
-    plt.plot(x, loss_bce.detach().numpy(), label='BCE')
-    plt.plot(x, loss.detach().numpy(), label='Focal BCE')
-    plt.plot(x, dx, linestyle='--', label='derivative of Focal loss')
-    plt.plot(x, dx_bce, linestyle='--', label='derivative of BCE')
+    # plt.plot(x, loss_bce.detach().numpy(), label='BCE')
+    plt.plot(x, loss.detach().numpy(), label='Loss')
+    plt.plot(x, dx, linestyle='--', label='Derivative')
+    # plt.plot(x, dx_bce, linestyle='--', label='derivative of BCE')
     # plt.vlines(0,-10,10)
     plt.legend()
-    plt.ylim((-5,5))
+    plt.ylim((-8,8))
     # plt.xticks(np.arange(-2*np.pi, 3*np.pi, 0.5*np.pi), rotation=0)
     plt.xticks(np.arange(-10, 10, 1), rotation=0)
     # plt.xticks(np.arange(0,1.1,0.2))
     plt.grid(linestyle=':')
-    plt.xlabel('Predicted probability when ground truth = 1')
+    # plt.xlabel('Predicted probability when ground truth = 1')
     plt.ylabel('Loss')
     plt.title('Loss functions')
 
