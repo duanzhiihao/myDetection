@@ -81,14 +81,14 @@ class Darknet53(nn.Module):
     def forward(self, x):
         for i in range(0,15):
             x = self.netlist[i](x)
-        p3 = x
+        c3 = x
         for i in range(15,24):
             x = self.netlist[i](x)
-        p4 = x
+        c4 = x
         for i in range(24,29):
             x = self.netlist[i](x)
-        p5 = x
-        return [p3,p4,p5]
+        c5 = x
+        return [c3,c4,c5]
 
 
 class ResNetBackbone(nn.Module):
@@ -184,28 +184,3 @@ def efficient_feature_info(model_name):
         'efficientnet-b8': (88, 248, 2816)
     }
     return feature_dict[model_name]
-
-
-# def _xy2radius(prediction, return_degree=True):
-#     '''
-#     use x,y coordinates in normalized image to calculate reference angle \
-#     regarding to the image center.
-
-#     Args:
-#         prediction: torch.tensor, the last dimension should be [x,y,something]
-    
-#     Return:
-#         reference: torch.tensor, same shape with xs and ys, degree
-#     '''
-#     assert return_degree == True
-#     assert prediction.shape[-1] >= 2
-#     xs = prediction[..., 0] - 0.5
-#     ys = -(prediction[..., 1] - 0.5)
-#     reference = torch.atan(xs/ys) / np.pi * 180 # -90 ~ 90
-
-#     if torch.isnan(reference).any():
-#         print('warning: some of reference angle is nan')
-#         reference[torch.isnan(reference)] = 0
-#     assert not torch.isinf(reference).any()
-
-#     return reference
