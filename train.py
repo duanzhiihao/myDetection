@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--print_interval', type=int, default=1)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     
-    parser.add_argument('--debug', action='store_true') # default=True)
+    # parser.add_argument('--debug', action='store_true') # default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     # -------------------------- settings ---------------------------
@@ -65,10 +65,10 @@ def main():
         valjson = '../COCO/annotations/instances_val2017.json'
     
     print('Initialing training set...')
-    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=args.res_max, 
-                             augmentation=enable_aug, debug_mode=args.debug)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
-                            num_workers=num_cpu, pin_memory=True, drop_last=False)
+    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh',
+                             img_size=args.res_max, augmentation=enable_aug)
+    dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=num_cpu,
+                            collate_fn=Dataset4ObjDet.collate_func, pin_memory=True)
     dataiterator = iter(dataloader)
     
     eval_img_names = [s for s in os.listdir('./images/') if s.endswith('.jpg')]
