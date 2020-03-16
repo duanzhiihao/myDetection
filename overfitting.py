@@ -13,7 +13,8 @@ import api
 
 if __name__ == '__main__':
     # -------------------------- settings ---------------------------
-    model_name = 'yolov3'
+    model_name = 'yv3_ltrb'
+    # model_name = 'yv3_ltrb'
     target_size = 512
     batch_size = 1
     subdivision = 1
