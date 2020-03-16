@@ -7,8 +7,8 @@ import torch.nn.functional as tnf
 import torchvision.transforms.functional as tvf
 
 import models.backbones, models.fpns
+import models.losses as lossLib
 from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
-from models.losses import iou_loss
 from utils.iou_funcs import bboxes_iou
 from utils.structures import ImageObjects
 # from utils.timer import contexttimer
@@ -55,11 +55,11 @@ class YOLOv3(nn.Module):
         elif pred_layer_name == 'FCOS':
             pred_layer = FCOSLayer
         self.yolo_S = pred_layer(self.anchors_all, self.index_S, class_num,
-                                 stride=8)
+                                 stride=8, **kwargs)
         self.yolo_M = pred_layer(self.anchors_all, self.index_M, class_num,
-                                 stride=16)
+                                 stride=16, **kwargs)
         self.yolo_L = pred_layer(self.anchors_all, self.index_L, class_num,
-                                 stride=32)
+                                 stride=32, **kwargs)
 
         self.time_dic = defaultdict(float)
 
@@ -318,11 +318,7 @@ class FCOSLayer(nn.Module):
         self.stride = kwargs['stride']
 
         self.ignore_thre = 0.6
-        # self.loss4bbox = iou_loss
-        # self.loss4bbox = tnf.mse_loss
-        # self.loss4bbox = tnf.l1_loss
-        # self.loss4conf = FocalBCE(reduction='sum')
-        # self.loss4conf = nn.BCELoss(reduction='sum')
+        self.ltrb_setting = kwargs.get('ltrb', 'exp_l2')
 
         self.time_dic = defaultdict(float)
 
@@ -349,18 +345,29 @@ class FCOSLayer(nn.Module):
         raw = raw.permute(0, 1, 3, 4, 2).contiguous()
         # Now raw.shape is (nB, nA, nG, nG, nCH), where the last demension is
         # (x,y,w,h,conf,categories)
+        if self.ltrb_setting.startswith('relu'):
+            # ReLU activation
+            tnf.relu(raw[..., 0:4], inplace=True)
 
         # ----------------------- logits to prediction -----------------------
         preds = raw.detach().clone()
         # left, top, right, bottom
         anch_w = self.anchors[:,0].view(1,nA,1,1).to(device=device)
         anch_h = self.anchors[:,1].view(1,nA,1,1).to(device=device)
-        preds[...,0] = torch.exp(preds[...,0]) * anch_w # unnormalized
-        preds[...,1] = torch.exp(preds[...,1]) * anch_h # unnormalized
-        preds[...,2] = torch.exp(preds[...,2]) * anch_w # unnormalized
-        preds[...,3] = torch.exp(preds[...,3]) * anch_h # unnormalized
-        preds[...,0:4].clamp_(min=0, max=img_size)
-        preds[...,0:4] = _ltrb_to_xywh(preds[...,0:4], nG, self.stride) # xywh
+        if self.ltrb_setting.startswith('exp'):
+            preds[...,0] = torch.exp(preds[...,0]) * anch_w # unnormalized
+            preds[...,1] = torch.exp(preds[...,1]) * anch_h # unnormalized
+            preds[...,2] = torch.exp(preds[...,2]) * anch_w # unnormalized
+            preds[...,3] = torch.exp(preds[...,3]) * anch_h # unnormalized
+        elif self.ltrb_setting.startswith('relu'):
+            preds[...,0] = preds[...,0] * anch_w # unnormalized
+            preds[...,1] = preds[...,1] * anch_h # unnormalized
+            preds[...,2] = preds[...,2] * anch_w # unnormalized
+            preds[...,3] = preds[...,3] * anch_h # unnormalized
+        else:
+            raise Exception('Unknown ltrb setting')
+        preds[..., 0:4].clamp_(min=0, max=img_size)
+        preds[..., 0:4] = _ltrb_to_xywh(preds[..., 0:4], nG, self.stride) # xywh
         # confidence
         preds[..., 4] = torch.sigmoid(preds[..., 4])
         # categories
@@ -419,13 +426,21 @@ class FCOSLayer(nn.Module):
             grid_ty = gt_xywh[:,1] / self.stride
             ti, tj = grid_tx.long(), grid_ty.long()
             tn = best_n[valid_mask] # target anchor box number
+            anch_w = self.anchors[tn,0]
+            anch_h = self.anchors[tn,1]
             
             conf_loss_mask[b,tn,tj,ti] = 1
             gt_mask[b,tn,tj,ti] = 1
-            target[b,tn,tj,ti,0] = torch.log(gt_ltrb[:,0]/self.anchors[tn,0] + 1e-8)
-            target[b,tn,tj,ti,1] = torch.log(gt_ltrb[:,1]/self.anchors[tn,1] + 1e-8)
-            target[b,tn,tj,ti,2] = torch.log(gt_ltrb[:,2]/self.anchors[tn,0] + 1e-8)
-            target[b,tn,tj,ti,3] = torch.log(gt_ltrb[:,3]/self.anchors[tn,1] + 1e-8)
+            if self.ltrb_setting.startswith('exp'):
+                target[b,tn,tj,ti,0] = torch.log(gt_ltrb[:,0] / anch_w + 1e-8)
+                target[b,tn,tj,ti,1] = torch.log(gt_ltrb[:,1] / anch_h + 1e-8)
+                target[b,tn,tj,ti,2] = torch.log(gt_ltrb[:,2] / anch_w + 1e-8)
+                target[b,tn,tj,ti,3] = torch.log(gt_ltrb[:,3] / anch_h + 1e-8)
+            elif self.ltrb_setting.startswith('relu'):
+                target[b,tn,tj,ti,0] = gt_ltrb[:,0] / anch_w
+                target[b,tn,tj,ti,1] = gt_ltrb[:,1] / anch_h
+                target[b,tn,tj,ti,2] = gt_ltrb[:,2] / anch_w
+                target[b,tn,tj,ti,3] = gt_ltrb[:,3] / anch_h
             target[b,tn,tj,ti,4] = 1 # objectness confidence
             if self.n_cls > 0:
                 target[b, tn, tj, ti, 5 + gt_cls] = 1
@@ -435,13 +450,24 @@ class FCOSLayer(nn.Module):
         # move the tagerts to GPU
         gt_mask = gt_mask.to(device=device)
         conf_loss_mask = conf_loss_mask.to(device=device)
-        weighted = weighted.unsqueeze(-1).to(device=device)
+        weighted = weighted.unsqueeze(-1).to(device=device)[gt_mask]
         target = target.to(device=device)
 
         bce_logits = tnf.binary_cross_entropy_with_logits
-        # weighted squared error for w,h
-        loss_bbox = (raw[...,0:4][gt_mask] - target[...,0:4][gt_mask]).pow(2)
-        loss_bbox = (weighted[gt_mask] * loss_bbox).sum()
+        p_ltrb, target_ltrb = raw[...,0:4][gt_mask], target[...,0:4][gt_mask]
+        if self.ltrb_setting.endswith('l2'):
+            # weighted squared error for l,t,r,b
+            loss_bbox = (p_ltrb - target_ltrb).pow(2)
+            loss_bbox = 0.5 * (weighted * loss_bbox).sum()
+        elif self.ltrb_setting.endswith('sl1'):
+            # weighted smooth L1 loss for l,t,r,b
+            loss_bbox = lossLib.smooth_L1_loss(p_ltrb, target_ltrb, beta=1, 
+                                               weight=weighted, reduction='sum')
+        elif self.ltrb_setting.endswith('giou'):
+            loss_bbox = lossLib.iou_loss(p_ltrb, target_ltrb, iou_type='giou', 
+                                         reduction='sum')
+        else:
+            raise Exception('Unknown loss')
         loss_conf = bce_logits(raw[...,4][conf_loss_mask],
                                target[...,4][conf_loss_mask], reduction='sum')
         if self.n_cls > 0:
@@ -449,7 +475,7 @@ class FCOSLayer(nn.Module):
                                   reduction='sum')
         else:
             loss_cls = 0
-        loss = 0.5*loss_bbox + loss_conf + loss_cls
+        loss = loss_bbox + loss_conf + loss_cls
 
         # logging
         ngt = valid_gt_num + 1e-16

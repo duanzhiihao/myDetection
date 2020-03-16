@@ -122,11 +122,33 @@ class FocalBCE(nn.Module):
         return focal_loss
 
 
+def smooth_L1_loss(pred, target, beta, weight=None, reduction='mean'):
+    '''
+    Smooth L1 Loss. Original: https://github.com/facebookresearch/fvcore
+    '''
+    assert beta > 1e-5, 'If beta is smaller than 1e-5, use L1 instead'
+    err = torch.abs(pred - target)
+    loss = torch.where(err < beta, 0.5*err.pow(2)/beta, err - 0.5*beta)
+    if weight is not None:
+        loss = weight * loss
+
+    if reduction == 'sum':
+        loss = loss.sum()
+    elif reduction == 'mean':
+        loss = loss.mean()
+    elif reduction == 'none':
+        pass
+    else:
+        raise Exception('Unknown reduction')
+    return loss
+
+
 def iou_loss(pred, target, iou_type='giou', reduction='mean'):
     '''
     Args:
         iou_type: str, default: 'giou'
     '''
+    raise Exception('Deprecated')
     assert pred.shape == target.shape
     assert pred.requires_grad and (not target.requires_grad)
     p_left = pred[..., 0] # left
@@ -146,9 +168,11 @@ def iou_loss(pred, target, iou_type='giou', reduction='mean'):
     h_intersect = torch.min(p_bottom, gt_bottom) + torch.min(p_top, gt_top)
     intersect = w_intersect * h_intersect
     union = target_area + pred_area - intersect
-    ious = (intersect.clamp(min=0) + 1e-6) / (union.clamp(min=0) + 1e-4)
+    ious = (intersect + 1) / (union + 1)
     if iou_type == 'iou':
         losses = -torch.log(ious)
+    if iou_type == 'linear_iou':
+        losses = 1 - ious
     elif iou_type == 'giou':
         G_w = torch.max(p_left, gt_left) + torch.max(p_right, gt_right)
         G_h = torch.max(p_bottom, gt_bottom) + torch.max(p_top, gt_top)
@@ -213,7 +237,5 @@ if __name__ == "__main__":
     plt.xlabel('Predicted probability when ground truth = 1')
     plt.ylabel('Loss')
     plt.title('Loss functions')
-
-
 
     plt.show()

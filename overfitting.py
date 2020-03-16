@@ -12,11 +12,12 @@ import api
 
 
 if __name__ == '__main__':
+    torch.autograd.set_detect_anomaly(True)
     # -------------------------- settings ---------------------------
-    model_name = 'yv3_ltrb'
+    model_name = 'yv3_ltrb_sl1'
     # model_name = 'yv3_ltrb'
     target_size = 512
-    batch_size = 2
+    batch_size = 1
     subdivision = 1
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
@@ -24,13 +25,13 @@ if __name__ == '__main__':
     lr_SGD = 0.0001 / batch_size / subdivision
     # Dataset setting
     train_img_dir = '../COCO/val2017/'
-    train_json = '../COCO/annotations/debug3.json'
+    train_json = '../COCO/annotations/debug1.json'
     
     print('Initialing training set...')
     dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=target_size, 
                              augmentation=False, debug_mode=False)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
-            collate_fn=Dataset4ObjDet.collate_func, num_workers=2, pin_memory=True)
+            collate_fn=Dataset4ObjDet.collate_func, num_workers=0, pin_memory=True)
     dataiterator = iter(dataloader)
 
     print('Initialing model...')
