@@ -172,8 +172,8 @@ def main():
             Rmin, Rmax = round(args.res_min / 128), round(args.res_max / 128)
             imgsize = random.randint(Rmin, Rmax) * 128
             dataset.img_size = imgsize
-            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True,
-                                num_workers=num_cpu, pin_memory=True, drop_last=False)
+            dataloader = DataLoader(dataset, batch_size, True, num_workers=num_cpu,
+                            collate_fn=Dataset4ObjDet.collate_func, pin_memory=True)
             dataiterator = iter(dataloader)
 
         # save checkpoint
