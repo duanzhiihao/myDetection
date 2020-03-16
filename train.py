@@ -9,31 +9,19 @@ from PIL import Image
 import numpy as np
 import cv2
 
+import sys
+import json
+from io import StringIO
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+
 from models.registry import name_to_model
 from datasets import Dataset4ObjDet
 from utils import timer, visualization
 import api
 
 
-# Learning rate setup
-def lr_schedule_func(i):
-    warm_up = 1000
-    if i < warm_up:
-        factor = i / warm_up
-    elif i < 40000:
-        factor = 1.0
-    elif i < 80000:
-        factor = 0.5
-    elif i < 160000:
-        factor = 0.2
-    elif i < 200000:
-        factor = 0.1
-    else:
-        factor = 0.01
-    return factor
-
-
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='yolov3')
     parser.add_argument('--dataset', type=str, default='COCO')
@@ -42,9 +30,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--checkpoint', type=str)
 
-    parser.add_argument('--resolution', type=int, default=320)
-    parser.add_argument('--res_min', type=int, default=320)
-    parser.add_argument('--res_max', type=int, default=320)
+    parser.add_argument('--resolution', type=int, default=512)
+    parser.add_argument('--res_min', type=int, default=384)
+    parser.add_argument('--res_max', type=int, default=640)
 
     parser.add_argument('--eval_interval', type=int, default=1000)
     parser.add_argument('--img_interval', type=int, default=500)
@@ -71,34 +59,10 @@ if __name__ == '__main__':
     lr_SGD = 0.001 / batch_size / subdivision
     # Dataset setting
     if args.dataset == 'COCO':
-        import sys
-        import json
-        from io import StringIO
-        from pycocotools.coco import COCO
-        from pycocotools.cocoeval import COCOeval
         train_img_dir = '../COCO/train2017/'
         train_json = '../COCO/annotations/instances_train2017.json'
         val_img_dir = '../COCO/val2017/'
         valjson = '../COCO/annotations/instances_val2017.json'
-        def evaluate_json(dts_json):
-            json.dump(dts_json, open('./tmp.json','w'), indent=1)
-            print('Initialing validation set...')
-            cocoGt = COCO(valjson)
-            cocoDt = cocoGt.loadRes('./tmp.json')
-            cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
-            cocoEval.evaluate()
-            cocoEval.accumulate()
-            # have to manually get the evaluation string 
-            stdout = sys.stdout
-            s = StringIO()
-            sys.stdout = s
-            cocoEval.summarize()
-            sys.stdout = stdout
-            s.seek(0)
-            s = s.read()
-            print(s)
-            ap, ap50, ap75 = cocoEval.stats[0], cocoEval.stats[1], cocoEval.stats[2]
-            return s, ap, ap50, ap75
     
     print('Initialing training set...')
     dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=args.res_max, 
@@ -153,7 +117,7 @@ if __name__ == '__main__':
                 model_eval = api.Detector(model=model)
                 dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
                                                 conf_thres=0.005)
-                eval_str, ap, ap50, ap75 = evaluate_json(dts)
+                eval_str, ap, ap50, ap75 = evaluate_json(dts, valjson)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
             s += eval_str + '\n\n'
@@ -230,3 +194,46 @@ if __name__ == '__main__':
                                             input_size=target_size, conf_thres=0.3)
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
+
+
+# Learning rate setup
+def lr_schedule_func(i):
+    warm_up = 1000
+    if i < warm_up:
+        factor = i / warm_up
+    elif i < 40000:
+        factor = 1.0
+    elif i < 80000:
+        factor = 0.5
+    elif i < 160000:
+        factor = 0.2
+    elif i < 200000:
+        factor = 0.1
+    else:
+        factor = 0.01
+    return factor
+
+
+def evaluate_json(dts_json, valjson):
+    json.dump(dts_json, open('./tmp.json','w'), indent=1)
+    print('Initialing validation set...')
+    cocoGt = COCO(valjson)
+    cocoDt = cocoGt.loadRes('./tmp.json')
+    cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
+    cocoEval.evaluate()
+    cocoEval.accumulate()
+    # have to manually get the evaluation string 
+    stdout = sys.stdout
+    s = StringIO()
+    sys.stdout = s
+    cocoEval.summarize()
+    sys.stdout = stdout
+    s.seek(0)
+    s = s.read()
+    print(s)
+    ap, ap50, ap75 = cocoEval.stats[0], cocoEval.stats[1], cocoEval.stats[2]
+    return s, ap, ap50, ap75
+
+
+if __name__ == "__main__":
+    main()

@@ -6,6 +6,7 @@ weights/
 logs/
 images/
 results/
+deprecated/
 
 .vscode
 .DS_Store

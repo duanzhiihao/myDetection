@@ -30,7 +30,8 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
     assert bboxes.dim() == 2 and bboxes.shape[1] >= 5
     line_width = round(im.shape[0] / 300)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_bold = im.shape[0] // 300
+    font_scale = im.shape[0] * im.shape[1] / (700*700)
+    font_bold = im.shape[0] // 400
     for bb in bboxes:
         if bb_type == 'gtbb':
             # ground truth BB

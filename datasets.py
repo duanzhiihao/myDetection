@@ -54,6 +54,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         with open(json_path, 'r') as f:
             json_data = json.load(f)
 
+        catgys = json_data['categories']
+        self.catid2idx = dict([(cat['id'],idx) for idx,cat in enumerate(catgys)])
+
         for ann in json_data['annotations']:
             # get width and height
             if bb_format == 'x1y1wh':
@@ -65,7 +68,8 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 assert len(ann['bbox']) == 4
             else:
                 raise Exception('Bounding box format not supported')
-            ann['bbox'] = torch.Tensor(ann['bbox'])
+            cat_id = self.catid2idx[ann['category_id']]
+            ann['gt'] = torch.Tensor([cat_id] + ann['bbox'])
             self.imgid2anns[ann['image_id']].append(ann)
 
         for img in json_data['images']:
@@ -85,9 +89,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             # otherwise, keep all 80 classes
             self.img_ids.append(img_id)
             self.imgid2info[img['id']] = img
-
-        catgys = json_data['categories']
-        self.catid2idx = dict([(cat['id'],idx) for idx,cat in enumerate(catgys)])
         debug = 1
 
     def __len__(self):
@@ -106,14 +107,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img_path = os.path.join(self.img_dir, img_name)
         img = Utils.imread_pil(img_path)
         ori_w, ori_h = img.width, img.height
-        # now img is a tensor with shape (3,h,w)
 
-        # load the annotations for this image
-        annotations = self.imgid2anns[img_id]
-        # labels shape(100, 5), 5 = [category, x, y, w, h]
-        labels = torch.zeros(self.max_obj_per_img, 5)
-        gt_num = 0
-        for _, ann in enumerate(annotations):
+        labels = []
+        for _, ann in enumerate(self.imgid2anns[img_id]):
             # if self.only_person and ann['category_id'] != 1:
             #     continue
             if ann['bbox'][2]*ann['bbox'][3] <= 100:
@@ -121,21 +117,22 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # plt.imshow(np.array(img))
                 # plt.show()
                 continue
-            labels[gt_num,0] = self.catid2idx[ann['category_id']]
-            labels[gt_num,1:] = ann['bbox']
-            gt_num += 1
+            labels.append(ann['gt'])
         # if self.only_person:
         #     assert (labels[:,0] == 0).all()
+        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
+        # each row of labels is [category, x, y, w, h]
 
         # augmentation
         if self.enable_aug:
-            img, labels[:gt_num] = self.augment_PIL(img, labels[:gt_num])
+            img, labels = self.augment_PIL(img, labels)
 
         # pad to square
-        img, labels[:gt_num], pad_info = Utils.rect_to_square(img, labels[:gt_num],
-                            self.img_size, pad_value=0, aug=self.enable_aug)
+        img, labels, pad_info = Utils.rect_to_square(img, labels, self.img_size,
+                                        pad_value=0, aug=self.enable_aug)
 
         img = tvf.to_tensor(img)
+        # now img is a tensor with shape (3,h,w)
         if self.enable_aug:
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
             #         augUtils.random_gaussian_filter]
@@ -147,17 +144,16 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             if np.random.rand() > 0.6:
                 img = augUtils.add_saltpepper(img, max_p=0.02)
 
-        labels[:gt_num] = Utils.normalize_bbox(labels[:gt_num], self.img_size)
-        if (labels[:,1:5] >= 1).any():
+        # labels = Utils.normalize_bbox(labels, self.img_size)
+        if (labels[:,1:5] >= self.img_size).any():
             print('Warning: some x,y in ground truth are greater than 1')
             print('image path:', img_path)
         if (labels[:,1:5] < 0).any():
             print('Warning: some x,y in ground truth are smaller than 0')
             print('image path:', img_path)
-        labels[:,1:5].clamp_(min=0, max=1-1e-8)
+        labels[:,1:5].clamp_(min=0)
 
-        # x,y,w,h: 0~1, angle: -90~90 degrees
-        assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all(), print(labels)
+        # assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all(), print(labels)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
@@ -179,6 +175,14 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
         return img, labels
+
+    @staticmethod
+    def collate_func(batch):
+        img_batch = torch.stack([items[0] for items in batch])
+        label_batch = [items[1] for items in batch]
+        ids_batch = [items[2] for items in batch]
+        pad_info_batch = [items[3] for items in batch]
+        return img_batch, label_batch, ids_batch, pad_info_batch
 
 
 def uniform(a, b):
