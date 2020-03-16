@@ -83,6 +83,16 @@ if __name__ == '__main__':
         #                         num_workers=0, pin_memory=True, drop_last=False)
         #     dataiterator = iter(dataloader)
 
+        # save checkpoint
+        if iter_i > 0 and (iter_i % 1000 == 0):
+            state_dict = {
+                'iter': iter_i,
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+            }
+            save_path = os.path.join('./weights', f'debug.ckpt')
+            torch.save(state_dict, save_path)
+
         # show detection
         if iter_i > 0 and iter_i % 20 == 0:
             for imid in dataset.img_ids:

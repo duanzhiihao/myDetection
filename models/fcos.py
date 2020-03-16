@@ -11,12 +11,12 @@ def _ltrb_to_xywh(ltrb, nG, stride):
     device = ltrb.device
     x_ = torch.arange(nG, dtype=torch.float, device=device) * stride
     centers_y, centers_x = torch.meshgrid(x_, x_)
-    centers_x = centers_x + stride / 2
-    centers_y = centers_y + stride / 2
+    centers_x = centers_x.view(1,1,nG,nG) + stride / 2
+    centers_y = centers_y.view(1,1,nG,nG) + stride / 2
 
     xywh = torch.empty_like(ltrb)
-    xywh[..., 0] = centers_x.view(1,1,nG,nG) - ltrb[...,0] + ltrb[...,2] # cx
-    xywh[..., 1] = centers_y.view(1,1,nG,nG) - ltrb[...,1] + ltrb[...,3] # cy
+    xywh[..., 0] = centers_x - (ltrb[...,0] - ltrb[...,2])/2 # cx
+    xywh[..., 1] = centers_y - (ltrb[...,1] - ltrb[...,3])/2 # cy
     xywh[..., 2] = ltrb[...,0] + ltrb[...,2] # w
     xywh[..., 3] = ltrb[...,1] + ltrb[...,3] # h
     return xywh

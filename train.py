@@ -23,7 +23,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov3')
+    parser.add_argument('--model', type=str, default='yv3_ltrb')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
     # parser.add_argument('--img_norm', action='store_true')
