@@ -2,7 +2,7 @@
 
 
 - [x] YOLO v3
-- [ ] YOLO v3 + FCOS layer
+- [x] YOLO v3 + FCOS
 - [ ] EfficentNet backbone
 - [ ] EfficientDet
 - [ ] EfficientDet + FCOS
