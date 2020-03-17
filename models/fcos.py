@@ -60,10 +60,10 @@ class FCOS(nn.Module):
             return bb
         else:
             # check all the gt objects are assigned
-            assert isinstance(labels, list)
-            total_gt_num = sum([t.shape[0] for t in labels])
-            assigned_gt_num = sum(branch._assigned_num for branch in self.head)
-            assert assigned_gt_num == total_gt_num
+            # assert isinstance(labels, list)
+            # total_gt_num = sum([t.shape[0] for t in labels])
+            # assigned_gt_num = sum(branch._assigned_num for branch in self.head)
+            # assert assigned_gt_num == total_gt_num
             self.loss_str = ''
             for m in self.head:
                 self.loss_str += m.loss_str + '\n'

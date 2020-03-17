@@ -23,7 +23,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yv3_ltrb')
+    parser.add_argument('--model', type=str, default='fcs_d53yc3_sl1')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
     # parser.add_argument('--img_norm', action='store_true')
@@ -32,7 +32,7 @@ def main():
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
-    parser.add_argument('--res_max', type=int, default=640)
+    parser.add_argument('--res_max', type=int, default=512)
 
     parser.add_argument('--eval_interval', type=int, default=1000)
     parser.add_argument('--img_interval', type=int, default=500)
@@ -65,7 +65,7 @@ def main():
         valjson = '../COCO/annotations/instances_val2017.json'
     
     print('Initialing training set...')
-    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh',
+    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', debug_mode=False,
                              img_size=args.res_max, augmentation=enable_aug)
     dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=num_cpu,
                             collate_fn=Dataset4ObjDet.collate_func, pin_memory=True)
@@ -133,10 +133,10 @@ def main():
         optimizer.zero_grad()
         for _ in range(subdivision):
             try:
-                imgs, labels, _, _ = next(dataiterator)  # load a batch
+                imgs, labels, imid, _ = next(dataiterator)  # load a batch
             except StopIteration:
                 dataiterator = iter(dataloader)
-                imgs, labels, _, _ = next(dataiterator)  # load a batch
+                imgs, labels, imid, _ = next(dataiterator)  # load a batch
             # visualization.imshow_tensor(imgs)
             imgs = imgs.cuda()
             loss = model(imgs, labels)
