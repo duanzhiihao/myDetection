@@ -16,7 +16,7 @@ if __name__ == '__main__':
     # -------------------------- settings ---------------------------
     model_name = 'fcs_d53yc3'
     # model_name = 'yv3_ltrb'
-    target_size = 512
+    target_size = 768
     batch_size = 1
     subdivision = 1
     print(f'effective batch size = {batch_size} * {subdivision}')

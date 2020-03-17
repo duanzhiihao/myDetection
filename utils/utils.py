@@ -127,6 +127,16 @@ def detection2original(boxes, pad_info):
     return boxes
 
 
+def cxcywh_to_x1y1x2y2(cxcywh):
+    assert cxcywh.shape[-1] >= 4
+    x1y1x2y2 = cxcywh.clone()
+    x1y1x2y2[...,0] = (cxcywh[..., 0] - cxcywh[..., 2] / 2)
+    x1y1x2y2[...,1] = (cxcywh[..., 1] - cxcywh[..., 3] / 2)
+    x1y1x2y2[...,2] = (cxcywh[..., 0] + cxcywh[..., 2] / 2)
+    x1y1x2y2[...,3] = (cxcywh[..., 1] + cxcywh[..., 3] / 2)
+    return x1y1x2y2
+
+
 def weights_init_normal(m):
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:

@@ -155,8 +155,10 @@ def main():
             sec_used = timer.tic() - start_time
             time_used = timer.sec2str(sec_used)
             avg_iter = timer.sec2str(sec_used/(iter_i+1-start_iter))
-            avg_epoch = avg_iter / batch_size / subdivision * 118287
-            print(f'\nTotal time: {time_used}, iter: {avg_iter}, epoch: {avg_epoch}')
+            avg_img = avg_iter / batch_size / subdivision
+            avg_epoch = avg_img * 118287
+            print(f'\nTotal time: {time_used}, img: {avg_img}, ',
+                  f'iter: {avg_iter}, epoch: {avg_epoch}')
             current_lr = scheduler.get_last_lr()[0] * batch_size * subdivision
             print(f'[Iteration {iter_i}] [learning rate {current_lr:.3g}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')

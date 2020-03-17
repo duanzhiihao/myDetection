@@ -43,3 +43,37 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
     en = (tl < br).type(tl.type()).prod(dim=2)
     area_i = torch.prod(br - tl, 2) * en  # * ((tl < br).all())
     return area_i / (area_a[:, None] + area_b - area_i)
+
+
+def xywh2mask(xywh, mask_size, resolution=1):
+    '''
+    Args:
+        xywh: torch.tensor, rows of (cx,cy,w,h)
+        mask_size: int for tuple, (h,w)
+        resolution: the range of xywh. resolution=1 means xywh is normalized
+    '''
+    assert xywh.dim() == 2 and xywh.shape[-1] >= 4 and resolution == 1
+    if torch.rand(1) > 0.99:
+        if (xywh <= 0).any() or (xywh >= resolution).any():
+            print('Warning: some xywh are out of range')
+    device = xywh.device
+    mh,mw = (mask_size,mask_size) if isinstance(mask_size,int) else mask_size
+
+    # boundaries
+    shape = xywh.shape[:-1]
+    left = (xywh[..., 0] - xywh[..., 2] / 2).view(*shape,1,1)
+    top = (xywh[..., 1] - xywh[..., 3] / 2).view(*shape,1,1)
+    right = (xywh[..., 0] + xywh[..., 2] / 2).view(*shape,1,1)
+    bottom = (xywh[..., 1] + xywh[..., 3] / 2).view(*shape,1,1)
+
+    # create meshgrid
+    x_ = torch.linspace(0,1,steps=mw+1, device=device)[:-1]
+    y_ = torch.linspace(0,1,steps=mh+1, device=device)[:-1]
+    gy, gx = torch.meshgrid(x_, y_)
+    gx = gx.unsqueeze_(0) + resolution / (2*mw)
+    gy = gy.unsqueeze_(0) + resolution / (2*mh)
+    
+    # build mask
+    masks = (gx > left) & (gx < right) & (gy > top) & (gy < bottom)
+
+    return masks
