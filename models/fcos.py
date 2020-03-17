@@ -22,7 +22,7 @@ class FCOS(nn.Module):
             amin = anchors[branch_i]
             amax = anchors[branch_i+1] if branch_i != len(strides)-1 else 1e8
             self.head.append(FCOSLayer(stride_all=strides, stride=s,
-                        class_num=class_num, anchor_range=[amin,amax]))
+                                class_num=class_num, anchor_range=[amin,amax]))
 
         self.input_normalization = kwargs.get('img_norm', False)
 
@@ -81,7 +81,7 @@ class FCOSLayer(nn.Module):
         self.n_cls = kwargs['class_num']
         self.center_region = 0.5 # positive sample center region
 
-        self.ltrb_setting = 'exp_sl1'
+        self.ltrb_setting = kwargs.get('ltrb_setting', 'exp_sl1')
         # self.ltrb_setting = 'exp_l2'
     
     def forward(self, raw, img_size, labels=None):
@@ -174,6 +174,8 @@ class FCOSLayer(nn.Module):
                 ltrb_ = ltrb_matrix[duty_mask]
                 if self.ltrb_setting.startswith('exp'):
                     TargetLTRB[b,di1,di2,:] = torch.log(ltrb_/self.stride + 1e-8)
+                else:
+                    raise NotImplementedError()
                 TargetConf[b, di1, di2] = 1
                 if self.n_cls > 0:
                     TargetCls[b, di1, di2, cls_] = 1

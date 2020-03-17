@@ -27,11 +27,11 @@ def name_to_model(model_name):
         return YOLOv3(class_num=80, backbone='dark53', img_norm=False,
                       pred_layer='FCOS', ltrb='relu_ach_giou')
     
-    elif model_name == 'fcs_d53yc3':
+    elif model_name == 'fcs_d53yc3_sl1':
         # darknet-53, YOLO fpn C3, 3 strides,
         # ltrb, norm by stride, exp, smooth_L1, center 1.5 stride, no centerness
         from .fcos import FCOS
-        return FCOS(backbone='dark53', fpn='yolo3_1anch', loss_ltrb='exp_sl1',
+        return FCOS(backbone='dark53', fpn='yolo3_1anch', ltrb_setting='exp_sl1',
                     img_norm=False)
 
     else:
