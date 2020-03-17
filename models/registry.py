@@ -1,4 +1,3 @@
-from .general import OneStageDetector
 
 
 def name_to_model(model_name):
@@ -31,8 +30,9 @@ def name_to_model(model_name):
     elif model_name == 'fcs_d53yc3':
         # darknet-53, YOLO fpn C3, 3 strides,
         # ltrb, norm by stride, exp, smooth_L1, center 1.5 stride, no centerness
-        return OneStageDetector(backbone='dark53', fpn='yolo3', head='fcos',
-                                loss_ltrb='exp_sl1', img_norm=False)
+        from .fcos import FCOS
+        return FCOS(backbone='dark53', fpn='yolo3_0anch', loss_ltrb='exp_sl1',
+                    img_norm=False)
 
     else:
         raise Exception('Unknown model name')

@@ -5,6 +5,14 @@ import torch.nn.functional as tnf
 from .backbones import ConvBnLeaky
 
 
+def get_fpn(name, **kwargs):
+    if name == 'yolo3':
+        return YOLOv3FPN(anch_num=3, **kwargs)
+    if name == 'yolo3_1anch':
+        return YOLOv3FPN(anch_num=1, **kwargs)
+    else:
+        raise Exception('Unknown backbone name')
+
 
 class YOLOBranch(nn.Module):
     '''
@@ -60,19 +68,37 @@ class YOLOBranch(nn.Module):
 
 
 class YOLOv3FPN(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024), class_num=80):
+    def __init__(self, in_channels=(256, 512, 1024), class_num=80, anch_num=3):
         super().__init__()
         ch3, ch4, ch5 = in_channels
-        out_ch = (class_num + 5) * 3
+        out_ch = (class_num + 5) * anch_num
         self.branch_P3 = YOLOBranch(ch3, out_ch, prev_ch=(ch4//2,ch3//2))
         self.branch_P4 = YOLOBranch(ch4, out_ch, prev_ch=(ch5//2,ch4//2))
         self.branch_P5 = YOLOBranch(ch5, out_ch)
     
     def forward(self, features):
-        p3, p4, p5 = features
+        c3, c4, c5 = features
         # go through FPN blocks in three scales
-        p5_fpn, p5_to_p4 = self.branch_P5(p5, previous=None)
-        p4_fpn, p4_to_p3 = self.branch_P4(p4, previous=p5_to_p4)
-        p3_fpn, _ = self.branch_P3(p3, previous=p4_to_p3)
+        p5, c5_to_c4 = self.branch_P5(c5, previous=None)
+        p4, c4_to_c3 = self.branch_P4(c4, previous=c5_to_c4)
+        p3, _ = self.branch_P3(c3, previous=c4_to_c3)
 
-        return [p3_fpn, p4_fpn, p5_fpn]
+        return [p3, p4, p5]
+
+
+# class YOLOFPN(nn.Module):
+#     def __init__(self, **kwargs):
+#         super().__init__()
+#         out_ch = (kwargs.get('class_num', 80) + 5) * 3
+#         self.branches = nn.ModuleList()
+#         for nCH in kwargs.get('channels', [256, 512, 1024]):
+#             self.branches.append()
+    
+#     def forward(self, features):
+#         c3, c4, c5 = features
+#         # go through FPN blocks in three scales
+#         p5_fpn, p5_to_p4 = self.branch_P5(c5, previous=None)
+#         p4_fpn, p4_to_p3 = self.branch_P4(c4, previous=p5_to_p4)
+#         p3_fpn, _ = self.branch_P3(c3, previous=p4_to_p3)
+
+#         return [p3_fpn, p4_fpn, p5_fpn]

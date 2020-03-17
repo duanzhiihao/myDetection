@@ -6,7 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 import torchvision.transforms.functional as tvf
 
-import models.backbones, models.fpns
+from .backbones import get_backbone
+from .fpns import get_fpn
 import models.losses as lossLib
 from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
 from utils.iou_funcs import bboxes_iou
@@ -30,24 +31,8 @@ class YOLOv3(nn.Module):
         self.index_M = torch.Tensor(indices[1]).long()
         self.index_S = torch.Tensor(indices[2]).long()
 
-        if backbone == 'dark53':
-            self.backbone = models.backbones.Darknet53()
-            chs = (256, 512, 1024)
-            print("Using backbone Darknet-53. Loading ImageNet weights....")
-            pretrained = torch.load('./weights/dark53_imgnet.pth')
-            self.load_state_dict(pretrained)
-        elif backbone == 'res34':
-            self.backbone = models.backbones.resnet34()
-        elif backbone == 'res50':
-            self.backbone = models.backbones.resnet50()
-        elif backbone == 'res101':
-            self.backbone = models.backbones.resnet101()
-        elif 'efficientnet' in backbone:
-            self.backbone = models.backbones.efficientnet(backbone)
-        else:
-            raise Exception('Unknown backbone name')
-
-        self.fpn = models.fpns.YOLOv3FPN(in_channels=chs, class_num=class_num)
+        self.backbone, chs = get_backbone('dark53')
+        self.fpn = get_fpn('yolo3', in_channels=chs, class_num=class_num)
         
         pred_layer_name = kwargs.get('pred_layer', 'YOLO')
         if pred_layer_name == 'YOLO':

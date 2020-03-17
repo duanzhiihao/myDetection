@@ -14,7 +14,7 @@ import api
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     # -------------------------- settings ---------------------------
-    model_name = 'yv3_ltrb_sl1'
+    model_name = 'yolov3'
     # model_name = 'yv3_ltrb'
     target_size = 512
     batch_size = 1

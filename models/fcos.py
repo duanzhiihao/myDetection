@@ -1,4 +1,17 @@
 import torch
+import torch.nn as nn
+
+from .backbones import get_backbone
+from .fpns import get_fpn
+
+class FCOS(nn.Module):
+    def __init__(self, backbone, fpn, **kwargs):
+        super().__init__()
+        self.input_normalization = kwargs.get('img_norm', False)
+        class_num = kwargs['class_num']
+
+        self.backbone = get_backbone(backbone)
+        self.fpn = get_fpn(fpn, anch_num=1)
 
 
 def _ltrb_to_xywh(ltrb, nG, stride):

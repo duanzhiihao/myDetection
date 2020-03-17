@@ -7,6 +7,25 @@ import torchvision.models
 from external_packages.efficientnet.model import EfficientNet
 
 
+def get_backbone(name):
+    if name == 'dark53':
+        model = Darknet53()
+        print("Using backbone Darknet-53. Loading ImageNet weights....")
+        pretrained = torch.load('./weights/dark53_imgnet.pth')
+        model.load_state_dict(pretrained)
+        return model, (256, 512, 1024)
+    # elif name == 'res34':
+    #     self.backbone = models.backbones.resnet34()
+    # elif name == 'res50':
+    #     self.backbone = models.backbones.resnet50()
+    # elif name == 'res101':
+    #     self.backbone = models.backbones.resnet101()
+    # elif 'efficientnet' in backbone:
+    #     self.backbone = models.backbones.efficientnet(backbone)
+    else:
+        raise Exception('Unknown backbone name')
+
+
 def ConvBnLeaky(in_, out_, k, s):
     '''
     in_: input channel, e.g. 32
