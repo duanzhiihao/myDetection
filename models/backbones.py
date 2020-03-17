@@ -13,7 +13,7 @@ def get_backbone(name):
         print("Using backbone Darknet-53. Loading ImageNet weights....")
         pretrained = torch.load('./weights/dark53_imgnet.pth')
         model.load_state_dict(pretrained)
-        return model, (256, 512, 1024)
+        return model, (256, 512, 1024), (8, 16, 32)
     # elif name == 'res34':
     #     self.backbone = models.backbones.resnet34()
     # elif name == 'res50':

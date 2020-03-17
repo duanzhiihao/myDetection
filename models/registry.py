@@ -31,7 +31,7 @@ def name_to_model(model_name):
         # darknet-53, YOLO fpn C3, 3 strides,
         # ltrb, norm by stride, exp, smooth_L1, center 1.5 stride, no centerness
         from .fcos import FCOS
-        return FCOS(backbone='dark53', fpn='yolo3_0anch', loss_ltrb='exp_sl1',
+        return FCOS(backbone='dark53', fpn='yolo3_1anch', loss_ltrb='exp_sl1',
                     img_norm=False)
 
     else:

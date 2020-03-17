@@ -31,7 +31,7 @@ class YOLOv3(nn.Module):
         self.index_M = torch.Tensor(indices[1]).long()
         self.index_S = torch.Tensor(indices[2]).long()
 
-        self.backbone, chs = get_backbone('dark53')
+        self.backbone, chs, strides = get_backbone('dark53')
         self.fpn = get_fpn('yolo3', in_channels=chs, class_num=class_num)
         
         pred_layer_name = kwargs.get('pred_layer', 'YOLO')
@@ -40,11 +40,11 @@ class YOLOv3(nn.Module):
         elif pred_layer_name == 'FCOS':
             pred_layer = FCOSLayer
         self.yolo_S = pred_layer(self.anchors_all, self.index_S, class_num,
-                                 stride=8, **kwargs)
+                                 stride=strides[0], **kwargs)
         self.yolo_M = pred_layer(self.anchors_all, self.index_M, class_num,
-                                 stride=16, **kwargs)
+                                 stride=strides[1], **kwargs)
         self.yolo_L = pred_layer(self.anchors_all, self.index_L, class_num,
-                                 stride=32, **kwargs)
+                                 stride=strides[2], **kwargs)
 
         self.time_dic = defaultdict(float)
 
@@ -329,7 +329,7 @@ class FCOSLayer(nn.Module):
         raw = raw.view(nB, nA, nCH, nG, nG)
         raw = raw.permute(0, 1, 3, 4, 2).contiguous()
         # Now raw.shape is (nB, nA, nG, nG, nCH), where the last demension is
-        # (x,y,w,h,conf,categories)
+        # (l,t,r,b,conf,categories)
         if self.ltrb_setting.startswith('relu'):
             # ReLU activation
             tnf.relu(raw[..., 0:4], inplace=True)

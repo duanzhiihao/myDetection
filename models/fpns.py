@@ -11,7 +11,7 @@ def get_fpn(name, **kwargs):
     if name == 'yolo3_1anch':
         return YOLOv3FPN(anch_num=1, **kwargs)
     else:
-        raise Exception('Unknown backbone name')
+        raise Exception('Unknown FPN name')
 
 
 class YOLOBranch(nn.Module):
