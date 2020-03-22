@@ -19,7 +19,9 @@ class Detector():
     def __init__(self, model_name=None, weights_path=None, model=None, conf_thres=0.5):
         assert torch.cuda.is_available()
 
+        self.input_img_size = 640
         self.conf_thres = conf_thres
+        self.nms_thres = 0.45
 
         if model:
             self.model = model
@@ -31,6 +33,7 @@ class Detector():
         if weights_path:
             model.load_state_dict(torch.load(weights_path)['model'])
         self.model = model.cuda()
+        self.model.eval()
         
     def predict_imgDir(self, img_dir, **kwargs):
         '''
@@ -63,7 +66,6 @@ class Detector():
             show_img (default: False): bool
             See _predict_pil() for more optinal arguments
         '''
-        self.model.eval()
         if 'img_path' in kwargs:
             img = Utils.imread_pil(kwargs['img_path'])
         else:
@@ -90,10 +92,11 @@ class Detector():
             input_size: int, default: 640
             conf_thres: float, confidence threshold
         '''
-        # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
-        input_size = kwargs['input_size'] if 'input_size' in kwargs else 640
-        conf_thres = kwargs['conf_thres'] if 'conf_thres' in kwargs else self.conf_thres
         assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
+        # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
+        input_size = kwargs.get('input_size', self.input_img_size)
+        conf_thres = kwargs.get('conf_thres', self.conf_thres)
+        nms_thres = kwargs.get('nms_thres', self.nms_thres)
 
         # pad to square
         input_img, _, pad_info = Utils.rect_to_square(pil_img, None, input_size)
@@ -104,14 +107,15 @@ class Detector():
         assert input_.dim() == 4
         with torch.no_grad():
             dts = self.model(input_.cuda())
-
+        assert isinstance(dts, list)
+        dts = dts[0]
         # post-processing
         dts.cpu_()
         dts = dts[dts.scores >= conf_thres]
         if len(dts) > 1000:
             _, idx = torch.topk(dts.scores, k=1000)
             dts = dts[idx]
-        dts = dts.nms(nms_thres=0.45)
+        dts = dts.nms(nms_thres=nms_thres)
         # np_img = np.array(tvf.to_pil_image(input_.squeeze()))
         # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
         # plt.imshow(np_img)

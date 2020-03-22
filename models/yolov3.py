@@ -31,7 +31,7 @@ class YOLOv3(nn.Module):
         self.index_M = torch.Tensor(indices[1]).long()
         self.index_S = torch.Tensor(indices[2]).long()
 
-        self.backbone, chs, strides = get_backbone('dark53')
+        self.backbone, chs, strides = get_backbone(backbone)
         self.fpn = get_fpn('yolo3', in_channels=chs, class_num=class_num)
         
         pred_layer_name = kwargs.get('pred_layer', 'YOLO')

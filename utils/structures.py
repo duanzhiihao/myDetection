@@ -20,7 +20,7 @@ class ImageObjects():
     '''
     def __init__(self, bboxes, cats, scores, bb_format='cxcywh'):
         # format check
-        assert bboxes.shape[:-1] == cats.shape
+        assert bboxes.dim() == 2 and bboxes.shape[0] == cats.shape[0]
         if bb_format == 'cxcywh':
             assert bboxes.shape[-1] == 4
         else:

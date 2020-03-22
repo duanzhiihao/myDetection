@@ -1,6 +1,7 @@
 
 script.py
 run?.py
+debug_*
 
 weights/
 logs/
@@ -13,6 +14,8 @@ deprecated/
 *.json
 *.sh
 *.txt
+*.pt
+*.pth
 
 
 

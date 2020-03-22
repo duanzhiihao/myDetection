@@ -5,25 +5,47 @@ import torch.nn.functional as F
 import torchvision.models
 
 from external_packages.efficientnet.model import EfficientNet
+from external_packages.maskrcnn_benchmark_resnet import ResNet
 
 
 def get_backbone(name):
     if name == 'dark53':
-        model = Darknet53()
+        backbone = Darknet53()
         print("Using backbone Darknet-53. Loading ImageNet weights....")
         pretrained = torch.load('./weights/dark53_imgnet.pth')
-        model.load_state_dict(pretrained)
-        return model, (256, 512, 1024), (8, 16, 32)
+        backbone.load_state_dict(pretrained)
+        return backbone, (256, 512, 1024), (8, 16, 32)
     # elif name == 'res34':
     #     self.backbone = models.backbones.resnet34()
-    # elif name == 'res50':
-    #     self.backbone = models.backbones.resnet50()
+    elif name == 'res50':
+        backbone = ResNet('res50')
+        info = {
+            'feature_channels': (512, 1024, 2048),
+            'feature_strides': (8, 16, 32),
+        }
+        return backbone, info
     # elif name == 'res101':
     #     self.backbone = models.backbones.resnet101()
     # elif 'efficientnet' in backbone:
     #     self.backbone = models.backbones.efficientnet(backbone)
     else:
         raise Exception('Unknown backbone name')
+
+
+def get_backbone_fpn(name):
+    if name == 'res50_retina':
+        backbone = ResNet('res50')
+        from .fpns import RetinaNetFPN
+        rpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)
+        info = {
+            'feature_channels': 256,
+            'feature_strides': (8, 16, 32, 64, 128),
+        }
+    else:
+        raise NotImplementedError()
+    
+    return backbone, rpn, info
+
 
 
 def ConvBnLeaky(in_, out_, k, s):
@@ -100,59 +122,16 @@ class Darknet53(nn.Module):
     def forward(self, x):
         for i in range(0,15):
             x = self.netlist[i](x)
-        c3 = x
+        C3 = x
         for i in range(15,24):
             x = self.netlist[i](x)
-        c4 = x
+        C4 = x
         for i in range(24,29):
             x = self.netlist[i](x)
-        c5 = x
-        return [c3,c4,c5]
-
-
-class ResNetBackbone(nn.Module):
-    '''
-    Args:
-        tv_model: torch vision model
-    '''
-    def __init__(self, tv_model):
-        super().__init__()
-        self.conv1 = tv_model.conv1
-        self.bn1 = tv_model.bn1
-        self.relu = tv_model.relu
-        self.maxpool = tv_model.maxpool
-
-        self.layer1 = tv_model.layer1
-        self.layer2 = tv_model.layer2
-        self.layer3 = tv_model.layer3
-        self.layer4 = tv_model.layer4
-    
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        small = self.layer2(x)
-        medium = self.layer3(small)
-        large = self.layer4(medium)
-        return small, medium, large
-
-def resnet34():
-    print('Using backbone ResNet-34. Loading ImageNet weights...')
-    model = torchvision.models.resnet34(pretrained=True)
-    return ResNetBackbone(model)
-
-def resnet50():
-    print('Using backbone ResNet-50. Loading ImageNet weights...')
-    model = torchvision.models.resnet50(pretrained=True)
-    return ResNetBackbone(model)
-
-def resnet101():
-    print('Using backbone ResNet-101. Loading ImageNet weights...')
-    model = torchvision.models.resnet101(pretrained=True)
-    return ResNetBackbone(model)
+        C5 = x
+        # We expect that C3 contains information about small objects,
+        # and C5 contains information about large objects
+        return [C3, C4, C5]
 
 
 class EfficientNetBackbone(EfficientNet):
