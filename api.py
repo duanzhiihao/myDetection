@@ -110,11 +110,8 @@ class Detector():
             # normalization
             t_img = tvf.normalize(t_img, [102.9801,115.9465,122.7717], [1,1,1],
                                     inplace=True)
-        # TODO
-        # torch.save(t_img, 'base_img.pt')
 
         input_ = t_img.unsqueeze(0)
-        
         assert input_.dim() == 4
         with torch.no_grad():
             dts = self.model(input_.cuda())
