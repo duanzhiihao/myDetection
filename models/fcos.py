@@ -28,24 +28,15 @@ class FCOS(nn.Module):
                                 num_class=num_class, anchor_range=[amin,amax],
                                 ltrb_setting=cfg['ltrb_setting']))
 
-        self.BGR_255_norm = cfg.get('BGR_255_norm', True)
+        self.input_format = 'BGR_255_norm'
 
     def forward(self, x, labels=None):
         '''
         x: a batch of images, e.g. shape(8,3,608,608)
         labels: a batch of ground truth
         '''
-        assert x.dim() == 4 and x.shape[2] == x.shape[3]
-        self.img_size = x.shape[2]
-        # normalization
-        if self.BGR_255_norm:
-            x = x[:,[2,1,0],:,:] * 255
-            for i in range(x.shape[0]):
-                # x[i] = tvf.normalize(x[i], [0.485,0.456,0.406], [0.229,0.224,0.225],
-                #                     inplace=True)
-                x[i] = tvf.normalize(x[i], [102.9801,115.9465,122.7717], [1,1,1],
-                                     inplace=True)
-                # debug = (x.mean(), x.std())
+        assert x.dim() == 4
+        self.img_size = x.shape[2:4]
 
         # go through the backbone and the feature payamid network
         features = self.backbone(x)
@@ -185,14 +176,11 @@ class FCOSLayer(nn.Module):
         p_ltrb = raw['bbox'].permute(0, 2, 3, 1)
         p_center_logits = raw['center'].permute(0, 2, 3, 1)
         p_cls_logits = raw['class'].permute(0, 2, 3, 1)
-        if p_ltrb.shape[1] != p_ltrb.shape[2]:
-            raise NotImplementedError()
         
         device = p_ltrb.device
         nB = p_ltrb.shape[0] # batch size
-        nG = p_ltrb.shape[1] # grid size, i.e., prediction resolution
+        nH, nW = p_ltrb.shape[1:3] # prediction grid size
         # nCls = self.n_cls # number of channels for each object
-        assert nG * self.stride == img_size
 
         if self.ltrb_setting.startswith('relu'):
             p_ltrb = tnf.relu(p_ltrb, inplace=True)
@@ -210,8 +198,7 @@ class FCOSLayer(nn.Module):
             else:
                 raise Exception('Unknown ltrb_setting')
             # Translate from ltrb to cxcywh
-            p_ltrb.clamp_(min=0, max=img_size)
-            p_ltrb = _ltrb_to_xywh(p_ltrb, nG, self.stride)
+            p_ltrb = _ltrb_to_xywh(p_ltrb, nH, nW, self.stride)
             # Logistic activation for 'centerness'
             p_center_conf = torch.sigmoid(p_center_logits)
             # Logistic activation for categories
@@ -361,16 +348,17 @@ def xywh2target(xywh, mask_size, resolution=1, center_region=0.5):
     return masks, ltrb_targets
 
 
-def _ltrb_to_xywh(ltrb, nG, stride):
+def _ltrb_to_xywh(ltrb, nH, nW, stride):
     '''
     transform (top,left,bottom,right) to (cx,cy,w,h)
     '''
-    # training, (..., nG, nG, >= 4)
-    assert ltrb.dim() >= 3 and ltrb.shape[-3] == ltrb.shape[-2] == nG
+    # training, (..., nH, nW, >= 4)
+    assert ltrb.dim() >= 3 and ltrb.shape[-3] == nH and ltrb.shape[-2] == nW
     # if torch.rand(1) > 0.9: assert (ltrb[..., 0:4] <= nG).all()
     device = ltrb.device
-    x_ = torch.arange(nG, dtype=torch.float, device=device) * stride
-    centers_y, centers_x = torch.meshgrid(x_, x_)
+    y_ = torch.arange(nH, dtype=torch.float, device=device) * stride
+    x_ = torch.arange(nW, dtype=torch.float, device=device) * stride
+    centers_y, centers_x = torch.meshgrid(y_, x_)
     for _ in range(ltrb.dim() - 3):
         centers_x.unsqueeze_(0)
         centers_y.unsqueeze_(0)

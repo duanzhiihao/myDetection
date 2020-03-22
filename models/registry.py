@@ -48,7 +48,6 @@ def name_to_model(model_name):
             'rpn': 'fcos',
             'ltrb_setting': 'relu_sl1',
             'num_class': 80,
-            'BGR_255_norm': True,
         }
         return FCOS(cfg)
 

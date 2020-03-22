@@ -32,6 +32,7 @@ class Detector():
         print('Number of parameters:', total_params)
         if weights_path:
             model.load_state_dict(torch.load(weights_path)['model'])
+        
         self.model = model.cuda()
         self.model.eval()
         
@@ -98,11 +99,21 @@ class Detector():
         conf_thres = kwargs.get('conf_thres', self.conf_thres)
         nms_thres = kwargs.get('nms_thres', self.nms_thres)
 
-        # pad to square
-        input_img, _, pad_info = Utils.rect_to_square(pil_img, None, input_size)
-        
-        input_ori = tvf.to_tensor(input_img)
-        input_ = input_ori.unsqueeze(0)
+        # resize such that the shorter side = input_size
+        ori_shorter = min(pil_img.height, pil_img.width)
+        pil_img = tvf.resize(pil_img, input_size)
+        # convert to tensor
+        t_img = tvf.to_tensor(pil_img)
+        if self.model.input_format == 'BGR_255_norm':
+            # to BGR, to 255
+            t_img = t_img[[2,1,0],:,:] * 255
+            # normalization
+            t_img = tvf.normalize(t_img, [102.9801,115.9465,122.7717], [1,1,1],
+                                    inplace=True)
+        # TODO
+        # torch.save(t_img, 'base_img.pt')
+
+        input_ = t_img.unsqueeze(0)
         
         assert input_.dim() == 4
         with torch.no_grad():
@@ -120,5 +131,6 @@ class Detector():
         # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
         # plt.imshow(np_img)
         # plt.show()
-        dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
+        # dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
+        dts.bboxes = dts.bboxes / input_size * ori_shorter
         return dts
