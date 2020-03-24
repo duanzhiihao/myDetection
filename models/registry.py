@@ -40,11 +40,30 @@ def name_to_model(model_name):
     #     return FCOS(backbone='dark53', fpn='yolo3_1anch', ltrb_setting='exp_sl1',
     #                 img_norm=False)
 
+    elif model_name == 'fcs2_r50_expsl1':
+        from .fcos2 import FCOS
+        cfg = {
+            'backbone_fpn': 'my_res50_retina',
+            'rpn': 'fcos',
+            'ltrb_setting': 'exp_sl1',
+            'num_class': 80,
+        }
+        return FCOS(cfg)
+        
+    elif model_name == 'fcs2_yv3_expsl1':
+        from .fcos2 import FCOS
+        cfg = {
+            'backbone_fpn': 'dark53_yv3',
+            'rpn': 'yv3',
+            'ltrb_setting': 'exp_sl1',
+            'num_class': 80,
+        }
+        return FCOS(cfg)
+
     elif model_name == 'fcos_r50_fpn':
         from .fcos import FCOS
         cfg = {
             'backbone_fpn': 'res50_retina',
-            'fpn_out_ch': 256,
             'rpn': 'fcos',
             'ltrb_setting': 'relu_sl1',
             'num_class': 80,

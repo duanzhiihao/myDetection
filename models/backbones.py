@@ -8,43 +8,59 @@ from external_packages.efficientnet.model import EfficientNet
 from external_packages.maskrcnn_benchmark_resnet import ResNet
 
 
-def get_backbone(name):
-    if name == 'dark53':
-        backbone = Darknet53()
-        print("Using backbone Darknet-53. Loading ImageNet weights....")
-        pretrained = torch.load('./weights/dark53_imgnet.pth')
-        backbone.load_state_dict(pretrained)
-        return backbone, (256, 512, 1024), (8, 16, 32)
-    # elif name == 'res34':
-    #     self.backbone = models.backbones.resnet34()
-    elif name == 'res50':
-        backbone = ResNet('res50')
-        info = {
-            'feature_channels': (512, 1024, 2048),
-            'feature_strides': (8, 16, 32),
-        }
-        return backbone, info
-    # elif name == 'res101':
-    #     self.backbone = models.backbones.resnet101()
-    # elif 'efficientnet' in backbone:
-    #     self.backbone = models.backbones.efficientnet(backbone)
-    else:
-        raise Exception('Unknown backbone name')
+# def get_backbone(name):
+#     if name == 'dark53':
+#         backbone = Darknet53()
+#         print("Using backbone Darknet-53. Loading ImageNet weights....")
+#         pretrained = torch.load('./weights/dark53_imgnet.pth')
+#         backbone.load_state_dict(pretrained)
+#         return backbone, (256, 512, 1024), (8, 16, 32)
+#     # elif name == 'res34':
+#     #     self.backbone = models.backbones.resnet34()
+#     elif name == 'res50':
+#         backbone = ResNet('res50')
+#         info = {
+#             'feature_channels': (512, 1024, 2048),
+#             'feature_strides': (8, 16, 32),
+#         }
+#         return backbone, info
+#     # elif name == 'res101':
+#     #     self.backbone = models.backbones.resnet101()
+#     # elif 'efficientnet' in backbone:
+#     #     self.backbone = models.backbones.efficientnet(backbone)
+#     else:
+#         raise Exception('Unknown backbone name')
 
 
 def get_backbone_fpn(name):
     if name == 'res50_retina':
         backbone = ResNet('res50')
         from .fpns import RetinaNetFPN
-        rpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)
+        fpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)
         info = {
             'feature_channels': 256,
             'feature_strides': (8, 16, 32, 64, 128),
         }
+    elif name == 'my_res50_retina':
+        backbone = get_resnet50()
+        from .fpns import C3toP5FPN
+        fpn = C3toP5FPN(in_channels=(512, 1024, 2048), out_ch=256)
+        info = {
+            'feature_channels': 256,
+            'feature_strides': (8, 16, 32, 64, 128),
+        }
+    elif name == 'dark53_yv3':
+        backbone = Darknet53()
+        from .fpns import YOLOv3FPN
+        fpn = YOLOv3FPN(in_channels=(256, 512, 1024))
+        info = {
+            'feature_channels': (256, 512, 1024),
+            'feature_strides': (8, 16, 32),
+        }
     else:
         raise NotImplementedError()
     
-    return backbone, rpn, info
+    return backbone, fpn, info
 
 
 
@@ -132,6 +148,42 @@ class Darknet53(nn.Module):
         # We expect that C3 contains information about small objects,
         # and C5 contains information about large objects
         return [C3, C4, C5]
+
+
+class ResNetBackbone(nn.Module):
+    '''
+    Args:
+        tv_model: torch vision model
+    '''
+    def __init__(self, tv_model):
+        super().__init__()
+        self.conv1 = tv_model.conv1
+        self.bn1 = tv_model.bn1
+        self.relu = tv_model.relu
+        self.maxpool = tv_model.maxpool
+
+        self.layer1 = tv_model.layer1
+        self.layer2 = tv_model.layer2
+        self.layer3 = tv_model.layer3
+        self.layer4 = tv_model.layer4
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        C3 = self.layer2(x)
+        C4 = self.layer3(C3)
+        C5 = self.layer4(C4)
+        return [C3, C4, C5]
+
+
+def get_resnet50():
+    print('Using backbone ResNet-50. Loading ImageNet weights...')
+    model = torchvision.models.resnet50(pretrained=True)
+    return ResNetBackbone(model)
 
 
 class EfficientNetBackbone(EfficientNet):

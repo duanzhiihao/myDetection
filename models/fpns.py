@@ -5,19 +5,19 @@ import torch.nn.functional as tnf
 from .backbones import ConvBnLeaky
 
 
-def get_fpn(name, backbone_info=None, **kwargs):
-    if name == 'yolo3':
-        return YOLOv3FPN(anch_num=3, **kwargs)
-    elif name == 'yolo3_1anch':
-        return YOLOv3FPN(anch_num=1, **kwargs)
-    elif name == 'retina':
-        rpn = RetinaNetFPN(backbone_info['feature_channels'], 256)
-        info = {
-            'strides'
-        }
-        return rpn, 
-    else:
-        raise Exception('Unknown FPN name')
+# def get_fpn(name, backbone_info=None, **kwargs):
+#     if name == 'yolo3':
+#         return YOLOv3FPN(anch_num=3, **kwargs)
+#     elif name == 'yolo3_1anch':
+#         return YOLOv3FPN(anch_num=1, **kwargs)
+#     elif name == 'retina':
+#         rpn = RetinaNetFPN(backbone_info['feature_channels'], 256)
+#         info = {
+#             'strides'
+#         }
+#         return rpn
+#     else:
+#         raise Exception('Unknown FPN name')
 
 
 class YOLOBranch(nn.Module):
@@ -30,7 +30,7 @@ class YOLOBranch(nn.Module):
                  default: None
     '''
     # def __init__(self, in_, out_=18, has_previous=False, prev_ch=None):
-    def __init__(self, in_, out_=18, prev_ch=None):
+    def __init__(self, in_, prev_ch=None):
         super(YOLOBranch, self).__init__()
         assert in_ % 2 == 0, 'input channel must be divisible by 2'
 
@@ -49,8 +49,6 @@ class YOLOBranch(nn.Module):
 
         self.cbl_4 = ConvBnLeaky(in_, in_//2, k=1, s=1)
         self.cbl_5 = ConvBnLeaky(in_//2, in_, k=3, s=1)
-
-        self.to_box = nn.Conv2d(in_, out_, kernel_size=1, stride=1)
         
     def forward(self, x, previous=None):
         '''
@@ -68,19 +66,17 @@ class YOLOBranch(nn.Module):
         x = self.cbl_3(x)
         feature = self.cbl_4(x)
         x = self.cbl_5(feature)
-        detection = self.to_box(x)
 
-        return detection, feature
+        return x, feature
 
 
 class YOLOv3FPN(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024), class_num=80, anch_num=3):
+    def __init__(self, in_channels=(256, 512, 1024)):
         super().__init__()
         ch3, ch4, ch5 = in_channels
-        out_ch = (class_num + 5) * anch_num
-        self.branch_P3 = YOLOBranch(ch3, out_ch, prev_ch=(ch4//2,ch3//2))
-        self.branch_P4 = YOLOBranch(ch4, out_ch, prev_ch=(ch5//2,ch4//2))
-        self.branch_P5 = YOLOBranch(ch5, out_ch)
+        self.branch_P5 = YOLOBranch(ch5)
+        self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
+        self.branch_P3 = YOLOBranch(ch3, prev_ch=(ch4//2,ch3//2))
     
     def forward(self, features):
         c3, c4, c5 = features
@@ -90,6 +86,66 @@ class YOLOv3FPN(nn.Module):
         p3, _ = self.branch_P3(c3, previous=c4_to_c3)
 
         return [p3, p4, p5]
+
+
+# class LastLevelP6P7(nn.Module):
+#     """
+#     This module is used in RetinaNet to generate extra layers, P6 and P7.
+#     """
+#     def __init__(self, in_channels, out_channels):
+#         super(LastLevelP6P7, self).__init__()
+#         self.p6 = nn.Conv2d(in_channels, out_channels, 3, 2, 1)
+#         self.p7 = nn.Conv2d(out_channels, out_channels, 3, 2, 1)
+#         for module in [self.p6, self.p7]:
+#             nn.init.kaiming_uniform_(module.weight, a=1)
+#             nn.init.constant_(module.bias, 0)
+#         self.use_P5 = in_channels == out_channels
+
+#     def forward(self, c5, p5):
+#         x = p5 if self.use_P5 else c5
+#         p6 = self.p6(x)
+#         p7 = self.p7(tnf.relu(p6))
+#         return [p6, p7]
+
+class C3toP5FPN(nn.Module):
+    '''
+    Args:
+        in_channels: list/tuple of int
+    '''
+    def __init__(self, in_channels=(512, 1024, 2048), out_ch=256):
+        super().__init__()
+        assert len(in_channels) == 3
+
+        ch3, ch4, ch5 = in_channels
+        self.c5_to_p5_ = conv_uniform(ch5, out_ch, kernel_size=1)
+        self.p5_to_p5 = conv_uniform(out_ch, out_ch, kernel_size=3, stride=1)
+        self.c4_to_p4_ = conv_uniform(ch4, out_ch, kernel_size=1)
+        self.p4_to_p4 = conv_uniform(out_ch, out_ch, kernel_size=3, stride=1)
+        self.c3_to_p3_ = conv_uniform(ch3, out_ch, kernel_size=1)
+        self.p3_to_p3 = conv_uniform(out_ch, out_ch, kernel_size=3, stride=1)
+
+        self.p5_to_p6 = nn.Conv2d(out_ch, out_ch, 3, 2, 1)
+        self.p6_to_p7 = nn.Conv2d(out_ch, out_ch, 3, 2, 1)
+
+    def forward(self, features):
+        C3, C4, C5 = features
+        results = []
+
+        p5_ = self.c5_to_p5_(C5)
+        p5 = self.p5_to_p5(p5_)
+
+        top_down = tnf.interpolate(p5_, C4.shape[-2:], mode='nearest')
+        p4_ = self.c4_to_p4_(C4) + top_down
+        p4 = self.p4_to_p4(p4_)
+        
+        top_down = tnf.interpolate(p4_, C3.shape[-2:], mode='nearest')
+        p3_ = self.c3_to_p3_(C3) + top_down
+        p3 = self.p3_to_p3(p3_)
+
+        p6 = self.p5_to_p6(p5_)
+        p7 = self.p6_to_p7(tnf.relu(p6))
+
+        return (p3, p4, p5, p6, p7)
 
 
 # Source: https://github.com/facebookresearch/maskrcnn-benchmark

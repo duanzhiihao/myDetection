@@ -16,12 +16,11 @@ import utils.visualization as visUtils
 
 
 class Detector():
-    def __init__(self, model_name=None, weights_path=None, model=None, conf_thres=0.5):
+    def __init__(self, model_name=None, weights_path=None, model=None, **kwargs):
         assert torch.cuda.is_available()
 
-        self.input_img_size = 640
-        self.conf_thres = conf_thres
-        self.nms_thres = 0.45
+        self.conf_thres = kwargs.get('conf_thres', 0.5)
+        self.nms_thres = kwargs.get('nms_thres', 0.45)
 
         if model:
             self.model = model
@@ -32,7 +31,6 @@ class Detector():
         print('Number of parameters:', total_params)
         if weights_path:
             model.load_state_dict(torch.load(weights_path)['model'])
-        
         self.model = model.cuda()
         self.model.eval()
         
@@ -95,13 +93,18 @@ class Detector():
         '''
         assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
         # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
-        input_size = kwargs.get('input_size', self.input_img_size)
+        input_size = kwargs.get('input_size', None)
+        to_square = kwargs.get('to_square', False)
         conf_thres = kwargs.get('conf_thres', self.conf_thres)
         nms_thres = kwargs.get('nms_thres', self.nms_thres)
 
         # resize such that the shorter side = input_size
         ori_shorter = min(pil_img.height, pil_img.width)
-        pil_img = tvf.resize(pil_img, input_size)
+        if to_square:
+            assert input_size > 0
+            pil_img, _, pad_info = Utils.rect_to_square(pil_img, None, input_size)
+        elif input_size:
+            pil_img = tvf.resize(pil_img, input_size)
         # convert to tensor
         t_img = tvf.to_tensor(pil_img)
         if self.model.input_format == 'BGR_255_norm':
@@ -128,6 +131,8 @@ class Detector():
         # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
         # plt.imshow(np_img)
         # plt.show()
-        # dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
-        dts.bboxes = dts.bboxes / input_size * ori_shorter
+        if to_square:
+            dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
+        elif input_size:
+            dts.bboxes = dts.bboxes / input_size * ori_shorter
         return dts

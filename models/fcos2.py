@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tnf
 import torchvision.transforms.functional as tvf
-from fvcore.nn import smooth_l1_loss
+# from fvcore.nn import smooth_l1_loss
 
 from .backbones import get_backbone_fpn
+from .rpns import get_rpn
 import models.losses as lossLib
 from utils.structures import ImageObjects
 
@@ -15,8 +16,7 @@ class FCOS(nn.Module):
         num_class = cfg['num_class']
 
         self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['backbone_fpn'])
-        assert cfg['rpn'] == 'fcos'
-        self.rpn = FCOSHead(fpn_info['feature_channels'], num_class, dcnv2=False)
+        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], num_class)
 
         anchors = [0, 64, 128, 256, 512, 1e8]
         strides = fpn_info['feature_strides']
@@ -77,89 +77,6 @@ class FCOS(nn.Module):
             return loss
 
 
-# Source: https://github.com/tianzhi0549/FCOS
-class FCOSHead(nn.Module):
-    def __init__(self, in_ch, num_class, dcnv2=False):
-        """
-        Arguments:
-            in_ch (int): number of channels of the input feature
-        """
-        super().__init__()
-        self.use_dcn_in_tower = dcnv2
-        num_convs = 4
-
-        cls_tower = []
-        bbox_tower = []
-        for i in range(num_convs):
-            if self.use_dcn_in_tower and i == num_convs - 1:
-                raise NotImplementedError()
-                # conv_func = DFConv2d
-            else:
-                conv_func = nn.Conv2d
-            cls_tower.append(conv_func(in_ch, in_ch, 3, stride=1, padding=1))
-            cls_tower.append(nn.GroupNorm(32, in_ch))
-            # cls_tower.append(nn.BatchNorm2d(in_ch, eps=1e-5, momentum=0.9))
-            cls_tower.append(nn.ReLU())
-            bbox_tower.append(conv_func(in_ch, in_ch, 3, stride=1, padding=1))
-            bbox_tower.append(nn.GroupNorm(32, in_ch))
-            # bbox_tower.append(nn.BatchNorm2d(in_ch, eps=1e-5, momentum=0.9))
-            bbox_tower.append(nn.ReLU())
-
-        self.cls_tower = nn.Sequential(*cls_tower)
-        self.bbox_tower = nn.Sequential(*bbox_tower)
-        self.cls_pred = nn.Conv2d(in_ch, num_class, 3, stride=1, padding=1)
-        self.bbox_pred = nn.Conv2d(in_ch, 4, 3, stride=1, padding=1)
-        self.centerness = nn.Conv2d(in_ch, 1, 3, stride=1, padding=1)
-
-        # initialization
-        for modules in [self.cls_tower, self.bbox_tower,
-                        self.cls_pred, self.bbox_pred,
-                        self.centerness]:
-            for l in modules.modules():
-                if isinstance(l, nn.Conv2d):
-                    nn.init.normal_(l.weight, std=0.01)
-                    nn.init.constant_(l.bias, 0)
-
-        # initialize the bias for focal loss
-        prior_prob = torch.Tensor([0.01])[0]
-        bias_value = -torch.log((1 - prior_prob) / prior_prob)
-        nn.init.constant_(self.cls_pred.bias, bias_value)
-
-        self.scales = nn.ModuleList([Scale(init_value=1.0) for _ in range(5)])
-
-    def forward(self, x):
-        # cls_logits = []
-        # bbox_reg = []
-        # centerness = []
-        all_branch_preds = []
-        for l, feature in enumerate(x):
-            cls_tower = self.cls_tower(feature)
-            box_tower = self.bbox_tower(feature)
-
-            conf_pred = self.centerness(box_tower)
-            bbox_pred = self.scales[l](self.bbox_pred(box_tower))
-            cls_pred = self.cls_pred(cls_tower)
-            # bbox_reg.append(bbox_pred)
-
-            raw = {
-                'bbox': bbox_pred,
-                'class': cls_pred,
-                'center': conf_pred,
-            }
-            all_branch_preds.append(raw)
-
-        return all_branch_preds
-
-
-class Scale(nn.Module):
-    def __init__(self, init_value=1.0):
-        super(Scale, self).__init__()
-        self.scale = nn.Parameter(torch.FloatTensor([init_value]))
-
-    def forward(self, x):
-        return x * self.scale
-
-
 class FCOSLayer(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
@@ -176,15 +93,14 @@ class FCOSLayer(nn.Module):
     def forward(self, raw, img_size, labels=None):
         assert isinstance(raw, dict)
 
-        p_ltrb = raw['bbox'].permute(0, 2, 3, 1)
+        p_ltrb = raw['bbox']
         device = p_ltrb.device
         nB = p_ltrb.shape[0] # batch size
         nH, nW = p_ltrb.shape[1:3] # prediction grid size
 
-        p_center_logits = raw['center'].permute(0, 2, 3, 1)
-        p_cls_logits = raw['class'].permute(0, 2, 3, 1)
+        p_center_logits = raw['center']
+        p_cls_logits = raw['class']
         
-
         if self.ltrb_setting.startswith('relu'):
             p_ltrb = tnf.relu(p_ltrb, inplace=True)
 
@@ -272,7 +188,7 @@ class FCOSLayer(nn.Module):
                     TargetLTRB[b,di1,di2,:] = torch.log(ltrb_/self.stride + 1e-8)
                 else:
                     raise NotImplementedError()
-                TargetConf[b, di1, di2] = 1 #gt_conf[i][duty_mask]
+                TargetConf[b, di1, di2] = gt_conf[i][duty_mask].unsqueeze_(-1)
                 if self.n_cls > 0:
                     TargetCls[b, di1, di2, gt_cls[i]] = 1
             # update the responsibility mask of the whole batch
@@ -287,14 +203,13 @@ class FCOSLayer(nn.Module):
         pLTRB, gtLTRB = p_ltrb[PenaltyMask], TargetLTRB[PenaltyMask]
         if self.ltrb_setting.endswith('sl1'):
             # smooth L1 loss for l,t,r,b
-            # loss_bbox = 0.5 * lossLib.smooth_L1_loss(pLTRB, gtLTRB, beta=1, 
-            #                                          reduction='sum')
-            loss_bbox = 0.5 * tnf.smooth_l1_loss(pLTRB, gtLTRB, reduction='sum')
+            loss_bbox = 0.5 * lossLib.smooth_L1_loss(pLTRB, gtLTRB, beta=1,
+                                                     reduction='sum')
+            # loss_bbox = 0.5 * tnf.smooth_l1_loss(pLTRB, gtLTRB, reduction='sum')
             # loss_bbox = 0.5 * smooth_l1_loss(pLTRB, gtLTRB, 1, reduction='sum')
         elif self.ltrb_setting.endswith('l2'):
             # smooth L1 loss for l,t,r,b
             loss_bbox = 0.5 * tnf.mse_loss(pLTRB, gtLTRB, reduction='sum')
-        # TODO
         # Binary cross entropy for confidence and classes
         bce_logits = tnf.binary_cross_entropy_with_logits
         loss_conf = bce_logits(p_center_logits, TargetConf, reduction='sum')
@@ -303,8 +218,7 @@ class FCOSLayer(nn.Module):
                                   TargetCls[PenaltyMask], reduction='sum')
         else:
             loss_cls = 0
-        # loss = loss_bbox + loss_conf + loss_cls
-        loss = loss_conf
+        loss = loss_bbox + loss_conf + loss_cls
         
         # logging
         ngt = ValidGTnum + 1e-16

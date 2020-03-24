@@ -14,10 +14,10 @@ import api
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     # -------------------------- settings ---------------------------
-    model_name = 'fcs_d53yc3_sl1'
+    model_name = 'fcs2_yv3_expsl1'
     # model_name = 'yv3_ltrb'
-    target_size = 512
-    batch_size = 2
+    target_size = 640
+    batch_size = 1
     subdivision = 1
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     lr_SGD = 0.0001 / batch_size / subdivision
     # Dataset setting
     train_img_dir = '../COCO/val2017/'
-    train_json = '../COCO/annotations/debug3.json'
+    train_json = '../COCO/annotations/debug1.json'
     
     print('Initialing training set...')
     dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=target_size, 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         optimizer.step()
 
         # logging
-        if iter_i % 10 == 0:
+        if iter_i % 2 == 0:
             print(f'[Iteration {iter_i}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')
             print(model.loss_str)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                 impath = os.path.join(train_img_dir, imname)
                 model_eval = api.Detector(model=model)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                                            input_size=target_size, conf_thres=0.3)
+                        to_square=True, input_size=target_size, conf_thres=0.3)
                 cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
                 log_dir = f'./logs/{model_name}_debug/'
                 if not os.path.exists(log_dir): os.mkdir(log_dir)
