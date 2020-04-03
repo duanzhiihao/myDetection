@@ -5,6 +5,7 @@
 - [x] YOLO v3 + FCOS
 - [ ] FCOS
 - [ ] EfficentNet backbone
+- [ ] EfficientNet + BiFPN + YOLO
 - [ ] EfficientDet
-- [ ] EfficientDet + FCOS
+- [ ] EfficientDet prediction layer vs YOLO prediction layer
 - [ ] EfficientDet + FCOS + ATSS
