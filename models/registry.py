@@ -5,7 +5,16 @@ def name_to_model(model_name):
         # darknet-53, YOLO fpn C3, 3x3 anchor boxes, 
         # xywh, norm by anchor, exp, xy:BCE, wh:L2
         from .yolov3 import YOLOv3
-        return YOLOv3(class_num=80, backbone='dark53', img_norm=False)
+        cfg = {
+            'backbone_fpn': 'my_res50_retina',
+            'rpn': 'yv3',
+            'n_anchors_per_level': 3,
+            'pred_layer': 'YOLO',
+            'wh_setting': 'exp_sl1',
+            'num_class': 80,
+            'input_format': 'RGB_1',
+        }
+        return YOLOv3(cfg)
 
     elif model_name == 'yv3_r50':
         # darknet-53, YOLO fpn C3, 3x3 anchor boxes, 

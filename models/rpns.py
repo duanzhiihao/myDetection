@@ -11,8 +11,9 @@ def get_rpn(name, chs, num_class):
 
 
 class YOLOHead(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024), num_class=80, n_anchor=1):
+    def __init__(self, in_channels=(256, 512, 1024), num_class=80, **kwargs):
         super().__init__()
+        n_anchor = kwargs['n_anchors_per_level']
         self.heads = nn.ModuleList()
         for ch in in_channels:
             self.heads.append(nn.Conv2d(ch, (80+5)*n_anchor, 1, stride=1))
@@ -28,7 +29,7 @@ class YOLOHead(nn.Module):
             raw = {
                 'bbox': bbox_pred,
                 'class': cls_pred,
-                'center': conf_pred,
+                'conf': conf_pred,
             }
             all_level_preds.append(raw)
         

@@ -1,24 +1,82 @@
-from time import time
-from collections import defaultdict
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as tnf
-import torchvision.transforms.functional as tvf
 
-from .backbones import get_backbone
-from .fpns import get_fpn
+from .backbones import get_backbone_fpn
+from .rpns import get_rpn
 import models.losses as lossLib
 from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
 from utils.iou_funcs import bboxes_iou
 from utils.structures import ImageObjects
-# from utils.timer import contexttimer
 
 
 class YOLOv3(nn.Module):
-    def __init__(self, class_num=80, backbone='dark53', **kwargs):
+    def __init__(self, cfg):
         super().__init__()
-        self.input_normalization = kwargs.get('img_norm', False)
+        num_class = cfg['num_class']
+
+        self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['dark53_yv3'])
+        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], num_class,
+                           **cfg)
+        
+        if cfg['pred_layer'] == 'YOLO':
+            pred_layer = YOLOLayer
+        elif cfg['pred_layer'] == 'FCOS':
+            pred_layer = FCOSLayer
+        self.bb_layers = nn.ModuleList()
+        strides = fpn_info['feature_strides']
+        for level_i, s in enumerate(strides):
+            self.bb_layers.append(pred_layer(strides_all=strides, stride=s,
+                                             level=level_i, **cfg))
+
+        self.input_format = cfg['input_format']
+
+    def forward(self, x, labels=None):
+        '''
+        x: a batch of images, e.g. shape(8,3,608,608)
+        labels: a batch of ground truth
+        '''
+        assert x.dim() == 4
+        self.img_size = x.shape[2:4]
+
+        # go through the backbone and the feature payamid network
+        features = self.backbone(x)
+        features = self.fpn(features)
+        all_branch_preds = self.rpn(features)
+        
+        dts_all = []
+        losses_all = []
+        for i, raw_preds in enumerate(all_branch_preds):
+            dts, loss = self.bb_layer[i](raw_preds, self.img_size, labels)
+            dts_all.append(dts)
+            losses_all.append(loss)
+
+        if labels is None:
+            batch_bbs = torch.cat([d['bbox'] for d in dts_all], dim=1)
+            batch_cls_idx = torch.cat([d['class_idx'] for d in dts_all], dim=1)
+            batch_confs = torch.cat([d['conf'] for d in dts_all], dim=1)
+
+            p_objects = []
+            for bbs, cls_idx, confs in zip(batch_bbs, batch_cls_idx, batch_confs):
+                p_objects.append(ImageObjects(bboxes=bbs, cats=cls_idx, scores=confs))
+            return p_objects
+        else:
+            assert isinstance(labels, list)
+            # total_gt_num = sum([t.shape[0] for t in labels])
+            # assigned_gt_num = sum(branch._assigned_num for branch in self.bb_layer)
+            self.loss_str = ''
+            for m in self.bb_layer:
+                self.loss_str += m.loss_str + '\n'
+            loss = sum(losses_all)
+            return loss
+
+
+class YOLOLayer(nn.Module):
+    '''
+    calculate the output boxes and losses
+    '''
+    def __init__(self, **kwargs):
+        super().__init__()
         anchors = [
             [10, 13], [16, 30], [33, 23],
             [30, 61], [62, 45], [59, 119],
@@ -26,110 +84,12 @@ class YOLOv3(nn.Module):
         ]
         indices = [[6,7,8], [3,4,5], [0,1,2]]
         self.anchors_all = torch.Tensor(anchors).float()
-        assert self.anchors_all.shape[1] == 2 and len(indices) == 3
-        self.index_L = torch.Tensor(indices[0]).long()
-        self.index_M = torch.Tensor(indices[1]).long()
-        self.index_S = torch.Tensor(indices[2]).long()
 
-        self.backbone, chs, strides = get_backbone(backbone)
-        self.fpn = get_fpn('yolo3', in_channels=chs, class_num=class_num)
-        
-        pred_layer_name = kwargs.get('pred_layer', 'YOLO')
-        if pred_layer_name == 'YOLO':
-            pred_layer = YOLOLayer
-        elif pred_layer_name == 'FCOS':
-            pred_layer = FCOSLayer
-        self.yolo_S = pred_layer(self.anchors_all, self.index_S, class_num,
-                                 stride=strides[0], **kwargs)
-        self.yolo_M = pred_layer(self.anchors_all, self.index_M, class_num,
-                                 stride=strides[1], **kwargs)
-        self.yolo_L = pred_layer(self.anchors_all, self.index_L, class_num,
-                                 stride=strides[2], **kwargs)
+        level_i = kwargs['level_i']
+        self.stride = kwargs['strides_all'][level_i]
+        self.n_cls = kwargs['num_class']
 
-        self.time_dic = defaultdict(float)
-
-    def forward(self, x, labels=None):
-        '''
-        x: a batch of images, e.g. shape(8,3,608,608)
-        labels: a batch of ground truth
-        '''
-        torch.cuda.reset_max_memory_allocated()
-        # assert x.dim() == 4 and x.shape[2] == x.shape[3]
-        # assert ((x>=-0.5) & (x<=1.5)).all()
-        self.img_size = x.shape[2]
-        # normalization
-        if self.input_normalization:
-            for i in range(x.shape[0]):
-                x[i] = tvf.normalize(x[i], [0.485,0.456,0.406], [0.229,0.224,0.225],
-                                    inplace=True)
-                # debug = (x.mean(), x.std())
-
-        # go through the backbone and the feature payamid network
-        # tic = time()
-        features = self.backbone(x)
-        # torch.cuda.synchronize()
-        # self.time_dic['backbone'] += time() - tic
-
-        # tic = time()
-        features_fpn = self.fpn(features)
-        # torch.cuda.synchronize()
-        # self.time_dic['fpn'] += time() - tic
-
-        # process the boxes, and calculate loss if there is gt
-        p3_fpn, p4_fpn, p5_fpn = features_fpn
-        # tic = time()
-        boxes_S, loss_S = self.yolo_S(p3_fpn, self.img_size, labels)
-        # torch.cuda.synchronize()
-        # self.time_dic['head_1'] += time() - tic
-
-        # tic = time()
-        boxes_M, loss_M = self.yolo_M(p4_fpn, self.img_size, labels)
-        # torch.cuda.synchronize()
-        # self.time_dic['head_2'] += time() - tic
-        
-        # tic = time()
-        boxes_L, loss_L = self.yolo_L(p5_fpn, self.img_size, labels)
-        # torch.cuda.synchronize()
-        # self.time_dic['head_3'] += time() - tic
-
-        if labels is None:
-            # tic = time()
-            # assert boxes_L.dim() == 3
-            boxes = torch.cat((boxes_L,boxes_M,boxes_S), dim=1)
-            bbs, confs, clss = boxes[...,:4], boxes[...,4], boxes[...,5:]
-            cls_score, cls_idx = clss.max(dim=2, keepdim=False)
-            # boxes = torch.cat([cls_idx.float(),boxes[...,0:5]], dim=2)
-            # boxes[:,:,4] *= cls_score.squeeze(-1)
-            # debug = boxes[boxes[...,5]>0.5]
-            # self.time_dic['cat_box'] += time() - tic
-            bb = ImageObjects(bboxes=bbs, cats=cls_idx, scores=confs*cls_score)
-            return bb
-        else:
-            # check all the gt objects are assigned
-            assert isinstance(labels, list)
-            gt_num = sum([t.shape[0] for t in labels])
-            assigned = self.yolo_L.gt_num + self.yolo_M.gt_num + self.yolo_S.gt_num
-            assert assigned == gt_num
-            self.loss_str = self.yolo_L.loss_str + '\n' + self.yolo_M.loss_str + \
-                            '\n' + self.yolo_S.loss_str
-            loss = loss_L + loss_M + loss_S
-            return loss
-    
-    def time_monitor(self):
-        s = str(self.time_dic)
-        # s += '\nbranch_1:' + str(self.yolo_S.time_dic)
-        # s += '\nbranch_2:' + str(self.yolo_M.time_dic)
-        # s += '\nbranch_3:' + str(self.yolo_L.time_dic)
-        return s
-
-
-class YOLOLayer(nn.Module):
-    '''
-    calculate the output boxes and losses
-    '''
-    def __init__(self, all_anchors, anchor_indices, class_num, **kwargs):
-        super().__init__()
-        self.anchors_all = all_anchors
+        anchor_indices = torch.Tensor(indices[level_i]).long()
         self.anchor_indices = anchor_indices
         self.anchors = self.anchors_all[anchor_indices, :]
         # anchors: tensor, e.g. shape(3,2), [[116, 90], [156, 198], [373, 326]]
@@ -137,14 +97,10 @@ class YOLOLayer(nn.Module):
         # all anchors, (0, 0, w, h), used for calculating IoU
         self.anch_00wh_all = torch.zeros(len(self.anchors_all), 4)
         self.anch_00wh_all[:,2:] = self.anchors_all # unnormalized
-        self.n_cls = class_num
-        self.stride = kwargs['stride']
 
         self.ignore_thre = 0.6
         # self.loss4conf = FocalBCE(reduction='sum')
         # self.loss4conf = nn.BCEWithLogitsLoss(reduction='sum')
-
-        self.time_dic = defaultdict(float)
 
     def forward(self, raw, img_size, labels=None):
         """
@@ -165,20 +121,16 @@ class YOLOLayer(nn.Module):
                 with boxsize-dependent weights.
             loss_conf: objectness loss - calculated by BCE.
         """
-        assert raw.shape[2] == raw.shape[3]
+        assert isinstance(raw, dict)
 
-        # raw shape(BatchSize, anchor_num*(5+cls_num), FeatureSize, FeatureSize)
-        device = raw.device
-        nB = raw.shape[0] # batch size
+        p_ltrb = raw['bbox']
+        device = p_ltrb.device
+        nB = p_ltrb.shape[0] # batch size
         nA = self.num_anchors # number of anchors
-        nG = raw.shape[2] # grid size, i.e., prediction resolution
-        nCH = 5 + self.n_cls # number of channels for each object
-        assert nG * self.stride == img_size
-
-        raw = raw.view(nB, nA, nCH, nG, nG)
-        raw = raw.permute(0, 1, 3, 4, 2).contiguous()
-        # Now raw.shape is (nB, nA, nG, nG, nCH), where the last demension is
-        # (x,y,w,h,conf,categories)
+        nH, nW = p_ltrb.shape[1:3] # prediction grid size
+        
+        p_conf_logits = raw['conf']
+        p_cls_logits = raw['class']
 
         # ----------------------- logits to prediction -----------------------
         preds = raw.detach().clone()
@@ -304,8 +256,6 @@ class FCOSLayer(nn.Module):
 
         self.ignore_thre = 0.6
         self.ltrb_setting = kwargs.get('ltrb', 'exp_l2')
-
-        self.time_dic = defaultdict(float)
 
     def forward(self, raw, img_size, labels=None):
         """
