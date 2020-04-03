@@ -1,12 +1,10 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.models
 
 from external_packages.efficientnet.model import EfficientNet
 from external_packages.maskrcnn_benchmark_resnet import ResNet
-
+from .modules import Swish
 
 # def get_backbone(name):
 #     if name == 'dark53':
@@ -186,51 +184,55 @@ def get_resnet50():
     return ResNetBackbone(model)
 
 
-class EfficientNetBackbone(EfficientNet):
-    def forward(self, inputs):
-        """
-        Serve as a backbone for YOLOv3. Returns output of the last three scales
-        """
-        ini_size = inputs.shape[-1]
-        # Stem
-        x = self._swish(self._bn0(self._conv_stem(inputs)))
+class EfNetBackbone(nn.Module):
+    '''
+    Args:
+        model_name: str, e.g., 'efficientnet-b0'
+        out_ch: int, e.g., 64
+    '''
+    valid_names = {
+        'efficientnet-b0', 'efficientnet-b1', 'efficientnet-b2',
+        'efficientnet-b3', 'efficientnet-b4', 'efficientnet-b5',
+        'efficientnet-b6'
+    }
+    def __init__(self, model_name, out_ch):
+        super().__init__()
+        assert model_name in self.valid_names, 'Unknown efficientnet model name'
+        efn = EfficientNet.from_pretrained(model_name, advprop=True)
+        del efn._conv_head, efn._bn1, efn._avg_pooling, efn._dropout, efn._fc
+        self.model = efn
 
+        p5_ch = efn._blocks_args[-1].output_filters
+        self.c5_to_c6 = conv1x1_bn_relu_maxp(p5_ch, out_ch)
+        self.c6_to_c7 = conv1x1_bn_relu_maxp(out_ch, out_ch)
+
+        efnet_chs = [efn._blocks_args[i].output_filters for i in [2,4,6]]
+        self.feature_chs = efnet_chs + [out_ch, out_ch]
+
+    def forward(self, x):
+        x = self.model._swish(self.model._bn0(self.model._conv_stem(x)))
         features = []
-        # Blocks
-        for idx, block in enumerate(self._blocks):
-            drop_connect_rate = self._global_params.drop_connect_rate
+        for idx, block in enumerate(self.model._blocks):
+            # print(block._depthwise_conv.stride)
+            drop_connect_rate = self.model._global_params.drop_connect_rate
             if drop_connect_rate:
-                drop_connect_rate *= float(idx) / len(self._blocks)
+                drop_connect_rate *= float(idx) / len(self.model._blocks)
             y = block(x, drop_connect_rate=drop_connect_rate)
             if y.shape[-1] != x.shape[-1]:
                 features.append(x)
             x = y
-
-        # Head
-        x = self._swish(self._bn1(self._conv_head(x)))
         features.append(x)
+        # C1 (2x), C2 (4x), C3 (8x), C4 (16x), C5 (32x)
+        C1, C2, C3, C4, C5 = features
+        C6 = self.c5_to_c6(C5)
+        C7 = self.c6_to_c7(C6)
+        return [C3, C4, C5, C6, C7]
 
-        # extract features for YOLOv3
-        small, medium, large = features[-3], features[-2], features[-1]
-        assert ini_size/small.shape[-1] == 8 and ini_size/large.shape[-1] == 32
-        return small, medium, large
 
-def efficientnet(model_name):
-    print(f'Using backbone {model_name}. Loading ImageNet weights...')
-    model = EfficientNetBackbone.from_pretrained(model_name, advprop=True)
-    return model
-
-def efficient_feature_info(model_name):
-    feature_dict = {
-        # Coefficients:   (small, medium, large)
-        'efficientnet-b0': (40, 112, 1280),
-        'efficientnet-b1': (40, 112, 1280),
-        'efficientnet-b2': (48, 120, 1408),
-        'efficientnet-b3': (48, 136, 1536),
-        'efficientnet-b4': (56, 160, 1792),
-        'efficientnet-b5': (64, 176, 2048),
-        'efficientnet-b6': (72, 200, 2304),
-        'efficientnet-b7': (80, 224, 2560),
-        'efficientnet-b8': (88, 248, 2816)
-    }
-    return feature_dict[model_name]
+def conv1x1_bn_relu_maxp(in_ch, out_ch):
+    return nn.Sequential(
+        nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0),
+        nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.99),
+        Swish(),
+        nn.MaxPool2d(3, stride=2, padding=1)
+    )

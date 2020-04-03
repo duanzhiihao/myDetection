@@ -1,5 +1,5 @@
 '''
-This pytorch implementation is copied from https://github.com/lukemelas/EfficientNet-PyTorch
+Full credit to https://github.com/lukemelas/EfficientNet-PyTorch
 '''
 
 import torch

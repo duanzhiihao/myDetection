@@ -1,5 +1,7 @@
 import torch.nn as nn
 
+from .modules import SeparableConv2d, Swish
+
 
 def get_rpn(name, chs, num_class):
     if name == 'yv3':
@@ -97,7 +99,6 @@ class FCOSHead(nn.Module):
 
         return all_branch_preds
 
-
 # class Scale(nn.Module):
 #     def __init__(self, init_value=1.0):
 #         super(Scale, self).__init__()
@@ -105,3 +106,40 @@ class FCOSHead(nn.Module):
 
 #     def forward(self, x):
 #         return x * self.scale
+
+
+class EfDetHead(nn.Module):
+    def __init__(self, feature_chs, repeat, cls_ch=720, bbox_ch=36):
+        super().__init__()
+        self.class_nets = nn.ModuleList()
+        self.bbox_nets = nn.ModuleList()
+        for ch in feature_chs:
+            cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
+            cls_net.append(SeparableConv2d(ch, cls_ch, 3, 1, padding=1))
+            cls_net = nn.Sequential(*cls_net)
+            self.class_nets.append(cls_net)
+            
+            bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
+            bb_net.append(SeparableConv2d(ch, bbox_ch, 3, 1, padding=1))
+            bb_net = nn.Sequential(*bb_net)
+            self.bbox_nets.append(bb_net)
+    
+    def forward(self, features: list):
+        all_level_preds = []
+        for i, x in enumerate(features):
+            cls_pred = self.class_nets[i](x)
+            bbox_pred = self.bbox_nets[i](x)
+            raw = {
+                'bbox': bbox_pred,
+                'class': cls_pred,
+            }
+            all_level_preds.append(raw)
+        
+        return all_level_preds
+
+def spconv3x3_bn_swish(inout_ch):
+    return nn.Sequential(
+        SeparableConv2d(inout_ch, inout_ch, 3, 1, padding=1),
+        nn.BatchNorm2d(inout_ch, eps=0.001, momentum=0.99),
+        Swish()
+    )

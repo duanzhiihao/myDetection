@@ -69,6 +69,10 @@ def name_to_model(model_name):
             'num_class': 80,
         }
         return FCOS(cfg)
+    
+    elif model_name in {'eff-d0'}:
+        from .effdet import EfficientDet
+        return EfficientDet(model_id=model_name[-2:], num_class=80)
 
     else:
         raise Exception('Unknown model name')

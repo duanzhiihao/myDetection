@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 from .backbones import ConvBnLeaky
-
+from .modules import SeparableConv2d
 
 # def get_fpn(name, backbone_info=None, **kwargs):
 #     if name == 'yolo3':
@@ -267,3 +267,111 @@ def conv_uniform(in_channels, out_channels, kernel_size, stride=1, dilation=1,
     if len(module) > 1:
         return nn.Sequential(*module)
     return conv
+
+
+def get_bifpn(in_chs, out_ch, repeat_num, fusion_method='linear'):
+    assert repeat_num >= 1
+    fpn = []
+    fpn.append(BiFPN5(out_ch, fusion_method=fusion_method, in_chs=in_chs))
+    for _ in range(repeat_num-1):
+        fpn.append(BiFPN5(out_ch, fusion_method=fusion_method))
+    fpn = nn.Sequential(*fpn)
+    return fpn
+
+
+class BiFPN5(nn.Module):
+    def __init__(self, fpn_ch, fusion_method='linear', in_chs=None):
+        super().__init__()
+        self.eps = 1e-4
+        
+        if in_chs:
+            assert len(in_chs) == 5
+            assert in_chs[3] == fpn_ch and in_chs[4] == fpn_ch
+        self.p3in_out = conv1x1_bn(in_chs[0], fpn_ch) if in_chs else lambda x:x
+        self.p4in_m = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
+        self.p4in_out = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
+        self.p5in_m = conv1x1_bn(in_chs[2], fpn_ch) if in_chs else lambda x:x
+        self.p5in_out = conv1x1_bn(in_chs[2], fpn_ch) if in_chs else lambda x:x
+        # self.in_chs = in_chs
+
+        if fusion_method == 'linear':
+            fusion_layer = LinearFusion
+        elif fusion_method == 'softmax':
+            raise NotImplementedError()
+
+        self.fuse_6m = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_5m = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_4m = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_3out = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_4out = fusion_layer(num=3, channels=fpn_ch)
+        self.fuse_5out = fusion_layer(num=3, channels=fpn_ch)
+        self.fuse_6out = fusion_layer(num=3, channels=fpn_ch)
+        self.fuse_7out = fusion_layer(num=2, channels=fpn_ch)
+
+    def forward(self, features):
+        """
+            P7in ------------------------- P7out -------->
+                 ------>-----|               |
+            P6in ---------- P6m ---------- P6out -------->
+                             |               |
+            P5in ---------- P5m ---------- P5out -------->
+                             |               |
+            P4in ---------- P4m ---------- P4out -------->
+                             |------>-----   |
+            P3in ------------------------- P3out -------->
+        """
+        P3in, P4in, P5in, P6in, P7in = features
+        assert P3in.shape[2] == P4in.shape[2]*2 == P5in.shape[2]*4 \
+               == P6in.shape[2]*8 == P7in.shape[2]*16
+        # P6in + P7in -> P6m
+        P6m = self.fuse_6m(P6in, upsample2x(P7in))
+        # P5in + P6m -> P5m
+        P5m = self.fuse_5m(self.p5in_m(P5in), upsample2x(P6m))
+        # P4in + P5m -> P4m
+        P4m = self.fuse_4m(self.p4in_m(P4in), upsample2x(P5m))
+        # P3in + P4m -> P3out
+        P3out = self.fuse_3out(self.p3in_out(P3in), upsample2x(P4m))
+        # P4in + P4m + P3out -> P4out
+        _P3out_to_P4 = tnf.max_pool2d(P3out, kernel_size=3, stride=2, padding=1)
+        P4out = self.fuse_4out(self.p4in_out(P4in), P4m, _P3out_to_P4)
+        # P5in + P5m + P4out -> P5out
+        _P4out_to_P5 = tnf.max_pool2d(P4out, kernel_size=3, stride=2, padding=1)
+        P5out = self.fuse_5out(self.p5in_out(P5in), P5m, _P4out_to_P5)
+        # P6in + P6m + P5out -> P6out
+        _P5out_to_P6 = tnf.max_pool2d(P5out, kernel_size=3, stride=2, padding=1)
+        P6out = self.fuse_6out(P6in, P6m, _P5out_to_P6)
+        # P7in + P6out -> P7out
+        _P6out_to_P7 = tnf.max_pool2d(P6out, kernel_size=3, stride=2, padding=1)
+        P7out = self.fuse_7out(P7in, _P6out_to_P7)
+        return [P3out, P4out, P5out, P6out, P7out]
+
+class LinearFusion(nn.Module):
+    def __init__(self, num, channels):
+        super().__init__()
+        self.num = num
+        self.weights = nn.Parameter(torch.ones(num), requires_grad=True)
+        self.spconv_bn = nn.Sequential(
+            SeparableConv2d(channels, channels, 3, 1, padding=1),
+            nn.BatchNorm2d(channels, eps=0.001,momentum=0.99)
+        )
+    
+    def forward(self, *features):
+        assert isinstance(features, (list,tuple)) and len(features) == self.num
+        weights = tnf.relu(self.weights)
+        weighted = [w*x for w,x in zip(weights, features)]
+        sum_ = weights.sum() + 0.0001
+        fused = sum(weighted) / sum_
+        fused = self.spconv_bn(swish(fused))
+        return fused
+
+def upsample2x(x):
+    return tnf.interpolate(x, scale_factor=(2,2), mode='nearest')
+
+def swish(x):
+    return x * torch.sigmoid(x)
+
+def conv1x1_bn(in_ch, out_ch):
+    return nn.Sequential(
+        nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0),
+        nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.99),
+    )
