@@ -27,17 +27,18 @@ if __name__ == '__main__':
     train_img_dir = '../COCO/val2017/'
     train_json = '../COCO/annotations/debug1.json'
     
-    print('Initialing training set...')
-    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', img_size=target_size, 
-                             augmentation=False, debug_mode=False)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
-            collate_fn=Dataset4ObjDet.collate_func, num_workers=0, pin_memory=True)
-    dataiterator = iter(dataloader)
-
     print('Initialing model...')
     model = name_to_model(model_name)
     model = model.cuda()
     model.train()
+    
+    print('Initialing training set...')
+    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', target_size,
+                             input_format=model.input_format, augmentation=False,
+                             debug_mode=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, 
+            collate_fn=Dataset4ObjDet.collate_func, num_workers=0, pin_memory=True)
+    dataiterator = iter(dataloader)
 
     # optimizer setup
     params = []
@@ -47,7 +48,7 @@ if __name__ == '__main__':
             params += [{'params':value, 'weight_decay':decay_SGD}]
         else:
             params += [{'params':value, 'weight_decay':0.0}]
-    optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.5, dampening=0,
+    optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.6, dampening=0,
                                 weight_decay=decay_SGD)
     # optimizer = torch.optim.SGD(params, lr=lr_SGD)
 

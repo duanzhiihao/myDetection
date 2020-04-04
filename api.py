@@ -107,12 +107,7 @@ class Detector():
             pil_img = tvf.resize(pil_img, input_size)
         # convert to tensor
         t_img = tvf.to_tensor(pil_img)
-        if self.model.input_format == 'BGR_255_norm':
-            # to BGR, to 255
-            t_img = t_img[[2,1,0],:,:] * 255
-            # normalization
-            t_img = tvf.normalize(t_img, [102.9801,115.9465,122.7717], [1,1,1],
-                                    inplace=True)
+        t_img = Utils.format_tensor_img(t_img, code=self.model.input_format)
 
         input_ = t_img.unsqueeze(0)
         assert input_.dim() == 4

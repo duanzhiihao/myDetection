@@ -23,7 +23,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='fcs_d53yc3_sl1')
+    parser.add_argument('--model', type=str, default='yolov3')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
     # parser.add_argument('--img_norm', action='store_true')
@@ -55,29 +55,32 @@ def main():
     subdivision = 128 // batch_size
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
-    decay_SGD = 0.0005 * batch_size * subdivision
+    decay_SGD = 0.0001 * batch_size * subdivision
     lr_SGD = 0.001 / batch_size / subdivision
     # Dataset setting
     if args.dataset == 'COCO':
-        train_img_dir = '../COCO/train2017/'
+        train_img_dir = '../COCO/train2017'
         train_json = '../COCO/annotations/instances_train2017.json'
-        val_img_dir = '../COCO/val2017/'
+        val_img_dir = '../COCO/val2017'
         valjson = '../COCO/annotations/instances_val2017.json'
+    else:
+        raise NotImplementedError()
     
-    print('Initialing training set...')
-    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', debug_mode=False,
-                             img_size=args.res_max, augmentation=enable_aug)
+    print('Initialing model...')
+    model = name_to_model(args.model)
+    model = model.cuda()
+    model.train()
+
+    print(f'Initialing training set {train_img_dir}...')
+    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', args.res_max,
+                             input_format=model.input_format, augmentation=enable_aug,
+                             debug_mode=False)
     dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=num_cpu,
                             collate_fn=Dataset4ObjDet.collate_func, pin_memory=True)
     dataiterator = iter(dataloader)
     
     eval_img_names = [s for s in os.listdir('./images/') if s.endswith('.jpg')]
     eval_img_paths = [os.path.join('./images/',s) for s in eval_img_names]
-
-    print('Initialing model...')
-    model = name_to_model(args.model)
-    model = model.cuda()
-    model.train()
 
     start_iter = -1
     if args.checkpoint:
@@ -91,7 +94,7 @@ def main():
     print('Initialing tensorboard SummaryWriter...')
     logger = SummaryWriter(f'./logs/{job_name}')
 
-    # optimizer setup
+    print(f'Initialing optimizer with lr: {lr_SGD}, decay: {decay_SGD}')
     params = []
     # set weight decay only on conv.weight
     for key, value in model.named_parameters():
@@ -99,7 +102,7 @@ def main():
             params += [{'params':value, 'weight_decay':decay_SGD}]
         else:
             params += [{'params':value, 'weight_decay':0.0}]
-
+    # Initialize optimizer
     optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.9, dampening=0,
                                 weight_decay=decay_SGD)
     if args.checkpoint and 'optimizer' in previous_state:
@@ -110,7 +113,7 @@ def main():
     print('Starting training...')
     today = timer.today()
     start_time = timer.tic()
-    for iter_i in range(start_iter, 500000):
+    for iter_i in range(start_iter, 100000):
         # evaluation
         if iter_i > 0 and iter_i % args.eval_interval == 0:
             with timer.contexttimer() as t0:
@@ -193,7 +196,7 @@ def main():
             for impath in eval_img_paths:
                 model_eval = api.Detector(model=model)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                                            input_size=target_size, conf_thres=0.3)
+                                               input_size=None, conf_thres=0.3)
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 
@@ -204,13 +207,13 @@ def lr_schedule_func(i):
     if i < warm_up:
         factor = i / warm_up
     elif i < 40000:
-        factor = 1.0
+        factor = 1
     elif i < 80000:
-        factor = 0.5
-    elif i < 160000:
-        factor = 0.2
-    elif i < 200000:
+        factor = 0.4
+    elif i < 100000:
         factor = 0.1
+    elif i < 200000:
+        factor = 1
     else:
         factor = 0.01
     return factor

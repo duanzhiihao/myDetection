@@ -24,12 +24,12 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         only_person: bool, if true, non-person BBs are discarded. default: True
         debug: bool, if True, only one data id is selected from the dataset
     """
-    def __init__(self, img_dir, json_path, bb_format='x1y1wh', img_size=608, 
+    def __init__(self, img_dir, json_path, bb_format, img_size, input_format,
                  augmentation=True, debug_mode=False):
         self.img_dir = img_dir
         self.img_size = img_size
+        self.input_format = input_format
         self.enable_aug = augmentation
-        self.max_obj_per_img = 100
         # self.only_person = only_person
         # if only_person:
         #     print('Only train on person images and objects')
@@ -112,27 +112,23 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         for _, ann in enumerate(self.imgid2anns[img_id]):
             # if self.only_person and ann['category_id'] != 1:
             #     continue
-            if ann['bbox'][2]*ann['bbox'][3] <= 100:
-                # import matplotlib.pyplot as plt
-                # plt.imshow(np.array(img))
-                # plt.show()
-                continue
             labels.append(ann['gt'])
         # if self.only_person:
         #     assert (labels[:,0] == 0).all()
         labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
         # each row of labels is [category, x, y, w, h]
-
         # augmentation
         if self.enable_aug:
             img, labels = self.augment_PIL(img, labels)
-
         # pad to square
         img, labels, pad_info = Utils.rect_to_square(img, labels, self.img_size,
                                         pad_value=0, aug=self.enable_aug)
-
+        # Remove annotations which are too small
+        label_areas = labels[:,3] * labels[:,4]
+        labels = labels[label_areas > 64]
+        # Convert PIL.image into torch.tensor with shape (3,h,w)
         img = tvf.to_tensor(img)
-        # now img is a tensor with shape (3,h,w)
+        # Noise augmentation
         if self.enable_aug:
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
             #         augUtils.random_gaussian_filter]
@@ -143,17 +139,16 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # img = augUtils.add_gaussian(img, max_var=0.002)
             if np.random.rand() > 0.6:
                 img = augUtils.add_saltpepper(img, max_p=0.02)
-
-        # labels = Utils.normalize_bbox(labels, self.img_size)
+        # Convert into desired input format, e.g., normalized
+        img = Utils.format_tensor_img(img, code=self.input_format)
+        # Debugging
         if (labels[:,1:5] >= self.img_size).any():
-            print('Warning: some x,y in ground truth are greater than 1')
+            print('Warning: some x,y in ground truth are greater than image size')
             print('image path:', img_path)
         if (labels[:,1:5] < 0).any():
             print('Warning: some x,y in ground truth are smaller than 0')
             print('image path:', img_path)
         labels[:,1:5].clamp_(min=0)
-
-        # assert (labels[:,1:3] >= 0).all() and (labels[:,1:3] < 1).all(), print(labels)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
