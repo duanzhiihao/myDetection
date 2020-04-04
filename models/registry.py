@@ -6,7 +6,7 @@ def name_to_model(model_name):
         # xywh, norm by anchor, exp, xy:BCE, wh:L2
         from .yolov3 import YOLOv3
         cfg = {
-            'backbone_fpn': 'dark53_yv3',
+            'backbone_fpn': 'eff-d0',
             'rpn': 'yv3',
             'n_anchors_per_level': 3,
             'pred_layer': 'YOLO',
