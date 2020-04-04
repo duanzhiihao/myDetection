@@ -90,11 +90,38 @@ def name_to_model(model_name):
         }
         return FCOS(cfg)
 
-    if model_name == 'd0_345_a3_conf_yolo':
+    elif model_name == 'd0_345_a3_conf_yolo':
         from .yolov3 import YOLOv3
         cfg = {
-            'backbone_fpn': 'b0_bifpn_345',
+            'backbone_fpn': 'd0_345',
             'rpn': 'eff_w_conf',
+            'head_repeat_num': 3,
+            'num_anchor_per_level': 3,
+            'pred_layer': 'YOLO',
+            'num_class': 80,
+            'input_format': 'RGB_1_norm',
+        }
+        return YOLOv3(cfg)
+    
+    elif model_name == 'd1_345_a3_conf_yolo':
+        from .yolov3 import YOLOv3
+        cfg = {
+            'backbone_fpn': 'd1_345',
+            'rpn': 'eff_w_conf',
+            'head_repeat_num': 3,
+            'num_anchor_per_level': 3,
+            'pred_layer': 'YOLO',
+            'num_class': 80,
+            'input_format': 'RGB_1_norm',
+        }
+        return YOLOv3(cfg)
+        
+    elif model_name == 'd2_345_a3_conf_yolo':
+        from .yolov3 import YOLOv3
+        cfg = {
+            'backbone_fpn': 'd2_345',
+            'rpn': 'eff_w_conf',
+            'head_repeat_num': 3,
             'num_anchor_per_level': 3,
             'pred_layer': 'YOLO',
             'num_class': 80,

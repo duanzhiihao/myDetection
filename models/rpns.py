@@ -7,7 +7,8 @@ def get_rpn(name, chs, **kwargs):
     if name == 'yv3':
         return YOLOHead(in_channels=chs, **kwargs)
     elif name == 'eff_w_conf':
-        return EfDetHead(chs, repeat=3, with_conf=True, **kwargs)
+        rep_num = kwargs.pop('head_repeat_num')
+        return EfDetHead(chs, repeat=rep_num, with_conf=True, **kwargs)
     else:
         raise NotImplementedError()
 

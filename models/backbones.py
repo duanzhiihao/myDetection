@@ -63,12 +63,17 @@ def get_backbone_fpn(name):
             'feature_channels': backbone.feature_chs,
             'feature_strides': (8, 16, 32),
         }
-    elif name == 'b0_bifpn_345':
-        backbone = EfNetBackbone(model_name='efficientnet-b0', C6C7=False)
+    elif name in {'d0_345', 'd1_345', 'd2_345', 'd3_345', 'd4_345'}:
+        id2info = {
+            'd0': (64, 3), 'd1': (88, 4), 'd2': (112, 5), 'd3': (160, 6),
+            'd4': (224, 7),
+        }
+        backbone = EfNetBackbone('efficientnet-b'+name[1], C6C7=False)
         from .fpns import get_bifpn
-        fpn = get_bifpn(backbone.feature_chs, out_ch=64, repeat_num=3)
+        fpn_ch, fpn_num = id2info[name[:2]]
+        fpn = get_bifpn(backbone.feature_chs, out_ch=fpn_ch, repeat_num=fpn_num)
         info = {
-            'feature_channels': (64, 64, 64),
+            'feature_channels': (fpn_ch, fpn_ch, fpn_ch),
             'feature_strides': (8, 16, 32),
         }
     else:
