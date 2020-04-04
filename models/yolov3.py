@@ -97,7 +97,6 @@ class YOLOLayer(nn.Module):
         self.anch_00wh_all[:,2:] = self.anchors_all # unnormalized
 
         self.ignore_thre = 0.6
-        self.wh_setting = kwargs.get('wh_setting', 'exp_sl1')
 
     def forward(self, raw: dict, img_size, labels=None):
         assert isinstance(raw, dict)
@@ -120,7 +119,6 @@ class YOLOLayer(nn.Module):
         p_xywh[..., 1] = (torch.sigmoid(p_xywh[..., 1]) + mesh_y) * self.stride
         # w, h
         anch_wh = self.anchors.view(1,nA,1,1,2).to(device=device)
-        assert self.wh_setting.startswith('exp')
         p_xywh[...,2:4] = torch.exp(p_xywh[...,2:4]) * anch_wh
         p_xywh = p_xywh.view(nB, nA*nH*nW, 4).cpu()
 

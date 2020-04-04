@@ -10,7 +10,6 @@ def name_to_model(model_name):
             'rpn': 'yv3',
             'n_anchors_per_level': 3,
             'pred_layer': 'YOLO',
-            'wh_setting': 'exp_sl1',
             'num_class': 80,
             'input_format': 'RGB_1',
         }
@@ -25,7 +24,6 @@ def name_to_model(model_name):
             'rpn': 'yv3',
             'n_anchors_per_level': 3,
             'pred_layer': 'YOLO',
-            'wh_setting': 'exp_sl1',
             'num_class': 80,
             'input_format': 'RGB_1',
         }

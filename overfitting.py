@@ -22,7 +22,7 @@ if __name__ == '__main__':
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
     decay_SGD = 0.0001 * batch_size * subdivision
-    lr_SGD = 0.00001 / batch_size / subdivision
+    lr_SGD = 0.00002 / batch_size / subdivision
     # Dataset setting
     train_img_dir = '../COCO/val2017/'
     train_json = '../COCO/annotations/debug1.json'
@@ -47,9 +47,9 @@ if __name__ == '__main__':
             params += [{'params':value, 'weight_decay':decay_SGD}]
         else:
             params += [{'params':value, 'weight_decay':0.0}]
-    # optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.8, dampening=0,
-    #                             weight_decay=decay_SGD)
-    optimizer = torch.optim.SGD(params, lr=lr_SGD)
+    optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.5, dampening=0,
+                                weight_decay=decay_SGD)
+    # optimizer = torch.optim.SGD(params, lr=lr_SGD)
 
     print('Starting training...')
     today = timer.today()
