@@ -6,6 +6,8 @@ from .modules import SeparableConv2d, Swish
 def get_rpn(name, chs, **kwargs):
     if name == 'yv3':
         return YOLOHead(in_channels=chs, **kwargs)
+    elif name == 'eff_w_conf':
+        return EfDetHead(chs, repeat=3, with_conf=True, **kwargs)
     else:
         raise NotImplementedError()
 
@@ -113,30 +115,48 @@ class FCOSHead(nn.Module):
 
 
 class EfDetHead(nn.Module):
-    def __init__(self, feature_chs, repeat, cls_ch=720, bbox_ch=36):
+    def __init__(self, feature_chs, repeat, with_conf=False, **kwargs):
         super().__init__()
+        n_anch = kwargs.get('num_anchor_per_level', 3)
+        n_cls = kwargs.get('num_class', 80)
         self.class_nets = nn.ModuleList()
         self.bbox_nets = nn.ModuleList()
+        cls_ch = n_anch*(1+n_cls) if with_conf else n_anch*n_cls
         for ch in feature_chs:
+            bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
+            bb_net.append(SeparableConv2d(ch, n_anch*4, 3, 1, padding=1))
+            bb_net = nn.Sequential(*bb_net)
+            self.bbox_nets.append(bb_net)
+
             cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
             cls_net.append(SeparableConv2d(ch, cls_ch, 3, 1, padding=1))
             cls_net = nn.Sequential(*cls_net)
             self.class_nets.append(cls_net)
-            
-            bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
-            bb_net.append(SeparableConv2d(ch, bbox_ch, 3, 1, padding=1))
-            bb_net = nn.Sequential(*bb_net)
-            self.bbox_nets.append(bb_net)
+        self.n_anch = n_anch
+        self.n_cls = n_cls
+        self.with_conf = with_conf
     
     def forward(self, features: list):
         all_level_preds = []
         for i, x in enumerate(features):
             cls_pred = self.class_nets[i](x)
             bbox_pred = self.bbox_nets[i](x)
-            raw = {
-                'bbox': bbox_pred,
-                'class': cls_pred,
-            }
+
+            nB, _, nH, nW = bbox_pred.shape
+            nA, nCls = self.n_anch, self.n_cls
+            bbox_pred = bbox_pred.view(nB, nA, 4, nH, nW).permute(0, 1, 3, 4, 2)
+            cls_pred = cls_pred.view(nB, nA, -1, nH, nW).permute(0, 1, 3, 4, 2)
+            if self.with_conf:
+                raw = {
+                    'bbox': bbox_pred,
+                    'conf': cls_pred[..., 0:1],
+                    'class': cls_pred[..., 1:],
+                }
+            else:
+                raw = {
+                    'bbox': bbox_pred,
+                    'class': cls_pred,
+                }
             all_level_preds.append(raw)
         return all_level_preds
 

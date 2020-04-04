@@ -269,17 +269,17 @@ def conv_uniform(in_channels, out_channels, kernel_size, stride=1, dilation=1,
     return conv
 
 
-def get_bifpn(in_chs, out_ch, repeat_num, fusion_method='linear'):
+def get_bifpn(in_channels, out_ch, repeat_num, fusion_method='linear'):
     assert repeat_num >= 1
-    if len(in_chs) == 3:
+    if len(in_channels) == 3:
         fpn_func = BiFPN3
-    elif len(in_chs) == 5:
+    elif len(in_channels) == 5:
         fpn_func = BiFPN5
     else:
         raise NotImplementedError()
 
     fpn = []
-    fpn.append(fpn_func(out_ch, fusion_method=fusion_method, in_chs=in_chs))
+    fpn.append(fpn_func(out_ch, fusion_method=fusion_method, in_chs=in_channels))
     for _ in range(repeat_num-1):
         fpn.append(fpn_func(out_ch, fusion_method=fusion_method))
     fpn = nn.Sequential(*fpn)

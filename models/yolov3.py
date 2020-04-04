@@ -20,7 +20,10 @@ class YOLOv3(nn.Module):
         if cfg['pred_layer'] == 'YOLO':
             pred_layer = YOLOLayer
         elif cfg['pred_layer'] == 'FCOS':
+            raise NotImplementedError()
             pred_layer = FCOSLayer
+        else:
+            raise NotImplementedError()
         self.bb_layers = nn.ModuleList()
         strides = fpn_info['feature_strides']
         for level_i, s in enumerate(strides):

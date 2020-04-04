@@ -2,16 +2,14 @@
 
 def name_to_model(model_name):
     if model_name == 'test':
-        # darknet-53, YOLO fpn C3, 3x3 anchor boxes, 
-        # xywh, norm by anchor, exp, xy:BCE, wh:L2
         from .yolov3 import YOLOv3
         cfg = {
-            'backbone_fpn': 'eff-d0',
-            'rpn': 'yv3',
-            'n_anchors_per_level': 3,
+            'backbone_fpn': 'b0_bifpn_345',
+            'rpn': 'eff_w_conf',
+            'num_anchor_per_level': 3,
             'pred_layer': 'YOLO',
             'num_class': 80,
-            'input_format': 'RGB_1',
+            'input_format': 'RGB_1_norm',
         }
         return YOLOv3(cfg)
         
@@ -22,7 +20,7 @@ def name_to_model(model_name):
         cfg = {
             'backbone_fpn': 'dark53_yv3',
             'rpn': 'yv3',
-            'n_anchors_per_level': 3,
+            'num_anchor_per_level': 3,
             'pred_layer': 'YOLO',
             'num_class': 80,
             'input_format': 'RGB_1',
@@ -91,6 +89,18 @@ def name_to_model(model_name):
             'num_class': 80,
         }
         return FCOS(cfg)
+
+    if model_name == 'd0_345_a3_conf_yolo':
+        from .yolov3 import YOLOv3
+        cfg = {
+            'backbone_fpn': 'b0_bifpn_345',
+            'rpn': 'eff_w_conf',
+            'num_anchor_per_level': 3,
+            'pred_layer': 'YOLO',
+            'num_class': 80,
+            'input_format': 'RGB_1_norm',
+        }
+        return YOLOv3(cfg)
 
     elif model_name == 'eff-d0_yolo':
         from .effdet import EfficientDet

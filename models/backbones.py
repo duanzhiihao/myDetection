@@ -55,6 +55,22 @@ def get_backbone_fpn(name):
             'feature_channels': (256, 512, 1024),
             'feature_strides': (8, 16, 32),
         }
+    elif name == 'b0_yv3_345':
+        backbone = EfNetBackbone(model_name='efficientnet-b0', C6C7=False)
+        from .fpns import YOLOv3FPN
+        fpn = YOLOv3FPN(in_channels=backbone.feature_chs)
+        info = {
+            'feature_channels': backbone.feature_chs,
+            'feature_strides': (8, 16, 32),
+        }
+    elif name == 'b0_bifpn_345':
+        backbone = EfNetBackbone(model_name='efficientnet-b0', C6C7=False)
+        from .fpns import get_bifpn
+        fpn = get_bifpn(backbone.feature_chs, out_ch=64, repeat_num=3)
+        info = {
+            'feature_channels': (64, 64, 64),
+            'feature_strides': (8, 16, 32),
+        }
     else:
         raise NotImplementedError()
     
@@ -195,7 +211,7 @@ class EfNetBackbone(nn.Module):
         'efficientnet-b3', 'efficientnet-b4', 'efficientnet-b5',
         'efficientnet-b6'
     }
-    def __init__(self, model_name, out_ch, C6C7=True):
+    def __init__(self, model_name, out_ch=None, C6C7=True):
         super().__init__()
         assert model_name in self.valid_names, 'Unknown efficientnet model name'
         efn = EfficientNet.from_pretrained(model_name, advprop=True)
