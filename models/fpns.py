@@ -57,7 +57,7 @@ class YOLOBranch(nn.Module):
         '''
         if previous is not None:
             pre = self.process(previous)
-            pre = tnf.interpolate(pre, scale_factor=2, mode='nearest')
+            pre = tnf.interpolate(pre, size=x.shape[2:4], mode='nearest')
             x = torch.cat((pre, x), dim=1)
         
         x = self.cbl_0(x)
@@ -74,9 +74,9 @@ class YOLOv3FPN(nn.Module):
     def __init__(self, in_channels=(256, 512, 1024)):
         super().__init__()
         ch3, ch4, ch5 = in_channels
-        self.branch_P5 = YOLOBranch(ch5)
-        self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
         self.branch_P3 = YOLOBranch(ch3, prev_ch=(ch4//2,ch3//2))
+        self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
+        self.branch_P5 = YOLOBranch(ch5)
     
     def forward(self, features):
         c3, c4, c5 = features
@@ -271,19 +271,66 @@ def conv_uniform(in_channels, out_channels, kernel_size, stride=1, dilation=1,
 
 def get_bifpn(in_chs, out_ch, repeat_num, fusion_method='linear'):
     assert repeat_num >= 1
+    if len(in_chs) == 3:
+        fpn_func = BiFPN3
+    elif len(in_chs) == 5:
+        fpn_func = BiFPN5
+    else:
+        raise NotImplementedError()
+
     fpn = []
-    fpn.append(BiFPN5(out_ch, fusion_method=fusion_method, in_chs=in_chs))
+    fpn.append(fpn_func(out_ch, fusion_method=fusion_method, in_chs=in_chs))
     for _ in range(repeat_num-1):
-        fpn.append(BiFPN5(out_ch, fusion_method=fusion_method))
+        fpn.append(fpn_func(out_ch, fusion_method=fusion_method))
     fpn = nn.Sequential(*fpn)
     return fpn
+
+
+class BiFPN3(nn.Module):
+    def __init__(self, fpn_ch, fusion_method='linear', in_chs=None):
+        super().__init__()
+        if in_chs: assert len(in_chs) == 3
+        self.p3in_out = conv1x1_bn(in_chs[0], fpn_ch) if in_chs else lambda x:x
+        self.p4in_m = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
+        self.p4in_out = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
+        self.p5in_4m = conv1x1_bn(in_chs[2], fpn_ch) if in_chs else lambda x:x
+        self.p5in_out = conv1x1_bn(in_chs[2], fpn_ch) if in_chs else lambda x:x
+
+        if fusion_method == 'linear':
+            fusion_layer = LinearFusion
+        elif fusion_method == 'softmax':
+            raise NotImplementedError()
+        self.fuse_4m = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_3out = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_4out = fusion_layer(num=3, channels=fpn_ch)
+        self.fuse_5out = fusion_layer(num=2, channels=fpn_ch)
+
+    def forward(self, features):
+        """
+            P5in ------------------------- P5out -------->
+                 ------>-----|               |
+            P4in ---------- P4m ---------- P4out -------->
+                             |------>-----   |
+            P3in ------------------------- P3out -------->
+        """
+        P3in, P4in, P5in = features
+        assert P3in.shape[2] == P4in.shape[2]*2 == P5in.shape[2]*4
+        # P4in + P5in -> P4m
+        P4m = self.fuse_4m(self.p4in_m(P4in), upsample2x(self.p5in_4m(P5in)))
+        # P3in + P4m -> P3out
+        P3out = self.fuse_3out(self.p3in_out(P3in), upsample2x(P4m))
+        # P4in + P4m + P3out -> P4out
+        _P3out_to_P4 = tnf.max_pool2d(P3out, kernel_size=3, stride=2, padding=1)
+        P4out = self.fuse_4out(self.p4in_out(P4in), P4m, _P3out_to_P4)
+        # P5in + P4out -> P5out
+        _P4out_to_P5 = tnf.max_pool2d(P4out, kernel_size=3, stride=2, padding=1)
+        P5out = self.fuse_5out(self.p5in_out(P5in), _P4out_to_P5)
+        return [P3out, P4out, P5out]
 
 
 class BiFPN5(nn.Module):
     def __init__(self, fpn_ch, fusion_method='linear', in_chs=None):
         super().__init__()
-        self.eps = 1e-4
-        
         if in_chs:
             assert len(in_chs) == 5
             assert in_chs[3] == fpn_ch and in_chs[4] == fpn_ch
@@ -298,7 +345,6 @@ class BiFPN5(nn.Module):
             fusion_layer = LinearFusion
         elif fusion_method == 'softmax':
             raise NotImplementedError()
-
         self.fuse_6m = fusion_layer(num=2, channels=fpn_ch)
         self.fuse_5m = fusion_layer(num=2, channels=fpn_ch)
         self.fuse_4m = fusion_layer(num=2, channels=fpn_ch)
@@ -344,6 +390,7 @@ class BiFPN5(nn.Module):
         _P6out_to_P7 = tnf.max_pool2d(P6out, kernel_size=3, stride=2, padding=1)
         P7out = self.fuse_7out(P7in, _P6out_to_P7)
         return [P3out, P4out, P5out, P6out, P7out]
+
 
 class LinearFusion(nn.Module):
     def __init__(self, num, channels):

@@ -3,33 +3,36 @@ import torch.nn as nn
 from .modules import SeparableConv2d, Swish
 
 
-def get_rpn(name, chs, num_class):
+def get_rpn(name, chs, **kwargs):
     if name == 'yv3':
-        return YOLOHead(in_channels=chs, num_class=num_class)
+        return YOLOHead(in_channels=chs, **kwargs)
     else:
         raise NotImplementedError()
 
 
 class YOLOHead(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024), num_class=80, **kwargs):
+    def __init__(self, in_channels=(256, 512, 1024), **kwargs):
         super().__init__()
-        n_anchor = kwargs['n_anchors_per_level']
+        n_anch = kwargs.get('num_anchor_per_level', 3)
+        n_cls = kwargs.get('num_class', 80)
         self.heads = nn.ModuleList()
+        out_ch = (n_cls + 5) * n_anch
         for ch in in_channels:
-            self.heads.append(nn.Conv2d(ch, (80+5)*n_anchor, 1, stride=1))
+            self.heads.append(nn.Conv2d(ch, out_ch, 1, stride=1))
+        self.n_anch = n_anch
+        self.n_cls = n_cls
 
     def forward(self, features):
         all_level_preds = []
         for module, P in zip(self.heads, features):
             preds = module(P)
-            bbox_pred = preds[:, 0:4, :, :].permute(0, 2, 3, 1)
-            conf_pred = preds[:, 4:5, :, :].permute(0, 2, 3, 1)
-            cls_pred = preds[:, 5:, :, :].permute(0, 2, 3, 1)
+            nB, _, nH, nW = preds.shape
+            preds = preds.view(nB, self.n_anch, self.n_cls+5, nH, nW)
             
             raw = {
-                'bbox': bbox_pred,
-                'class': cls_pred,
-                'conf': conf_pred,
+                'bbox': preds[:, :, 0:4, :, :].permute(0, 1, 3, 4, 2),
+                'conf': preds[:, :, 4:5, :, :].permute(0, 1, 3, 4, 2),
+                'class': preds[:, :, 5:, :, :].permute(0, 1, 3, 4, 2),
             }
             all_level_preds.append(raw)
         
@@ -135,7 +138,6 @@ class EfDetHead(nn.Module):
                 'class': cls_pred,
             }
             all_level_preds.append(raw)
-        
         return all_level_preds
 
 def spconv3x3_bn_swish(inout_ch):

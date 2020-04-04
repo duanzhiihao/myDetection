@@ -195,19 +195,20 @@ class EfNetBackbone(nn.Module):
         'efficientnet-b3', 'efficientnet-b4', 'efficientnet-b5',
         'efficientnet-b6'
     }
-    def __init__(self, model_name, out_ch):
+    def __init__(self, model_name, out_ch, C6C7=True):
         super().__init__()
         assert model_name in self.valid_names, 'Unknown efficientnet model name'
         efn = EfficientNet.from_pretrained(model_name, advprop=True)
         del efn._conv_head, efn._bn1, efn._avg_pooling, efn._dropout, efn._fc
         self.model = efn
-
-        p5_ch = efn._blocks_args[-1].output_filters
-        self.c5_to_c6 = conv1x1_bn_relu_maxp(p5_ch, out_ch)
-        self.c6_to_c7 = conv1x1_bn_relu_maxp(out_ch, out_ch)
-
         efnet_chs = [efn._blocks_args[i].output_filters for i in [2,4,6]]
-        self.feature_chs = efnet_chs + [out_ch, out_ch]
+        if C6C7:
+            self.c5_to_c6 = conv1x1_bn_relu_maxp(efnet_chs[-1], out_ch)
+            self.c6_to_c7 = conv1x1_bn_relu_maxp(out_ch, out_ch)
+            self.feature_chs = efnet_chs + [out_ch, out_ch]
+        else:
+            self.feature_chs = efnet_chs
+        self.C6C7 = C6C7
 
     def forward(self, x):
         x = self.model._swish(self.model._bn0(self.model._conv_stem(x)))
@@ -224,9 +225,12 @@ class EfNetBackbone(nn.Module):
         features.append(x)
         # C1 (2x), C2 (4x), C3 (8x), C4 (16x), C5 (32x)
         C1, C2, C3, C4, C5 = features
-        C6 = self.c5_to_c6(C5)
-        C7 = self.c6_to_c7(C6)
-        return [C3, C4, C5, C6, C7]
+        if self.C6C7:
+            C6 = self.c5_to_c6(C5)
+            C7 = self.c6_to_c7(C6)
+            return [C3, C4, C5, C6, C7]
+        else:
+            return [C3, C4, C5]
 
 
 def conv1x1_bn_relu_maxp(in_ch, out_ch):

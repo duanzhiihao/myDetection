@@ -1,12 +1,27 @@
 
 
 def name_to_model(model_name):
-    if model_name == 'yolov3':
+    if model_name == 'test':
         # darknet-53, YOLO fpn C3, 3x3 anchor boxes, 
         # xywh, norm by anchor, exp, xy:BCE, wh:L2
         from .yolov3 import YOLOv3
         cfg = {
-            'backbone_fpn': 'my_res50_retina',
+            'backbone_fpn': 'dark53_yv3',
+            'rpn': 'yv3',
+            'n_anchors_per_level': 3,
+            'pred_layer': 'YOLO',
+            'wh_setting': 'exp_sl1',
+            'num_class': 80,
+            'input_format': 'RGB_1',
+        }
+        return YOLOv3(cfg)
+        
+    elif model_name == 'yolov3':
+        # darknet-53, YOLO fpn C3, 3x3 anchor boxes, 
+        # xywh, norm by anchor, exp, xy:BCE, wh:L2
+        from .yolov3 import YOLOv3
+        cfg = {
+            'backbone_fpn': 'dark53_yv3',
             'rpn': 'yv3',
             'n_anchors_per_level': 3,
             'pred_layer': 'YOLO',
@@ -78,10 +93,23 @@ def name_to_model(model_name):
             'num_class': 80,
         }
         return FCOS(cfg)
-    
-    elif model_name in {'eff-d0'}:
+
+    elif model_name == 'eff-d0_yolo':
         from .effdet import EfficientDet
-        return EfficientDet(model_id=model_name[-2:], num_class=80)
+        cfg = {
+            'model_id': 'd0',
+            'C6C7': False,
+            'pred_layer': 'YOLO',
+            'num_anchor_per_level': 3,
+            'wh_setting': 'exp_sl1',
+            'num_class': 80,
+            'input_format': 'RGB_1_norm',
+        }
+        return EfficientDet(cfg)
+    
+    # elif model_name in {'eff-d0'}:
+    #     from .effdet import EfficientDet
+    #     return EfficientDet(model_id=model_name[-2:], num_class=80)
 
     else:
         raise Exception('Unknown model name')

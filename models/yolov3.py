@@ -13,11 +13,9 @@ from utils.structures import ImageObjects
 class YOLOv3(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        num_class = cfg['num_class']
 
-        self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['dark53_yv3'])
-        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], num_class,
-                           **cfg)
+        self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['backbone_fpn'])
+        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], **cfg)
         
         if cfg['pred_layer'] == 'YOLO':
             pred_layer = YOLOLayer
@@ -47,7 +45,7 @@ class YOLOv3(nn.Module):
         dts_all = []
         losses_all = []
         for i, raw_preds in enumerate(all_branch_preds):
-            dts, loss = self.bb_layer[i](raw_preds, self.img_size, labels)
+            dts, loss = self.bb_layers[i](raw_preds, self.img_size, labels)
             dts_all.append(dts)
             losses_all.append(loss)
 
@@ -63,9 +61,9 @@ class YOLOv3(nn.Module):
         else:
             assert isinstance(labels, list)
             # total_gt_num = sum([t.shape[0] for t in labels])
-            # assigned_gt_num = sum(branch._assigned_num for branch in self.bb_layer)
+            # assigned_gt_num = sum(branch._assigned_num for branch in self.bb_layers)
             self.loss_str = ''
-            for m in self.bb_layer:
+            for m in self.bb_layers:
                 self.loss_str += m.loss_str + '\n'
             loss = sum(losses_all)
             return loss
@@ -82,10 +80,10 @@ class YOLOLayer(nn.Module):
             [30, 61], [62, 45], [59, 119],
             [116, 90], [156, 198], [373, 326]
         ]
-        indices = [[6,7,8], [3,4,5], [0,1,2]]
+        indices = [[0,1,2], [3,4,5], [6,7,8]]
         self.anchors_all = torch.Tensor(anchors).float()
 
-        level_i = kwargs['level_i']
+        level_i = kwargs['level']
         self.stride = kwargs['strides_all'][level_i]
         self.n_cls = kwargs['num_class']
 
@@ -99,68 +97,57 @@ class YOLOLayer(nn.Module):
         self.anch_00wh_all[:,2:] = self.anchors_all # unnormalized
 
         self.ignore_thre = 0.6
-        # self.loss4conf = FocalBCE(reduction='sum')
-        # self.loss4conf = nn.BCEWithLogitsLoss(reduction='sum')
+        self.wh_setting = kwargs.get('wh_setting', 'exp_sl1')
 
-    def forward(self, raw, img_size, labels=None):
-        """
-        Args:
-            raw: input raw detections
-            labels: list[tensor]`. \
-                N and K denote batchsize and number of labels. \
-                Each label consists of [xc, yc, w, h, angle]: \
-                xc, yc (float): center of bbox whose values range from 0 to 1. \
-                w, h (float): size of bbox whose values range from 0 to 1. \
-                angle (float): angle, degree from 0 to max_angle
-        
-        Returns:
-            loss: total loss - the target of backprop.
-            loss_xy: x, y loss - calculated by binary cross entropy (BCE) \
-                with boxsize-dependent weights.
-            loss_wh: w, h loss - calculated by l2 without averaging and \
-                with boxsize-dependent weights.
-            loss_conf: objectness loss - calculated by BCE.
-        """
+    def forward(self, raw: dict, img_size, labels=None):
         assert isinstance(raw, dict)
-
-        p_ltrb = raw['bbox']
-        device = p_ltrb.device
-        nB = p_ltrb.shape[0] # batch size
+        t_xywh = raw['bbox']
+        device = t_xywh.device
+        nB = t_xywh.shape[0] # batch size
         nA = self.num_anchors # number of anchors
-        nH, nW = p_ltrb.shape[1:3] # prediction grid size
-        
-        p_conf_logits = raw['conf']
-        p_cls_logits = raw['class']
+        nH, nW = t_xywh.shape[2:4] # prediction grid size
+        assert t_xywh.shape[1] == nA and t_xywh.shape[-1] == 4
+        conf_logits = raw['conf']
+        cls_logits = raw['class']
 
         # ----------------------- logits to prediction -----------------------
-        preds = raw.detach().clone()
+        p_xywh = t_xywh.detach().clone()
         # x, y
-        x_ = torch.arange(nG, dtype=torch.float, device=device)
-        mesh_y, mesh_x = torch.meshgrid(x_, x_)
-        preds[..., 0] = (torch.sigmoid(preds[..., 0]) + mesh_x) * self.stride
-        preds[..., 1] = (torch.sigmoid(preds[..., 1]) + mesh_y) * self.stride
+        y_ = torch.arange(nH, dtype=torch.float, device=device)
+        x_ = torch.arange(nW, dtype=torch.float, device=device)
+        mesh_y, mesh_x = torch.meshgrid(y_, x_)
+        p_xywh[..., 0] = (torch.sigmoid(p_xywh[..., 0]) + mesh_x) * self.stride
+        p_xywh[..., 1] = (torch.sigmoid(p_xywh[..., 1]) + mesh_y) * self.stride
         # w, h
         anch_wh = self.anchors.view(1,nA,1,1,2).to(device=device)
-        preds[...,2:4] = torch.exp(preds[...,2:4]) * anch_wh
-        # confidence
-        preds[..., 4] = torch.sigmoid(preds[..., 4])
-        # categories
-        if self.n_cls > 0:
-            preds[..., 5:] = torch.sigmoid(preds[..., 5:])
-        preds = preds.view(nB, nA*nG*nG, nCH).cpu()
-        # debug0 = angle[conf >= 0.1]
-        # debug1 = preds[conf >= 0.1]
+        assert self.wh_setting.startswith('exp')
+        p_xywh[...,2:4] = torch.exp(p_xywh[...,2:4]) * anch_wh
+        p_xywh = p_xywh.view(nB, nA*nH*nW, 4).cpu()
 
         if labels is None:
+            # Logistic activation for confidence score
+            p_conf = torch.sigmoid(conf_logits)
+            # Logistic activation for categories
+            if self.n_cls > 0:
+                p_cls = torch.sigmoid(cls_logits)
+            cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
+            confs = p_conf * cls_score
+            preds = {
+                'bbox': p_xywh,
+                'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
+                'conf': confs.view(nB, nA*nH*nW).cpu(),
+            }
             return preds, None
             
         assert isinstance(labels, list)
         # traverse all images in a batch
         valid_gt_num = 0
-        gt_mask = torch.zeros(nB, nA, nG, nG, dtype=torch.bool)
-        conf_loss_mask = torch.ones(nB, nA, nG, nG, dtype=torch.bool)
-        weighted = torch.zeros(nB, nA, nG, nG)
-        target = torch.zeros(nB, nA, nG, nG, nCH)
+        gt_mask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
+        conf_loss_mask = torch.ones(nB, nA, nH, nW, dtype=torch.bool)
+        weighted = torch.zeros(nB, nA, nH, nW)
+        tgt_xywh = torch.zeros(nB, nA, nH, nW, 4)
+        tgt_conf = torch.zeros(nB, nA, nH, nW, 1)
+        tgt_cls = torch.zeros(nB, nA, nH, nW, self.n_cls)
         for b in range(nB):
             im_labels = labels[b]
             num_gt = im_labels.shape[0]
@@ -185,10 +172,10 @@ class YOLOLayer(nn.Module):
             else:
                 valid_gt_num += sum(valid_mask)
 
-            pred_ious = bboxes_iou(preds[b,:,0:4], im_labels[:,1:5], xyxy=False)
+            pred_ious = bboxes_iou(p_xywh[b], im_labels[:,1:5], xyxy=False)
             iou_with_gt, _ = pred_ious.max(dim=1)
             # ignore the conf of a pred BB if it matches a gt more than 0.7
-            conf_loss_mask[b] = (iou_with_gt < self.ignore_thre).view(nA,nG,nG)
+            conf_loss_mask[b] = (iou_with_gt < self.ignore_thre).view(nA,nH,nW)
             # conf_loss_mask = 1 -> give penalty
 
             im_labels = im_labels[valid_mask,:]
@@ -199,33 +186,36 @@ class YOLOLayer(nn.Module):
             
             conf_loss_mask[b,tn,tj,ti] = 1
             gt_mask[b,tn,tj,ti] = 1
-            target[b,tn,tj,ti,0] = grid_tx - grid_tx.floor()
-            target[b,tn,tj,ti,1] = grid_ty - grid_ty.floor()
-            target[b,tn,tj,ti,2] = torch.log(im_labels[:,3]/self.anchors[tn,0] + 1e-8)
-            target[b,tn,tj,ti,3] = torch.log(im_labels[:,4]/self.anchors[tn,1] + 1e-8)
-            target[b,tn,tj,ti,4] = 1 # objectness confidence
+            tgt_xywh[b,tn,tj,ti,0] = grid_tx - grid_tx.floor()
+            tgt_xywh[b,tn,tj,ti,1] = grid_ty - grid_ty.floor()
+            tgt_xywh[b,tn,tj,ti,2] = torch.log(im_labels[:,3]/self.anchors[tn,0] + 1e-8)
+            tgt_xywh[b,tn,tj,ti,3] = torch.log(im_labels[:,4]/self.anchors[tn,1] + 1e-8)
+            tgt_conf[b,tn,tj,ti] = 1 # objectness confidence
             if self.n_cls > 0:
-                target[b, tn, tj, ti, 5 + im_labels[:,0].long()] = 1
+                tgt_cls[b, tn, tj, ti, im_labels[:,0].long()] = 1
             # smaller objects have higher losses
-            weighted[b,tn,tj,ti] = 2 - im_labels[:,3]*im_labels[:,4]/img_size/img_size
+            img_area = img_size[0] * img_size[1]
+            weighted[b,tn,tj,ti] = 2 - im_labels[:,3] * im_labels[:,4] / img_area
 
         # move the tagerts to GPU
         gt_mask = gt_mask.to(device=device)
         conf_loss_mask = conf_loss_mask.to(device=device)
         weighted = weighted.unsqueeze(-1).to(device=device)
-        target = target.to(device=device)
+        tgt_xywh = tgt_xywh.to(device=device)
+        tgt_conf = tgt_conf.to(device=device)
+        tgt_cls = tgt_cls.to(device=device)
 
         bce_logits = tnf.binary_cross_entropy_with_logits
         # weighted BCE loss for x,y
-        loss_xy = bce_logits(raw[...,0:2][gt_mask], target[...,0:2][gt_mask],
+        loss_xy = bce_logits(t_xywh[...,0:2][gt_mask], tgt_xywh[...,0:2][gt_mask],
                              weight=weighted[gt_mask], reduction='sum')
         # weighted squared error for w,h
-        loss_wh = (raw[...,2:4][gt_mask] - target[...,2:4][gt_mask]).pow(2)
+        loss_wh = (t_xywh[...,2:4][gt_mask] - tgt_xywh[...,2:4][gt_mask]).pow(2)
         loss_wh = (weighted[gt_mask] * loss_wh).sum()
-        loss_conf = bce_logits(raw[...,4][conf_loss_mask],
-                               target[...,4][conf_loss_mask], reduction='sum')
+        loss_conf = bce_logits(conf_logits[conf_loss_mask],
+                               tgt_conf[conf_loss_mask], reduction='sum')
         if self.n_cls > 0:
-            loss_cls = bce_logits(raw[...,5:][gt_mask], target[...,5:][gt_mask], 
+            loss_cls = bce_logits(cls_logits[gt_mask], tgt_cls[gt_mask], 
                                   reduction='sum')
         else:
             loss_cls = 0
@@ -233,7 +223,7 @@ class YOLOLayer(nn.Module):
 
         # logging
         ngt = valid_gt_num + 1e-16
-        self.loss_str = f'yolo_{nG} total {int(ngt)} objects: ' \
+        self.loss_str = f'yolo_{nH}x{nW} total {int(ngt)} objects: ' \
                         f'xy/gt {loss_xy/ngt:.3f}, wh/gt {loss_wh/ngt:.3f}' \
                         f', conf {loss_conf:.3f}, class {loss_cls:.3f}'
         self.gt_num = valid_gt_num

@@ -14,15 +14,15 @@ import api
 if __name__ == '__main__':
     torch.autograd.set_detect_anomaly(True)
     # -------------------------- settings ---------------------------
-    model_name = 'fcs2_yv3_expsl1'
+    model_name = 'yolov3'
     # model_name = 'yv3_ltrb'
     target_size = 640
     batch_size = 1
     subdivision = 1
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
-    decay_SGD = 0.0005 * batch_size * subdivision
-    lr_SGD = 0.0001 / batch_size / subdivision
+    decay_SGD = 0.0001 * batch_size * subdivision
+    lr_SGD = 0.00001 / batch_size / subdivision
     # Dataset setting
     train_img_dir = '../COCO/val2017/'
     train_json = '../COCO/annotations/debug1.json'
@@ -47,9 +47,9 @@ if __name__ == '__main__':
             params += [{'params':value, 'weight_decay':decay_SGD}]
         else:
             params += [{'params':value, 'weight_decay':0.0}]
-    optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.9, dampening=0,
-                                weight_decay=decay_SGD)
-    # optimizer = torch.optim.SGD(params, lr=lr_SGD)
+    # optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.8, dampening=0,
+    #                             weight_decay=decay_SGD)
+    optimizer = torch.optim.SGD(params, lr=lr_SGD)
 
     print('Starting training...')
     today = timer.today()
