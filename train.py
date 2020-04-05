@@ -23,7 +23,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov3')
+    parser.add_argument('--model', type=str, default='d0_345_a3_conf_yolo')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
 
@@ -66,6 +66,8 @@ def main():
     
     print('Initialing model...')
     model = name_to_model(args.model)
+    pnum = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Number of trainable parameters in {args.model}:', pnum)
     model = model.cuda()
     model.train()
 
@@ -117,7 +119,7 @@ def main():
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model=model)
                 dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
-                                                conf_thres=0.005)
+                                                to_square=True, conf_thres=0.005)
                 eval_str, ap, ap50, ap75 = evaluate_json(dts, valjson)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
@@ -166,9 +168,7 @@ def main():
             print(model.loss_str)
             max_cuda = torch.cuda.max_memory_allocated(0) / 1024 / 1024 / 1024
             print(f'Max GPU memory usage: {max_cuda} GigaBytes')
-            torch.cuda.reset_max_memory_allocated(0)
-            # if hasattr(model, 'time_monitor'):
-            #     print(model.time_monitor())
+        torch.cuda.reset_max_memory_allocated(0)
 
         # random resizing
         if multiscale and iter_i > 0 and (iter_i % multiscale_interval == 0):
@@ -190,11 +190,11 @@ def main():
             torch.save(state_dict, save_path)
 
         # save detection
-        if iter_i > 0 and iter_i % args.img_interval == 0:
+        if iter_i % args.img_interval == 0:
             for impath in eval_img_paths:
                 model_eval = api.Detector(model=model)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                                               input_size=None, conf_thres=0.3)
+                            input_size=target_size, to_square=True, conf_thres=0.3)
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 

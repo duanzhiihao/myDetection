@@ -137,8 +137,7 @@ class EfficientNet(nn.Module):
 
         # Build blocks
         self._blocks = nn.ModuleList([])
-        for block_args in self._blocks_args:
-
+        for i, block_args in enumerate(self._blocks_args):
             # Update block input and output filters based on depth multiplier.
             block_args = block_args._replace(
                 input_filters=round_filters(block_args.input_filters, self._global_params),
@@ -152,6 +151,9 @@ class EfficientNet(nn.Module):
                 block_args = block_args._replace(input_filters=block_args.output_filters, stride=1)
             for _ in range(block_args.num_repeat - 1):
                 self._blocks.append(MBConvBlock(block_args, self._global_params))
+            
+            # update self._blocks_args
+            self._blocks_args[i] = block_args
 
         # Head
         in_channels = block_args.output_filters  # output of final block
