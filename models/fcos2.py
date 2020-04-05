@@ -16,15 +16,14 @@ class FCOS(nn.Module):
         num_class = cfg['num_class']
 
         self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['backbone_fpn'])
-        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], num_class)
+        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], **cfg)
 
         anchors = [0, 64, 128, 256, 512, 1e8]
         strides = fpn_info['feature_strides']
         self.bb_layer = nn.ModuleList()
         # anchors = [0, 64, 128, 256, 512, 1e8]
         for branch_i, s in enumerate(strides):
-            amin = anchors[branch_i]
-            amax = anchors[branch_i+1] if branch_i != len(strides)-1 else 1e8
+            amin, amax = anchors[branch_i:branch_i+2]
             self.bb_layer.append(FCOSLayer(stride_all=strides, stride=s,
                                 num_class=num_class, anchor_range=[amin,amax],
                                 ltrb_setting=cfg['ltrb_setting']))
@@ -98,7 +97,7 @@ class FCOSLayer(nn.Module):
         nB = p_ltrb.shape[0] # batch size
         nH, nW = p_ltrb.shape[1:3] # prediction grid size
 
-        p_center_logits = raw['center']
+        p_conf_logits = raw['conf']
         p_cls_logits = raw['class']
         
         if self.ltrb_setting.startswith('relu'):
@@ -117,11 +116,11 @@ class FCOSLayer(nn.Module):
             # Translate from ltrb to cxcywh
             p_ltrb = _ltrb_to_xywh(p_ltrb, nH, nW, self.stride)
             # Logistic activation for 'centerness'
-            p_center_conf = torch.sigmoid(p_center_logits)
+            p_conf = torch.sigmoid(p_conf_logits)
             # Logistic activation for categories
             p_cls = torch.sigmoid(p_cls_logits)
             cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
-            confs = torch.sqrt(p_center_conf * cls_score)
+            confs = torch.sqrt(p_conf * cls_score)
             preds = {
                 'bbox': p_ltrb.view(nB, -1, 4),
                 'class_idx': cls_idx.view(nB, -1),
@@ -212,7 +211,7 @@ class FCOSLayer(nn.Module):
             loss_bbox = 0.5 * tnf.mse_loss(pLTRB, gtLTRB, reduction='sum')
         # Binary cross entropy for confidence and classes
         bce_logits = tnf.binary_cross_entropy_with_logits
-        loss_conf = bce_logits(p_center_logits, TargetConf, reduction='sum')
+        loss_conf = bce_logits(p_conf_logits, TargetConf, reduction='sum')
         if self.n_cls > 0:
             loss_cls = bce_logits(p_cls_logits[PenaltyMask],
                                   TargetCls[PenaltyMask], reduction='sum')

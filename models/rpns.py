@@ -100,7 +100,7 @@ class FCOSHead(nn.Module):
             raw = {
                 'bbox': bbox_pred,
                 'class': cls_pred,
-                'center': conf_pred,
+                'conf': conf_pred,
             }
             all_branch_preds.append(raw)
 

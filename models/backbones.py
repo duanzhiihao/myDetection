@@ -3,7 +3,6 @@ import torch.nn as nn
 import torchvision.models
 
 from external_packages.efficientnet.model import EfficientNet
-from external_packages.maskrcnn_benchmark_resnet import ResNet
 from .modules import Swish
 
 # def get_backbone(name):
@@ -32,6 +31,7 @@ from .modules import Swish
 
 def get_backbone_fpn(name):
     if name == 'res50_retina':
+        from external_packages.maskrcnn_benchmark_resnet import ResNet
         backbone = ResNet('res50')
         from .fpns import RetinaNetFPN
         fpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)

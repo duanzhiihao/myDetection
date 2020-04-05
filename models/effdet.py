@@ -35,7 +35,7 @@ class EfficientDet(nn.Module):
         fpn_chs = [cfg['FPN_CH'] for _ in self.backbone.feature_chs]
         nC = cfg['num_class']
         nA = cfg['num_anchor_per_level']
-        self.rpn = EfDetHead(fpn_chs, cfg['HEAD_NUM'], cls_ch=nC*nA, bbox_ch=nA*4)
+        self.rpn = EfDetHead(fpn_chs, cfg['HEAD_NUM'], **cfg)
         # Initialize prediction layers
         self.bb_layers = nn.ModuleList()
         if cfg['pred_layer'] == 'EffDet':
