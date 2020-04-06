@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=1)
 
     parser.add_argument('--checkpoint', type=str)
+    parser.add_argument('--decay_SGD', type=float, default=0.0005)
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
@@ -53,7 +54,7 @@ def main():
     subdivision = 128 // batch_size
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
-    decay_SGD = 0.0001 * batch_size * subdivision
+    decay_SGD = args.decay_SGD * batch_size * subdivision
     lr_SGD = 0.001 / batch_size / subdivision
     # Dataset setting
     if args.dataset == 'COCO':
