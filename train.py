@@ -23,12 +23,11 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d0_345_a3_conf_yolo')
+    parser.add_argument('--model', type=str, default='yolov3')
     parser.add_argument('--dataset', type=str, default='COCO')
     parser.add_argument('--batch_size', type=int, default=1)
 
     parser.add_argument('--checkpoint', type=str)
-    parser.add_argument('--decay_SGD', type=float, default=0.0005)
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
@@ -41,6 +40,9 @@ def main():
     
     args = parser.parse_args()
     assert torch.cuda.is_available()
+    print('Initialing model...')
+    model, cfg = name_to_model(args.model)
+
     # -------------------------- settings ---------------------------
     target_size = round(args.resolution / 128) * 128
     job_name = f'{args.model}_{args.dataset}{target_size}'
@@ -54,7 +56,7 @@ def main():
     subdivision = 128 // batch_size
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
-    decay_SGD = args.decay_SGD * batch_size * subdivision
+    decay_SGD = cfg['train.sgd.weight_decay'] * batch_size * subdivision
     lr_SGD = 0.001 / batch_size / subdivision
     # Dataset setting
     if args.dataset == 'COCO':
@@ -65,8 +67,7 @@ def main():
     else:
         raise NotImplementedError()
     
-    print('Initialing model...')
-    model = name_to_model(args.model)
+    # Prepare model
     pnum = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Number of trainable parameters in {args.model}:', pnum)
     model = model.cuda()
@@ -118,7 +119,7 @@ def main():
         # evaluation
         if iter_i > 0 and iter_i % args.eval_interval == 0:
             with timer.contexttimer() as t0:
-                model_eval = api.Detector(model=model)
+                model_eval = api.Detector(model_and_cfg=(model, cfg))
                 dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
                                                 to_square=True, conf_thres=0.005)
                 eval_str, ap, ap50, ap75 = evaluate_json(dts, valjson)
@@ -193,9 +194,9 @@ def main():
         # save detection
         if iter_i % args.img_interval == 0:
             for impath in eval_img_paths:
-                model_eval = api.Detector(model=model)
+                model_eval = api.Detector(model_and_cfg=(model, cfg))
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                            input_size=target_size, to_square=True, conf_thres=0.3)
+                                               conf_thres=0.3)
                 logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 

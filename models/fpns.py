@@ -6,18 +6,29 @@ from .backbones import ConvBnLeaky
 from .modules import SeparableConv2d
 
 # def get_fpn(name, backbone_info=None, **kwargs):
-#     if name == 'yolo3':
-#         return YOLOv3FPN(anch_num=3, **kwargs)
-#     elif name == 'yolo3_1anch':
-#         return YOLOv3FPN(anch_num=1, **kwargs)
-#     elif name == 'retina':
-#         rpn = RetinaNetFPN(backbone_info['feature_channels'], 256)
-#         info = {
-#             'strides'
-#         }
-#         return rpn
-#     else:
-#         raise Exception('Unknown FPN name')
+def get_fpn(cfg: dict):
+    fpn_name = cfg['model.fpn.name']
+    if fpn_name == 'yolo3':
+        fpn = YOLOv3FPN(cfg)
+        out_feature_channels = cfg['model.backbone.out_channels']
+        out_strides = cfg['model.backbone.out_strides']
+    elif fpn_name == 'bifpn':
+        fpn = get_bifpn(cfg)
+        ch = cfg['model.bifpn.out_ch']
+        out_feature_channels = [ch for _ in cfg['model.backbone.out_channels']]
+        out_strides = cfg['model.backbone.out_strides']
+    # elif name == 'retina':
+    #     rpn = RetinaNetFPN(backbone_info['feature_channels'], 256)
+    #     info = {
+    #         'strides'
+    #     }
+    #     return rpn
+    else:
+        raise Exception('Unknown FPN name')
+
+    cfg['model.fpn.out_channels'] = out_feature_channels
+    cfg['model.fpn.out_strides'] = out_strides
+    return fpn
 
 
 class YOLOBranch(nn.Module):
@@ -29,7 +40,6 @@ class YOLOBranch(nn.Module):
         prev_ch: (int,int), the Conv2d channel for the previous feature,
                  default: None
     '''
-    # def __init__(self, in_, out_=18, has_previous=False, prev_ch=None):
     def __init__(self, in_, prev_ch=None):
         super(YOLOBranch, self).__init__()
         assert in_ % 2 == 0, 'input channel must be divisible by 2'
@@ -71,9 +81,10 @@ class YOLOBranch(nn.Module):
 
 
 class YOLOv3FPN(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024)):
+    def __init__(self, cfg: dict):
         super().__init__()
-        ch3, ch4, ch5 = in_channels
+        assert cfg['model.backbone.num_levels'] == 3
+        ch3, ch4, ch5 = cfg['model.backbone.out_channels']
         self.branch_P3 = YOLOBranch(ch3, prev_ch=(ch4//2,ch3//2))
         self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
         self.branch_P5 = YOLOBranch(ch5)
@@ -269,7 +280,13 @@ def conv_uniform(in_channels, out_channels, kernel_size, stride=1, dilation=1,
     return conv
 
 
-def get_bifpn(in_channels, out_ch, repeat_num, fusion_method='linear'):
+# def get_bifpn(in_channels, out_ch, repeat_num, fusion_method='linear'):
+def get_bifpn(cfg: dict):
+    in_channels = cfg['model.backbone.out_channels']
+    out_ch = cfg['model.bifpn.out_ch']
+    repeat_num = cfg['model.bifpn.repeat_num']
+    fusion_method = cfg['model.bifpn.fusion_method']
+
     assert repeat_num >= 1
     if len(in_channels) == 3:
         fpn_func = BiFPN3
@@ -277,7 +294,6 @@ def get_bifpn(in_channels, out_ch, repeat_num, fusion_method='linear'):
         fpn_func = BiFPN5
     else:
         raise NotImplementedError()
-
     fpn = []
     fpn.append(fpn_func(out_ch, fusion_method=fusion_method, in_chs=in_channels))
     for _ in range(repeat_num-1):

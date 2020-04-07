@@ -2,35 +2,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tnf
 
-from .backbones import get_backbone_fpn
+from .backbones import get_backbone
+from .fpns import get_fpn
 from .rpns import get_rpn
 import models.losses as lossLib
-from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
+# from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
 from utils.iou_funcs import bboxes_iou
 from utils.structures import ImageObjects
 
 
 class YOLOv3(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg: dict):
         super().__init__()
 
-        self.backbone, self.fpn, fpn_info = get_backbone_fpn(cfg['backbone_fpn'])
-        self.rpn = get_rpn(cfg['rpn'], fpn_info['feature_channels'], **cfg)
+        self.backbone = get_backbone(cfg)
+        self.fpn = get_fpn(cfg)
+        self.rpn = get_rpn(cfg)
         
-        if cfg['pred_layer'] == 'YOLO':
+        if cfg['model.pred_layer'] == 'YOLO':
             pred_layer = YOLOLayer
-        elif cfg['pred_layer'] == 'FCOS':
+        elif cfg['model.pred_layer'] == 'FCOS':
             raise NotImplementedError()
             pred_layer = FCOSLayer
         else:
             raise NotImplementedError()
         self.bb_layers = nn.ModuleList()
-        strides = fpn_info['feature_strides']
-        for level_i, s in enumerate(strides):
-            self.bb_layers.append(pred_layer(strides_all=strides, stride=s,
-                                             level=level_i, **cfg))
+        for level_i in range(len(cfg['model.fpn.out_channels'])):
+            self.bb_layers.append(pred_layer(level_i, cfg))
 
-        self.input_format = cfg['input_format']
+        self.input_format = cfg['general.input_format']
 
     def forward(self, x, labels=None):
         '''
@@ -76,19 +76,14 @@ class YOLOLayer(nn.Module):
     '''
     calculate the output boxes and losses
     '''
-    def __init__(self, **kwargs):
+    def __init__(self, level_i: int, cfg: dict):
         super().__init__()
-        anchors = [
-            [10, 13], [16, 30], [33, 23],
-            [30, 61], [62, 45], [59, 119],
-            [116, 90], [156, 198], [373, 326]
-        ]
-        indices = [[0,1,2], [3,4,5], [6,7,8]]
+        anchors = cfg['model.yolo.anchors']
+        indices = cfg['model.yolo.anchor_indices']
         self.anchors_all = torch.Tensor(anchors).float()
 
-        level_i = kwargs['level']
-        self.stride = kwargs['strides_all'][level_i]
-        self.n_cls = kwargs['num_class']
+        self.stride = cfg['model.fpn.out_strides'][level_i]
+        self.n_cls = cfg['general.num_class']
 
         anchor_indices = torch.Tensor(indices[level_i]).long()
         self.anchor_indices = anchor_indices

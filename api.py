@@ -16,23 +16,25 @@ import utils.visualization as visUtils
 
 
 class Detector():
-    def __init__(self, model_name=None, weights_path=None, model=None, **kwargs):
+    def __init__(self, model_name:str=None, model_and_cfg:tuple=None,
+                       weights_path:str=None):
         assert torch.cuda.is_available()
-
-        self.conf_thres = kwargs.get('conf_thres', 0.5)
-        self.nms_thres = kwargs.get('nms_thres', 0.45)
-
-        if model:
-            self.model = model
-            return
+        if model_and_cfg:
+            self.model, self.cfg = model_and_cfg
         else:
-            model = name_to_model(model_name)
-        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print('Number of parameters:', total_params)
+            self.model, self.cfg = name_to_model(model_name)
+            self.model = self.model.cuda().eval()
+
+        self.input_size = self.cfg['test.default_input_size']
+        self.to_square = self.cfg['test.to_square']
+        self.conf_thres = self.cfg['test.default_conf_thres']
+        self.nms_thres = self.cfg['test.nms_thres']
+        
+        n_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print('Number of parameters:', n_params)
         if weights_path:
-            model.load_state_dict(torch.load(weights_path)['model'])
-        self.model = model.cuda()
-        self.model.eval()
+            self.model.load_state_dict(torch.load(weights_path)['model'])
+
         
     def predict_imgDir(self, img_dir, **kwargs):
         '''
@@ -55,7 +57,7 @@ class Detector():
 
         return detection_json
 
-    def detect_one(self, **kwargs): # img_path, test_aug=None, input_size=1024):
+    def detect_one(self, **kwargs):
         '''
         object detection in one single image. Predict and show the results
 
@@ -93,8 +95,8 @@ class Detector():
         '''
         assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
         # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
-        input_size = kwargs.get('input_size', None)
-        to_square = kwargs.get('to_square', False)
+        input_size = kwargs.get('input_size', self.input_size)
+        to_square = kwargs.get('to_square', self.to_square)
         conf_thres = kwargs.get('conf_thres', self.conf_thres)
         nms_thres = kwargs.get('nms_thres', self.nms_thres)
 

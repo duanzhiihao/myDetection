@@ -1,0 +1,34 @@
+{
+    "base": "YOLO",
+    
+    "general.input_format": "RGB_1",
+    "general.num_class": 80,
+
+    "model.backbone.name": "dark53",
+    "model.backbone.num_levels": 3,
+    "model.backbone.out_channels": "PLACEHOLDER",
+    "model.backbone.out_strides": "PLACEHOLDER",
+
+    "model.fpn.name": "yolo3",
+    "model.fpn.out_channels": "PLACEHOLDER",
+    "model.fpn.out_strides": "PLACEHOLDER",
+
+    "model.rpn.name": "yv3",
+    
+    "model.pred_layer": "YOLO",
+
+    "model.yolo.num_anchor_per_level": 3,
+    "model.yolo.anchors": [
+        [10, 13], [16, 30], [33, 23],
+        [30, 61], [62, 45], [59, 119],
+        [116, 90], [156, 198], [373, 326]
+    ],
+    "model.yolo.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
+
+    "train.sgd.weight_decay": 0.0005,
+
+    "test.default_input_size": null,
+    "test.to_square": false,
+    "test.default_conf_thres": 0.5,
+    "test.nms_thres": 0.45
+}

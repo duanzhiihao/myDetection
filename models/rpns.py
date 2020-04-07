@@ -3,24 +3,27 @@ import torch.nn as nn
 from .modules import SeparableConv2d, Swish
 
 
-def get_rpn(name, chs, **kwargs):
-    if name == 'yv3':
-        return YOLOHead(in_channels=chs, **kwargs)
-    elif name == 'eff_w_conf':
-        rep_num = kwargs.pop('head_repeat_num')
-        return EfDetHead(chs, repeat=rep_num, with_conf=True, **kwargs)
+# def get_rpn(name, chs, **kwargs):
+def get_rpn(cfg: dict):
+    rpn_name = cfg['model.rpn.name']
+    if rpn_name == 'yv3':
+        rpn = YOLOHead(cfg)
+    elif rpn_name == 'effrpn':
+        rpn = EfDetHead(cfg)
     else:
         raise NotImplementedError()
+    return rpn
 
 
 class YOLOHead(nn.Module):
-    def __init__(self, in_channels=(256, 512, 1024), **kwargs):
+    def __init__(self, cfg: dict):
         super().__init__()
-        n_anch = kwargs.get('num_anchor_per_level', 3)
-        n_cls = kwargs.get('num_class', 80)
+
+        n_anch = cfg['model.yolo.num_anchor_per_level']
+        n_cls = cfg['general.num_class']
         self.heads = nn.ModuleList()
         out_ch = (n_cls + 5) * n_anch
-        for ch in in_channels:
+        for ch in cfg['model.fpn.out_channels']:
             self.heads.append(nn.Conv2d(ch, out_ch, 1, stride=1))
         self.n_anch = n_anch
         self.n_cls = n_cls
@@ -116,10 +119,14 @@ class FCOSHead(nn.Module):
 
 
 class EfDetHead(nn.Module):
-    def __init__(self, feature_chs, repeat, with_conf=False, **kwargs):
+    # def __init__(self, feature_chs, repeat, with_conf=False, **kwargs):
+    def __init__(self, cfg: dict):
         super().__init__()
-        n_anch = kwargs.get('num_anchor_per_level', 3)
-        n_cls = kwargs.get('num_class', 80)
+        n_cls = cfg['general.num_class']
+        n_anch = cfg['model.effrpn.num_anchor_per_level']
+        with_conf = cfg['model.effrpn.with_conf']
+        feature_chs = cfg['model.fpn.out_channels']
+        repeat = cfg['model.effrpn.repeat_num']
         self.class_nets = nn.ModuleList()
         self.bbox_nets = nn.ModuleList()
         cls_ch = n_anch*(1+n_cls) if with_conf else n_anch*n_cls
@@ -144,7 +151,7 @@ class EfDetHead(nn.Module):
             bbox_pred = self.bbox_nets[i](x)
 
             nB, _, nH, nW = bbox_pred.shape
-            nA, nCls = self.n_anch, self.n_cls
+            nA = self.n_anch
             bbox_pred = bbox_pred.view(nB, nA, 4, nH, nW).permute(0, 1, 3, 4, 2)
             cls_pred = cls_pred.view(nB, nA, -1, nH, nW).permute(0, 1, 3, 4, 2)
             if self.with_conf:

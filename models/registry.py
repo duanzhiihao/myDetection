@@ -1,6 +1,19 @@
+import json
 
 
 def name_to_model(model_name):
+    cfg = json.load(open(f'./configs/{model_name}.json', 'r'))
+
+    if cfg['base'] == 'YOLO':
+        from .yolov3 import YOLOv3
+        model = YOLOv3(cfg)
+    
+    else:
+        raise Exception('Unknown model name')
+    
+    return model, cfg
+
+def deprecated_name_to_model(model_name):
     if model_name == 'test':
         from .yolov3 import YOLOv3
         cfg = {

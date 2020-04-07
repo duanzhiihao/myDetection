@@ -5,81 +5,92 @@ import torchvision.models
 from external_packages.efficientnet.model import EfficientNet
 from .modules import Swish
 
-# def get_backbone(name):
-#     if name == 'dark53':
-#         backbone = Darknet53()
-#         print("Using backbone Darknet-53. Loading ImageNet weights....")
-#         pretrained = torch.load('./weights/dark53_imgnet.pth')
-#         backbone.load_state_dict(pretrained)
-#         return backbone, (256, 512, 1024), (8, 16, 32)
-#     # elif name == 'res34':
-#     #     self.backbone = models.backbones.resnet34()
-#     elif name == 'res50':
+def get_backbone(cfg: dict):
+    backbone_name = cfg['model.backbone.name']
+    if backbone_name == 'dark53':
+        assert cfg['model.backbone.num_levels'] == 3
+        backbone = Darknet53()
+        print("Using backbone Darknet-53. Loading ImageNet weights....")
+        pretrained = torch.load('./weights/dark53_imgnet.pth')
+        backbone.load_state_dict(pretrained)
+        out_feature_channels = (256, 512, 1024)
+        out_strides = (8, 16, 32)
+    elif backbone_name.startswith('efficientnet'):
+        backbone = EfNetBackbone(cfg)
+        out_feature_channels = backbone.feature_chs
+        out_strides = backbone.feature_strides
+    else:
+        raise Exception('Unknown backbone name')
+    
+    cfg['model.backbone.out_channels'] = out_feature_channels
+    cfg['model.backbone.out_strides'] = out_strides
+    return backbone
+    # elif name == 'res34':
+    #     self.backbone = models.backbones.resnet34()
+    # elif name == 'res50':
+    #     backbone = ResNet('res50')
+    #     info = {
+    #         'feature_channels': (512, 1024, 2048),
+    #         'feature_strides': (8, 16, 32),
+    #     }
+    #     return backbone, info
+    # elif name == 'res101':
+    #     self.backbone = models.backbones.resnet101()
+    # elif 'efficientnet' in backbone:
+    #     self.backbone = models.backbones.efficientnet(backbone)
+
+
+# def get_backbone_fpn(name):
+#     if name == 'res50_retina':
+#         from external_packages.maskrcnn_benchmark_resnet import ResNet
 #         backbone = ResNet('res50')
+#         from .fpns import RetinaNetFPN
+#         fpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)
 #         info = {
-#             'feature_channels': (512, 1024, 2048),
+#             'feature_channels': 256,
+#             'feature_strides': (8, 16, 32, 64, 128),
+#         }
+#     elif name == 'my_res50_retina':
+#         backbone = get_resnet50()
+#         from .fpns import C3toP5FPN
+#         fpn = C3toP5FPN(in_channels=(512, 1024, 2048), out_ch=256)
+#         info = {
+#             'feature_channels': 256,
+#             'feature_strides': (8, 16, 32, 64, 128),
+#         }
+#     elif name == 'dark53_yv3':
+#         backbone = Darknet53()
+#         from .fpns import YOLOv3FPN
+#         fpn = YOLOv3FPN(in_channels=(256, 512, 1024))
+#         info = {
+#             'feature_channels': (256, 512, 1024),
 #             'feature_strides': (8, 16, 32),
 #         }
-#         return backbone, info
-#     # elif name == 'res101':
-#     #     self.backbone = models.backbones.resnet101()
-#     # elif 'efficientnet' in backbone:
-#     #     self.backbone = models.backbones.efficientnet(backbone)
+#     elif name == 'b0_yv3_345':
+#         backbone = EfNetBackbone(model_name='efficientnet-b0', C6C7=False)
+#         from .fpns import YOLOv3FPN
+#         fpn = YOLOv3FPN(in_channels=backbone.feature_chs)
+#         info = {
+#             'feature_channels': backbone.feature_chs,
+#             'feature_strides': (8, 16, 32),
+#         }
+#     elif name in {'d0_345', 'd1_345', 'd2_345', 'd3_345', 'd4_345'}:
+#         id2info = {
+#             'd0': (64, 3), 'd1': (88, 4), 'd2': (112, 5), 'd3': (160, 6),
+#             'd4': (224, 7),
+#         }
+#         backbone = EfNetBackbone('efficientnet-b'+name[1], C6C7=False)
+#         from .fpns import get_bifpn
+#         fpn_ch, fpn_num = id2info[name[:2]]
+#         fpn = get_bifpn(backbone.feature_chs, out_ch=fpn_ch, repeat_num=fpn_num)
+#         info = {
+#             'feature_channels': (fpn_ch, fpn_ch, fpn_ch),
+#             'feature_strides': (8, 16, 32),
+#         }
 #     else:
-#         raise Exception('Unknown backbone name')
-
-
-def get_backbone_fpn(name):
-    if name == 'res50_retina':
-        from external_packages.maskrcnn_benchmark_resnet import ResNet
-        backbone = ResNet('res50')
-        from .fpns import RetinaNetFPN
-        fpn = RetinaNetFPN(feature_channels=(512, 1024, 2048), out_channels=256)
-        info = {
-            'feature_channels': 256,
-            'feature_strides': (8, 16, 32, 64, 128),
-        }
-    elif name == 'my_res50_retina':
-        backbone = get_resnet50()
-        from .fpns import C3toP5FPN
-        fpn = C3toP5FPN(in_channels=(512, 1024, 2048), out_ch=256)
-        info = {
-            'feature_channels': 256,
-            'feature_strides': (8, 16, 32, 64, 128),
-        }
-    elif name == 'dark53_yv3':
-        backbone = Darknet53()
-        from .fpns import YOLOv3FPN
-        fpn = YOLOv3FPN(in_channels=(256, 512, 1024))
-        info = {
-            'feature_channels': (256, 512, 1024),
-            'feature_strides': (8, 16, 32),
-        }
-    elif name == 'b0_yv3_345':
-        backbone = EfNetBackbone(model_name='efficientnet-b0', C6C7=False)
-        from .fpns import YOLOv3FPN
-        fpn = YOLOv3FPN(in_channels=backbone.feature_chs)
-        info = {
-            'feature_channels': backbone.feature_chs,
-            'feature_strides': (8, 16, 32),
-        }
-    elif name in {'d0_345', 'd1_345', 'd2_345', 'd3_345', 'd4_345'}:
-        id2info = {
-            'd0': (64, 3), 'd1': (88, 4), 'd2': (112, 5), 'd3': (160, 6),
-            'd4': (224, 7),
-        }
-        backbone = EfNetBackbone('efficientnet-b'+name[1], C6C7=False)
-        from .fpns import get_bifpn
-        fpn_ch, fpn_num = id2info[name[:2]]
-        fpn = get_bifpn(backbone.feature_chs, out_ch=fpn_ch, repeat_num=fpn_num)
-        info = {
-            'feature_channels': (fpn_ch, fpn_ch, fpn_ch),
-            'feature_strides': (8, 16, 32),
-        }
-    else:
-        raise NotImplementedError()
+#         raise NotImplementedError()
     
-    return backbone, fpn, info
+#     return backbone, fpn, info
 
 
 
@@ -216,20 +227,28 @@ class EfNetBackbone(nn.Module):
         'efficientnet-b3', 'efficientnet-b4', 'efficientnet-b5',
         'efficientnet-b6'
     }
-    def __init__(self, model_name, out_ch=None, C6C7=True):
+    def __init__(self, cfg: dict):
         super().__init__()
+        model_name = cfg['model.backbone.name']
         assert model_name in self.valid_names, 'Unknown efficientnet model name'
         efn = EfficientNet.from_pretrained(model_name, advprop=True)
         del efn._conv_head, efn._bn1, efn._avg_pooling, efn._dropout, efn._fc
         self.model = efn
+        
         efnet_chs = [efn._blocks_args[i].output_filters for i in [2,4,6]]
-        if C6C7:
+        if cfg['model.backbone.num_levels'] == 3:
+            self.feature_chs = efnet_chs
+            self.feature_strides = (8, 16, 32)
+            self.C6C7 = False
+        elif cfg['model.backbone.num_levels'] == 5:
+            out_ch = cfg['model.backbone.C6C7_out_channels']
             self.c5_to_c6 = conv1x1_bn_relu_maxp(efnet_chs[-1], out_ch)
             self.c6_to_c7 = conv1x1_bn_relu_maxp(out_ch, out_ch)
             self.feature_chs = efnet_chs + [out_ch, out_ch]
+            self.feature_strides = (8, 16, 32, 64, 128)
+            self.C6C7 = True
         else:
-            self.feature_chs = efnet_chs
-        self.C6C7 = C6C7
+            raise NotImplementedError()
 
     def forward(self, x):
         x = self.model._swish(self.model._bn0(self.model._conv_stem(x)))
