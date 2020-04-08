@@ -105,30 +105,22 @@ class YOLOLayer(nn.Module):
         tgt_conf = torch.zeros(nB, nA, nH, nW, 1)
         if self.n_cls > 0:
             tgt_cls = torch.zeros(nB, nA, nH, nW, self.n_cls)
+        
         # traverse all images in a batch
-
-        # tx_all, ty_all = labels[:,:,0] * nG, labels[:,:,1] * nG # 0-nG
-        # tw_all, th_all = labels[:,:,2], labels[:,:,3] # normalized 0-1
-        # ta_all = labels[:,:,4] # degree, 0-max_angle
-
-        # ti_all = tx_all.long()
-        # tj_all = ty_all.long()
-
-        # norm_anch_wh = anchors[:,0:2] / img_size # normalized
-        # norm_anch_00wha = self.anch_00wha_all.clone().to(device=device)
-        # norm_anch_00wha[:,2:4] /= img_size # normalized
-
         for b in range(nB):
             im_labels = labels[b]
-            nGT = im_labels.shape[0]
+            im_labels.sanity_check()
+            nGT = len(im_labels)
             if nGT == 0:
                 # no ground truth
                 continue
-            assert im_labels.shape[1] == 6 # (cls_idx, x, y, w, h, a)
+            gt_bboxes = im_labels.bboxes
+            gt_cls_idx = im_labels.cats
+            assert gt_bboxes.shape[1] == 6 # (cls_idx, x, y, w, h, a)
 
             # calculate iou between truth and reference anchors
             _gt_00wh0 = torch.zeros(nGT, 5)
-            _gt_00wh0[:, 2:4] = im_labels[:, 3:5]
+            _gt_00wh0[:, 2:4] = gt_bboxes[:, 2:4]
             _gt_00wh0[:, 4] = 0
             # anchor_ious = iou_mask(gt_boxes, norm_anch_00wha, xywha=True,
             #                        mask_size=64, is_degree=True)

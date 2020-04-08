@@ -1,6 +1,7 @@
 # This is the main training file we are using
 import os
 import argparse
+import functools
 import random
 import torch
 from torch.utils.data import DataLoader
@@ -23,7 +24,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov3')
+    parser.add_argument('--model', type=str, default='d1_345_a3_conf_yolo')
     parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='debug3')
     parser.add_argument('--batch_size', type=int, default=1)
@@ -35,12 +36,13 @@ def main():
     parser.add_argument('--res_max', type=int, default=512)
 
     parser.add_argument('--print_interval', type=int, default=10)
-    parser.add_argument('--eval_interval', type=int, default=1000)
+    parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
-    parser.add_argument('--demo_interval', type=int, default=500)
+    parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
     
     parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -60,10 +62,8 @@ def main():
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
     decay_SGD = global_cfg['train.sgd.weight_decay'] * batch_size * subdivision
-    if args.debug_mode:
-        lr_SGD = 0.0001 / batch_size / subdivision
-    else:
-        lr_SGD = 0.001 / batch_size / subdivision
+    base_lr = 0.0001 if args.debug_mode else 0.001
+    lr_SGD = base_lr / batch_size / subdivision
     # Training set setting
     if args.train_set == 'debug3':
         training_set_cfg = {
@@ -147,6 +147,9 @@ def main():
                                 weight_decay=decay_SGD)
     if args.checkpoint and 'optimizer' in previous_state:
         optimizer.load_state_dict(previous_state['optimizer'])
+    # Learning rate scheduler
+    warmup_iter = 100 if args.debug_mode else 1000
+    lr_schedule_func = functools.partial(lr_warmup, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
 
@@ -249,8 +252,7 @@ def main():
 
 
 # Learning rate setup
-def lr_schedule_func(i):
-    warm_up = 1000
+def lr_warmup(i, warm_up=1000):
     if i < warm_up:
         factor = i / warm_up
     elif i < 40000:
