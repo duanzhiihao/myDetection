@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from .utils import COCO_CATEGORY_LIST
+from .constants import COCO_CATEGORY_LIST
 
 
 def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5):
@@ -27,6 +27,8 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
     im: numpy array, uint8, shape(h,w,3), RGB
     bboxes: rows of [class,x,y,w,h,conf]
     '''
+    raise DeprecationWarning()
+
     assert bboxes.dim() == 2 and bboxes.shape[1] >= 5
     line_width = round(im.shape[0] / 300)
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -64,6 +66,46 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
                     (255,255,255), font_bold, cv2.LINE_AA)
     # plt.imshow(im)
     # plt.show()
+
+
+def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
+    print_dt = kwargs.get('print_dt', False)
+    # Extract bboxes, scores, and category indices
+    obj_num = img_objs.bboxes.shape[0]
+    if obj_num == 0: return
+    bboxes = img_objs.bboxes
+    scores = img_objs.scores if img_objs.scores is not None else \
+             [None for _ in range(obj_num)]
+    class_indices = img_objs.cats
+    assert len(bboxes) == len(scores) == len(class_indices)
+    # Select the target dataset
+    if class_map == 'COCO':
+        cat_idx2name = lambda x: COCO_CATEGORY_LIST[x]['name']
+        cat_idx2color = lambda x: COCO_CATEGORY_LIST[x]['color']
+    else: raise NotImplementedError()
+    # Initialize some drawing parameters
+    line_width = round(im.shape[0] / 250)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = im.shape[0] * im.shape[1] / (700*700)
+    font_bold = im.shape[0] // 400
+    # Interate over all bounding boxes
+    for bb, conf, c_idx in zip(bboxes, scores, class_indices):
+        if img_objs._bb_format == 'cxcywh':
+            cx, cy, w, h = bb
+            a = 0
+        elif img_objs._bb_format == 'cxcywhd':
+            cx, cy, w, h, a = bb
+        else: raise NotImplementedError()
+        cat_name = cat_idx2name(c_idx)
+        cat_color = cat_idx2color(c_idx)
+        if print_dt:
+            print(f'category:{cat_name}, score: {conf},',
+                  f'[{cx:.1f} {cy:.1f} {w:.1f} {h:.1f} {a:.1f}].')
+        _draw_xywha(im, cx, cy, w, h, a, color=cat_color, linewidth=line_width)
+        x1, y1 = cx - w/2, cy - h/2
+        text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
+        cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
+                    (255,255,255), font_bold, cv2.LINE_AA)
 
 
 def tensor_to_npimg(tensor_img):

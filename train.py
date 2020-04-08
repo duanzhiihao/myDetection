@@ -24,46 +24,82 @@ import api
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='yolov3')
-    parser.add_argument('--dataset', type=str, default='COCO')
+    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--val_set', type=str, default='debug3')
     parser.add_argument('--batch_size', type=int, default=1)
 
     parser.add_argument('--checkpoint', type=str)
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
-    parser.add_argument('--res_max', type=int, default=512)
+    parser.add_argument('--res_max', type=int, default=640)
 
+    parser.add_argument('--print_interval', type=int, default=10)
     parser.add_argument('--eval_interval', type=int, default=1000)
-    parser.add_argument('--img_interval', type=int, default=500)
-    parser.add_argument('--print_interval', type=int, default=1)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
+    parser.add_argument('--demo_interval', type=int, default=500)
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
     
+    parser.add_argument('--debug_mode', action='store_true')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
-    model, cfg = name_to_model(args.model)
+    model, global_cfg = name_to_model(args.model)
 
     # -------------------------- settings ---------------------------
     target_size = round(args.resolution / 128) * 128
-    job_name = f'{args.model}_{args.dataset}{target_size}'
+    job_name = f'{args.model}_{args.train_set}{target_size}'
     # multi-scale training setting
-    enable_aug = True
-    multiscale = True
+    enable_aug = not args.debug_mode
+    multiscale = not args.debug_mode
     multiscale_interval = 10
     # dataloader setting
     batch_size = args.batch_size
     num_cpu = 0 if batch_size == 1 else 4
-    subdivision = 128 // batch_size
+    subdivision = 128 // batch_size if not args.debug_mode else 3
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
-    decay_SGD = cfg['train.sgd.weight_decay'] * batch_size * subdivision
-    lr_SGD = 0.001 / batch_size / subdivision
-    # Dataset setting
-    if args.dataset == 'COCO':
-        train_img_dir = '../COCO/train2017'
-        train_json = '../COCO/annotations/instances_train2017.json'
+    decay_SGD = global_cfg['train.sgd.weight_decay'] * batch_size * subdivision
+    lr_SGD = 0.0001 / batch_size / subdivision
+    # Training set setting
+    if args.train_set == 'debug3':
+        training_set_cfg = {
+            'img_dir': '../COCO/val2017',
+            'json_path': '../COCO/annotations/debug3.json',
+            'ann_bbox_format': 'x1y1wh',
+            'input_image_format': model.input_format,
+            'img_size': args.res_max,
+            'enable_aug': enable_aug,
+        }
+    elif args.train_set == 'COCO':
+        training_set_cfg = {
+            'img_dir': '../COCO/train2017',
+            'json_path': '../COCO/annotations/instances_train2017.json',
+            'ann_bbox_format': 'x1y1wh',
+            'input_image_format': model.input_format,
+            'img_size': args.res_max,
+            'enable_aug': enable_aug,
+        }
+    elif args.train_set == 'COCO80-R':
+        # TODO
+        dataset_cfg = {
+            'train_img_dir': '../COCO/train2017',
+            'train_json': '../COCO/annotations/instances_train2017.json',
+            'val_img_dir': '../COCO/val2017',
+            'val_json': '../COCO/annotations/instances_val2017.json',
+            'rotated_bbox': True,
+        }
+    else:
+        raise NotImplementedError()
+    # Validation set setting
+    if args.train_set == 'debug3':
+        val_img_dir = './images/debug3/'
+        val_json_path = '../COCO/annotations/debug3.json'
+        validation_func = coco_evaluate_json
+    elif args.val_set == 'val2017':
         val_img_dir = '../COCO/val2017'
-        valjson = '../COCO/annotations/instances_val2017.json'
+        val_json_path = '../COCO/annotations/instances_val2017.json'
+        validation_func = coco_evaluate_json
     else:
         raise NotImplementedError()
     
@@ -73,20 +109,16 @@ def main():
     model = model.cuda()
     model.train()
 
-    print(f'Initialing training set {train_img_dir}...')
-    dataset = Dataset4ObjDet(train_img_dir, train_json, 'x1y1wh', args.res_max,
-                             input_format=model.input_format, augmentation=enable_aug,
-                             debug_mode=False)
+    print(f'Initialing training set...')
+    print(training_set_cfg)
+    dataset = Dataset4ObjDet(training_set_cfg)
     dataloader = DataLoader(dataset, batch_size, shuffle=True, num_workers=num_cpu,
                             collate_fn=Dataset4ObjDet.collate_func, pin_memory=True)
     dataiterator = iter(dataloader)
-    
-    eval_img_names = [s for s in os.listdir('./images/') if s.endswith('.jpg')]
-    eval_img_paths = [os.path.join('./images/',s) for s in eval_img_names]
 
     start_iter = -1
     if args.checkpoint:
-        print("Loading ckpt...", args.checkpoint)
+        print("Loading checkpoint...", args.checkpoint)
         weights_path = os.path.join('./weights/', args.checkpoint)
         previous_state = torch.load(weights_path)
         model.load_state_dict(previous_state['model'])
@@ -94,7 +126,10 @@ def main():
         print(f'Start from iteration: {start_iter}')
 
     print('Initialing tensorboard SummaryWriter...')
-    logger = SummaryWriter(f'./logs/{job_name}')
+    if args.debug_mode:
+        logger = SummaryWriter(f'./logs/debug/{job_name}')
+    else:
+        logger = SummaryWriter(f'./logs/{job_name}')
 
     print(f'Initialing optimizer with lr: {lr_SGD}, decay: {decay_SGD}')
     params = []
@@ -119,10 +154,10 @@ def main():
         # evaluation
         if iter_i > 0 and iter_i % args.eval_interval == 0:
             with timer.contexttimer() as t0:
-                model_eval = api.Detector(model_and_cfg=(model, cfg))
+                model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
                                                 to_square=True, conf_thres=0.005)
-                eval_str, ap, ap50, ap75 = evaluate_json(dts, valjson)
+                eval_str, ap, ap50, ap75 = validation_func(dts, val_json_path)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
             s += eval_str + '\n\n'
@@ -188,16 +223,25 @@ def main():
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
             }
-            save_path = os.path.join('./weights', f'{job_name}_{today}_{iter_i}.ckpt')
+            save_path = os.path.join('./weights', f'{job_name}_{today}_{iter_i}.pth')
             torch.save(state_dict, save_path)
 
         # save detection
-        if iter_i % args.img_interval == 0:
-            for impath in eval_img_paths:
-                model_eval = api.Detector(model_and_cfg=(model, cfg))
+        if iter_i % args.demo_interval == 0:
+            model_eval = api.Detector(model_and_cfg=(model, global_cfg))
+            for imname in os.listdir(args.demo_images_dir):
+                if not imname.endswith('.jpg'): continue
+                impath = os.path.join(args.demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                                conf_thres=0.3)
-                logger.add_image(impath, np_img, iter_i, dataformats='HWC')
+                if args.debug_mode:
+                    cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
+                    log_dir = f'./logs/{args.model}_debug/'
+                    if not os.path.exists(log_dir): os.mkdir(log_dir)
+                    s = os.path.join(log_dir, f'{imname[:-4]}_iter{iter_i}.jpg')
+                    cv2.imwrite(s, cv2_im)
+                else:
+                    logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 
 
@@ -219,10 +263,10 @@ def lr_schedule_func(i):
     return factor
 
 
-def evaluate_json(dts_json, valjson):
+def coco_evaluate_json(dts_json, gt_json_path):
     json.dump(dts_json, open('./tmp.json','w'), indent=1)
     print('Initialing validation set...')
-    cocoGt = COCO(valjson)
+    cocoGt = COCO(gt_json_path)
     cocoDt = cocoGt.loadRes('./tmp.json')
     cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
     cocoEval.evaluate()

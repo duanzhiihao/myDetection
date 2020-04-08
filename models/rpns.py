@@ -19,26 +19,26 @@ class YOLOHead(nn.Module):
     def __init__(self, cfg: dict):
         super().__init__()
 
-        n_anch = cfg['model.yolo.num_anchor_per_level']
-        n_cls = cfg['general.num_class']
+        self.n_anch = cfg['model.yolo.num_anchor_per_level']
+        self.n_cls = cfg['general.num_class']
+        self.bb_param = cfg.get('general.bbox_param', 4)
         self.heads = nn.ModuleList()
-        out_ch = (n_cls + 5) * n_anch
+        out_ch = (self.bb_param + 1 + self.n_cls) * self.n_anch
         for ch in cfg['model.fpn.out_channels']:
             self.heads.append(nn.Conv2d(ch, out_ch, 1, stride=1))
-        self.n_anch = n_anch
-        self.n_cls = n_cls
 
     def forward(self, features):
+        nBp = self.bb_param
         all_level_preds = []
         for module, P in zip(self.heads, features):
             preds = module(P)
             nB, _, nH, nW = preds.shape
-            preds = preds.view(nB, self.n_anch, self.n_cls+5, nH, nW)
+            preds = preds.view(nB, self.n_anch, nBp+1+self.n_cls, nH, nW)
             
             raw = {
-                'bbox': preds[:, :, 0:4, :, :].permute(0, 1, 3, 4, 2),
-                'conf': preds[:, :, 4:5, :, :].permute(0, 1, 3, 4, 2),
-                'class': preds[:, :, 5:, :, :].permute(0, 1, 3, 4, 2),
+                'bbox': preds[:, :, 0:nBp, :, :].permute(0, 1, 3, 4, 2),
+                'conf': preds[:, :, nBp:nBp+1, :, :].permute(0, 1, 3, 4, 2),
+                'class': preds[:, :, nBp+1:, :, :].permute(0, 1, 3, 4, 2),
             }
             all_level_preds.append(raw)
         
@@ -127,12 +127,13 @@ class EfDetHead(nn.Module):
         with_conf = cfg['model.effrpn.with_conf']
         feature_chs = cfg['model.fpn.out_channels']
         repeat = cfg['model.effrpn.repeat_num']
+        bb_param = cfg.get('general.bbox_param', 4)
         self.class_nets = nn.ModuleList()
         self.bbox_nets = nn.ModuleList()
-        cls_ch = n_anch*(1+n_cls) if with_conf else n_anch*n_cls
+        cls_ch = n_anch * (1 + n_cls) if with_conf else n_anch * n_cls
         for ch in feature_chs:
             bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
-            bb_net.append(SeparableConv2d(ch, n_anch*4, 3, 1, padding=1))
+            bb_net.append(SeparableConv2d(ch, n_anch*bb_param, 3, 1, padding=1))
             bb_net = nn.Sequential(*bb_net)
             self.bbox_nets.append(bb_net)
 

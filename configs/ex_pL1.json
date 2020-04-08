@@ -2,7 +2,9 @@
     "base": "OneStageBBox",
     
     "general.input_format": "RGB_1",
-    "general.num_class": 80,
+    "general.num_class": 0,
+    "general.pred_bbox_format": "cxcywhd",
+    "general.bbox_param": 5,
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,
@@ -15,20 +17,23 @@
 
     "model.rpn.name": "yv3",
     
-    "model.pred_layer": "YOLO",
+    "model.pred_layer": "YOLO_EX",
 
     "model.yolo.num_anchor_per_level": 3,
     "model.yolo.anchors": [
-        [10, 13], [16, 30], [33, 23],
-        [30, 61], [62, 45], [59, 119],
-        [116, 90], [156, 198], [373, 326]
+        [18.7807, 33.4659], [28.8912, 61.7536], [48.6849, 68.3897],
+        [45.0668, 101.4673], [63.0952, 113.5382], [81.3909, 134.4554],
+        [91.7364, 144.9949], [137.5189, 178.4791], [194.4429, 250.7985]
     ],
     "model.yolo.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
+    "model.angle.loss_angle": "period_L1",
+    "model.angle.pred_range": 360,
 
     "train.sgd.weight_decay": 0.0005,
+    "train.check_gt_assignment": true,
 
-    "test.default_input_size": 640,
-    "test.to_square": true,
-    "test.default_conf_thres": 0.5,
+    "test.default_input_size": 1024,
+    "test.to_square": false,
+    "test.default_conf_thres": 0.3,
     "test.nms_thres": 0.45
 }

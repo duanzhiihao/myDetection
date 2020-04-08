@@ -11,7 +11,7 @@ import torch
 import torchvision.transforms.functional as tvf
 
 from models.registry import name_to_model
-import utils.utils as Utils
+import utils.image_ops as imgUtils
 import utils.visualization as visUtils
 
 
@@ -68,7 +68,7 @@ class Detector():
             See _predict_pil() for more optinal arguments
         '''
         if 'img_path' in kwargs:
-            img = Utils.imread_pil(kwargs['img_path'])
+            img = imgUtils.imread_pil(kwargs['img_path'])
         else:
             assert 'pil_img' in kwargs
             img = kwargs.pop('pil_img')
@@ -104,12 +104,12 @@ class Detector():
         ori_shorter = min(pil_img.height, pil_img.width)
         if to_square:
             assert input_size > 0
-            pil_img, _, pad_info = Utils.rect_to_square(pil_img, None, input_size)
+            pil_img, _, pad_info = imgUtils.rect_to_square(pil_img, None, input_size)
         elif input_size:
             pil_img = tvf.resize(pil_img, input_size)
         # convert to tensor
         t_img = tvf.to_tensor(pil_img)
-        t_img = Utils.format_tensor_img(t_img, code=self.model.input_format)
+        t_img = imgUtils.format_tensor_img(t_img, code=self.model.input_format)
 
         input_ = t_img.unsqueeze(0)
         assert input_.dim() == 4
@@ -129,7 +129,7 @@ class Detector():
         # plt.imshow(np_img)
         # plt.show()
         if to_square:
-            dts.bboxes = Utils.detection2original(dts.bboxes, pad_info.squeeze())
+            dts.bboxes_to_original_(pad_info.squeeze())
         elif input_size:
             dts.bboxes = dts.bboxes / input_size * ori_shorter
         return dts

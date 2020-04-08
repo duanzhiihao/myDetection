@@ -19,50 +19,50 @@ def hflip(image, labels):
     return image, labels
 
 
-# def vflip(image, labels):
-#     '''
-#     up-down flip
+def vflip(image, labels):
+    '''
+    up-down flip
 
-#     Args:
-#         image: PIL.Image
-#         labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
-#     '''
-#     image = tvf.vflip(image)
-#     labels[:,1] = image.height - labels[:,1] # x,y,w,h,(angle)
-#     labels[:,4] = -labels[:,4]
-#     return image, labels
+    Args:
+        image: PIL.Image
+        labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
+    '''
+    image = tvf.vflip(image)
+    labels[:,1] = image.height - labels[:,1] # x,y,w,h,(angle)
+    labels[:,4] = -labels[:,4]
+    return image, labels
 
 
-# def rotate(image, degrees, labels, expand=False):
-#     '''
-#     image: PIL.Image
-#     labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
-#     '''
-#     img_w, img_h = image.width, image.height
-#     image = tvf.rotate(image, angle=-degrees, expand=expand)
-#     new_w, new_h = image.width, image.height
-#     # image coordinate to cartesian coordinate
-#     x = labels[:,0] - 0.5*img_w
-#     y = -(labels[:,1] - 0.5*img_h)
-#     # cartesian to polar
-#     r = (x.pow(2) + y.pow(2)).sqrt()
+def rotate(image, degrees, labels, expand=False):
+    '''
+    image: PIL.Image
+    labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
+    '''
+    img_w, img_h = image.width, image.height
+    image = tvf.rotate(image, angle=-degrees, expand=expand)
+    new_w, new_h = image.width, image.height
+    # image coordinate to cartesian coordinate
+    x = labels[:,0] - 0.5*img_w
+    y = -(labels[:,1] - 0.5*img_h)
+    # cartesian to polar
+    r = (x.pow(2) + y.pow(2)).sqrt()
 
-#     theta = torch.empty_like(r)
-#     theta[x>=0] = torch.atan(y[x>=0]/x[x>=0])
-#     theta[x<0] = torch.atan(y[x<0]/x[x<0]) + np.pi
-#     theta[torch.isnan(theta)] = 0
-#     # modify theta
-#     theta -= (degrees*np.pi/180)
-#     # polar to cartesian
-#     x = r * torch.cos(theta)
-#     y = r * torch.sin(theta)
-#     labels[:,0] = x + 0.5*new_w
-#     labels[:,1] = -y + 0.5*new_h
-#     labels[:,4] += degrees
-#     labels[:,4] = torch.remainder(labels[:,4], 180)
-#     labels[:,4][labels[:,4]>=90] -= 180
+    theta = torch.empty_like(r)
+    theta[x>=0] = torch.atan(y[x>=0]/x[x>=0])
+    theta[x<0] = torch.atan(y[x<0]/x[x<0]) + np.pi
+    theta[torch.isnan(theta)] = 0
+    # modify theta
+    theta -= (degrees*np.pi/180)
+    # polar to cartesian
+    x = r * torch.cos(theta)
+    y = r * torch.sin(theta)
+    labels[:,0] = x + 0.5*new_w
+    labels[:,1] = -y + 0.5*new_h
+    labels[:,4] += degrees
+    labels[:,4] = torch.remainder(labels[:,4], 180)
+    labels[:,4][labels[:,4]>=90] -= 180
 
-#     return image, labels
+    return image, labels
 
 
 def add_gaussian(imgs, max_var=0.1):

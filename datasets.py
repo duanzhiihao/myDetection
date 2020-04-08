@@ -7,8 +7,9 @@ from collections import defaultdict, OrderedDict
 import torch
 import torchvision.transforms.functional as tvf
 
-import utils.utils as Utils
+import utils.image_ops as imgUtils
 import utils.augmentation as augUtils
+from utils.structures import ImageObjects
 
 
 class Dataset4ObjDet(torch.utils.data.Dataset):
@@ -21,32 +22,25 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         bb_format: str, default: 'x1y1wh'
         img_size: int, target image size input to the YOLO, default: 608
         augmentation: bool, default: True
-        only_person: bool, if true, non-person BBs are discarded. default: True
         debug: bool, if True, only one data id is selected from the dataset
     """
-    def __init__(self, img_dir, json_path, bb_format, img_size, input_format,
-                 augmentation=True, debug_mode=False):
-        self.img_dir = img_dir
-        self.img_size = img_size
-        self.input_format = input_format
-        self.enable_aug = augmentation
-        # self.only_person = only_person
-        # if only_person:
-        #     print('Only train on person images and objects')
+    # def __init__(self, img_dir, json_path, bb_format, img_size, input_format,
+    #              augmentation=True):
+    def __init__(self, cfg: dict):
+        self.img_dir = cfg['img_dir']
+        self.img_size = cfg['img_size']
+        self.input_format = cfg['input_image_format']
+        self.enable_aug = cfg['enable_aug']
         self.skip_crowd = False
+        self.config = cfg
 
         self.img_ids = []
         self.imgid2info = dict()
         self.imgid2anns = defaultdict(list)
         self.catid2idx = []
-        self.load_json(json_path, bb_format)
+        self.load_json(cfg['json_path'], cfg['ann_bbox_format'])
 
-        if debug_mode:
-            # self.img_ids = self.img_ids[0:1]
-            self.img_ids = [222639]
-            print(f"debug mode..., only train on one image: {self.img_ids[0]}")
-
-    def load_json(self, json_path, bb_format):
+    def load_json(self, json_path, ann_bbox_format):
         '''
         laod json file to self.img_ids, self.imgid2anns
         '''
@@ -58,18 +52,22 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.catid2idx = dict([(cat['id'],idx) for idx,cat in enumerate(catgys)])
 
         for ann in json_data['annotations']:
-            # get width and height
-            if bb_format == 'x1y1wh':
+            # Parse bounding box annotation
+            if ann_bbox_format == 'x1y1wh':
                 assert len(ann['bbox']) == 4
                 # The dataset is using (x1,y1,w,h). Converting to (cx,cy,w,h)
                 ann['bbox'][0] = ann['bbox'][0] + ann['bbox'][2] / 2
                 ann['bbox'][1] = ann['bbox'][1] + ann['bbox'][3] / 2
-            elif bb_format == 'cxcywh':
+                self.bb_format = 'cxcywh'
+            elif ann_bbox_format == 'cxcywh':
                 assert len(ann['bbox']) == 4
-            else:
-                raise Exception('Bounding box format not supported')
-            cat_id = self.catid2idx[ann['category_id']]
-            ann['gt'] = torch.Tensor([cat_id] + ann['bbox'])
+                self.bb_format = 'cxcywh'
+            elif ann_bbox_format == 'cxcywhd':
+                assert len(ann['bbox']) == 5
+                self.bb_format = 'cxcywhd'
+            else: raise Exception('Bounding box format is not supported')
+            cat_idx = self.catid2idx[ann['category_id']]
+            ann['_gt'] = torch.Tensor([cat_idx] + ann['bbox'])
             self.imgid2anns[ann['image_id']].append(ann)
 
         for img in json_data['images']:
@@ -79,14 +77,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # if there is crowd gt, skip this image
                 if any(ann['iscrowd'] for ann in anns):
                     continue
-            # if only for person detection
-            # if self.only_person:
-            #     # select the images which contain at least one person
-            #     if not any(ann['category_id']==1 for ann in anns):
-            #         continue
-            #     # and ignore all other categories
-            #     self.imgid2anns[img_id] = [a for a in anns if a['category_id']==1]
-            # otherwise, keep all 80 classes
             self.img_ids.append(img_id)
             self.imgid2info[img['id']] = img
         debug = 1
@@ -105,27 +95,23 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img_id = self.img_ids[index]
         img_name = self.imgid2info[img_id]['file_name']
         img_path = os.path.join(self.img_dir, img_name)
-        img = Utils.imread_pil(img_path)
+        img = imgUtils.imread_pil(img_path)
         ori_w, ori_h = img.width, img.height
 
         labels = []
         for _, ann in enumerate(self.imgid2anns[img_id]):
-            # if self.only_person and ann['category_id'] != 1:
-            #     continue
-            labels.append(ann['gt'])
-        # if self.only_person:
-        #     assert (labels[:,0] == 0).all()
-        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
-        # each row of labels is [category, x, y, w, h]
+            labels.append(ann['_gt'])
+        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,6)
+        # each row of labels is [category, cx, cy, w, h, (degree)]
         # augmentation
         if self.enable_aug:
             img, labels = self.augment_PIL(img, labels)
         # pad to square
-        img, labels, pad_info = Utils.rect_to_square(img, labels, self.img_size,
+        img, labels, pad_info = imgUtils.rect_to_square(img, labels, self.img_size,
                                         pad_value=0, aug=self.enable_aug)
         # Remove annotations which are too small
         label_areas = labels[:,3] * labels[:,4]
-        labels = labels[label_areas > 64]
+        labels = labels[label_areas >= 50]
         # Convert PIL.image into torch.tensor with shape (3,h,w)
         img = tvf.to_tensor(img)
         # Noise augmentation
@@ -135,12 +121,10 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             # if np.random.rand() > 0.7:
             #     blur_func = random.choice(blur)
             #     img = blur_func(img)
-            # if np.random.rand() > 0.6:
-                # img = augUtils.add_gaussian(img, max_var=0.002)
             if np.random.rand() > 0.6:
                 img = augUtils.add_saltpepper(img, max_p=0.02)
         # Convert into desired input format, e.g., normalized
-        img = Utils.format_tensor_img(img, code=self.input_format)
+        img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
         if (labels[:,1:5] >= self.img_size).any():
             print('Warning: some x,y in ground truth are greater than image size')
@@ -149,6 +133,8 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             print('Warning: some x,y in ground truth are smaller than 0')
             print('image path:', img_path)
         labels[:,1:5].clamp_(min=0)
+        labels = ImageObjects(bboxes=labels[:,1:], cats=labels[:,0].long(),
+                              bb_format=self.bb_format, img_size=img.shape[1:3])
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
@@ -169,6 +155,18 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # horizontal flip
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
+        if self.bb_format in {'cxcywhd'}:
+            # vertical flip
+            if np.random.rand() > 0.5:
+                img, labels = augUtils.vflip(img, labels)
+            # random rotation
+            rand_deg = np.random.rand() * 360
+            if self.config['rotation_expand']:
+                img, labels = augUtils.rotate(img, rand_deg, labels, expand=True)
+            else:
+                img, labels = augUtils.rotate(img, rand_deg, labels, expand=False)
+            return img, labels
+
         return img, labels
 
     @staticmethod
