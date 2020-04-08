@@ -2,6 +2,7 @@
 script.py
 test_*
 debug_*
+tmp.json
 
 weights/
 logs/

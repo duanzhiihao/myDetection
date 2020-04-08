@@ -32,7 +32,7 @@ def main():
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
-    parser.add_argument('--res_max', type=int, default=640)
+    parser.add_argument('--res_max', type=int, default=512)
 
     parser.add_argument('--print_interval', type=int, default=10)
     parser.add_argument('--eval_interval', type=int, default=1000)
@@ -60,7 +60,10 @@ def main():
     print(f'effective batch size = {batch_size} * {subdivision}')
     # optimizer setting
     decay_SGD = global_cfg['train.sgd.weight_decay'] * batch_size * subdivision
-    lr_SGD = 0.0001 / batch_size / subdivision
+    if args.debug_mode:
+        lr_SGD = 0.0001 / batch_size / subdivision
+    else:
+        lr_SGD = 0.001 / batch_size / subdivision
     # Training set setting
     if args.train_set == 'debug3':
         training_set_cfg = {
