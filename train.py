@@ -16,7 +16,7 @@ from io import StringIO
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
-from models.registry import name_to_model
+from models.general import name_to_model
 from datasets import Dataset4ObjDet
 from utils import timer, visualization
 import api

@@ -3,18 +3,6 @@ import torch.nn as nn
 from .modules import SeparableConv2d, Swish
 
 
-# def get_rpn(name, chs, **kwargs):
-def get_rpn(cfg: dict):
-    rpn_name = cfg['model.rpn.name']
-    if rpn_name == 'yv3':
-        rpn = YOLOHead(cfg)
-    elif rpn_name == 'effrpn':
-        rpn = EfDetHead(cfg)
-    else:
-        raise NotImplementedError()
-    return rpn
-
-
 class YOLOHead(nn.Module):
     def __init__(self, cfg: dict):
         super().__init__()
@@ -172,6 +160,6 @@ class EfDetHead(nn.Module):
 def spconv3x3_bn_swish(inout_ch):
     return nn.Sequential(
         SeparableConv2d(inout_ch, inout_ch, 3, 1, padding=1),
-        nn.BatchNorm2d(inout_ch, eps=0.001, momentum=0.99),
+        nn.BatchNorm2d(inout_ch, eps=0.001, momentum=0.01),
         Swish()
     )

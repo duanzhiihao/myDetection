@@ -5,31 +5,6 @@ import torch.nn.functional as tnf
 from .backbones import ConvBnLeaky
 from .modules import SeparableConv2d
 
-# def get_fpn(name, backbone_info=None, **kwargs):
-def get_fpn(cfg: dict):
-    fpn_name = cfg['model.fpn.name']
-    if fpn_name == 'yolo3':
-        fpn = YOLOv3FPN(cfg)
-        out_feature_channels = cfg['model.backbone.out_channels']
-        out_strides = cfg['model.backbone.out_strides']
-    elif fpn_name == 'bifpn':
-        fpn = get_bifpn(cfg)
-        ch = cfg['model.bifpn.out_ch']
-        out_feature_channels = [ch for _ in cfg['model.backbone.out_channels']]
-        out_strides = cfg['model.backbone.out_strides']
-    # elif name == 'retina':
-    #     rpn = RetinaNetFPN(backbone_info['feature_channels'], 256)
-    #     info = {
-    #         'strides'
-    #     }
-    #     return rpn
-    else:
-        raise Exception('Unknown FPN name')
-
-    cfg['model.fpn.out_channels'] = out_feature_channels
-    cfg['model.fpn.out_strides'] = out_strides
-    return fpn
-
 
 class YOLOBranch(nn.Module):
     '''
@@ -415,7 +390,7 @@ class LinearFusion(nn.Module):
         self.weights = nn.Parameter(torch.ones(num), requires_grad=True)
         self.spconv_bn = nn.Sequential(
             SeparableConv2d(channels, channels, 3, 1, padding=1),
-            nn.BatchNorm2d(channels, eps=0.001,momentum=0.99)
+            nn.BatchNorm2d(channels, eps=0.001, momentum=0.01)
         )
     
     def forward(self, *features):
@@ -436,5 +411,5 @@ def swish(x):
 def conv1x1_bn(in_ch, out_ch):
     return nn.Sequential(
         nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0),
-        nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.99),
+        nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
     )

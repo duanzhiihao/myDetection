@@ -6,7 +6,7 @@ class SeparableConv2d(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size, stride, padding):
         super().__init__()
         self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size, stride,
-                                   padding=padding, groups=in_ch)
+                                   padding=padding, groups=in_ch, bias=False)
         self.pointwise = nn.Conv2d(in_ch, out_ch, 1, 1, padding=0)
 
     def forward(self, x):

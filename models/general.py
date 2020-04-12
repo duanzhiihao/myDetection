@@ -1,9 +1,19 @@
+import json
 import torch
 
-from .backbones import get_backbone
-from .fpns import get_fpn
-from .rpns import get_rpn
+from .registry import get_backbone, get_fpn, get_rpn, get_det_layer
 from utils.structures import ImageObjects
+
+
+def name_to_model(model_name):
+    cfg = json.load(open(f'./configs/{model_name}.json', 'r'))
+
+    if cfg['base'] == 'OneStageBBox':
+        model = OneStageBBox(cfg)
+    else:
+        raise Exception('Unknown model name')
+    
+    return model, cfg
 
 
 class OneStageBBox(torch.nn.Module):
@@ -14,19 +24,10 @@ class OneStageBBox(torch.nn.Module):
         self.fpn = get_fpn(cfg)
         self.rpn = get_rpn(cfg)
         
-        if cfg['model.pred_layer'] == 'YOLO':
-            from .yolov3 import YOLOLayer
-            pred_layer = YOLOLayer
-        elif cfg['model.pred_layer'] == 'YOLO_EX':
-            from .yoloa import YOLOLayer
-            pred_layer = YOLOLayer
-        elif cfg['model.pred_layer'] == 'FCOS':
-            raise NotImplementedError()
-        else:
-            raise NotImplementedError()
-        self.bb_layers = torch.nn.ModuleList()
+        det_layer = get_det_layer(cfg)
+        self.det_layers = torch.nn.ModuleList()
         for level_i in range(len(cfg['model.fpn.out_channels'])):
-            self.bb_layers.append(pred_layer(level_i=level_i, cfg=cfg))
+            self.det_layers.append(det_layer(level_i=level_i, cfg=cfg))
 
         self.check_gt_assignment = cfg.get('general.check_gt_assignment', False)
         self.bb_format = cfg.get('general.pred_bbox_format', 'cxcywh')
@@ -48,7 +49,7 @@ class OneStageBBox(torch.nn.Module):
         dts_all = []
         losses_all = []
         for i, raw_preds in enumerate(all_branch_preds):
-            dts, loss = self.bb_layers[i](raw_preds, self.img_size, labels)
+            dts, loss = self.det_layers[i](raw_preds, self.img_size, labels)
             dts_all.append(dts)
             losses_all.append(loss)
 
@@ -68,10 +69,10 @@ class OneStageBBox(torch.nn.Module):
         else:
             if self.check_gt_assignment:
                 total_gt_num = sum([t.shape[0] for t in labels])
-                assigned = sum(branch._assigned_num for branch in self.bb_layers)
+                assigned = sum(branch._assigned_num for branch in self.det_layers)
                 assert assigned == total_gt_num
             self.loss_str = ''
-            for m in self.bb_layers:
+            for m in self.det_layers:
                 self.loss_str += m.loss_str + '\n'
             loss = sum(losses_all)
             return loss

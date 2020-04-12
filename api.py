@@ -10,7 +10,7 @@ from random import randint
 import torch
 import torchvision.transforms.functional as tvf
 
-from models.registry import name_to_model
+from models.general import name_to_model
 import utils.image_ops as imgUtils
 import utils.visualization as visUtils
 
