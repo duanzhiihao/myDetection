@@ -1,15 +1,78 @@
 import os
+import sys
+from io import StringIO
 import json
 import random
 import numpy as np
 from collections import defaultdict, OrderedDict
-
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 import torch
 import torchvision.transforms.functional as tvf
 
 import utils.image_ops as imgUtils
 import utils.augmentation as augUtils
 from utils.structures import ImageObjects
+
+
+def get_trainingset(dataset_name, **kwargs):
+    if dataset_name == 'debug3':
+        training_set_cfg = {
+            'img_dir': '../COCO/val2017',
+            'json_path': '../COCO/annotations/debug3.json',
+            'ann_bbox_format': 'x1y1wh',
+            'input_image_format': kwargs['input_format'],
+            'img_size': kwargs['img_size'],
+            'enable_aug': kwargs['enable_aug'],
+        }
+    elif dataset_name == 'debug_zebra':
+        training_set_cfg = {
+            'img_dir': '../COCO/val2017',
+            'json_path': '../COCO/annotations/debug_zebra.json',
+            'ann_bbox_format': 'x1y1wh',
+            'input_image_format': kwargs['input_format'],
+            'img_size': kwargs['img_size'],
+            'enable_aug': kwargs['enable_aug'],
+        }
+    elif dataset_name == 'COCO':
+        training_set_cfg = {
+            'img_dir': '../COCO/train2017',
+            'json_path': '../COCO/annotations/instances_train2017.json',
+            'ann_bbox_format': 'x1y1wh',
+            'input_image_format': kwargs['input_format'],
+            'img_size': kwargs['img_size'],
+            'enable_aug': kwargs['enable_aug'],
+        }
+    elif dataset_name == 'COCO80-R':
+        raise NotImplementedError()
+        training_set_cfg = {
+            'train_img_dir': '../COCO/train2017',
+            'train_json': '../COCO/annotations/instances_train2017.json',
+            'val_img_dir': '../COCO/val2017',
+            'val_json': '../COCO/annotations/instances_val2017.json',
+            'rotated_bbox': True,
+        }
+    else:
+        raise NotImplementedError()
+    return Dataset4ObjDet(training_set_cfg)
+
+
+def get_valset(valset_name):
+    if valset_name == 'debug3':
+        val_img_dir = './images/debug3/'
+        val_json_path = '../COCO/annotations/debug3.json'
+        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'debug_zebra':
+        val_img_dir = './images/debug_zebra/'
+        val_json_path = '../COCO/annotations/debug_zebra.json'
+        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'val2017':
+        val_img_dir = '../COCO/val2017'
+        val_json_path = '../COCO/annotations/instances_val2017.json'
+        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    else:
+        raise NotImplementedError()
+    return val_img_dir, validation_func
 
 
 class Dataset4ObjDet(torch.utils.data.Dataset):
@@ -176,7 +239,32 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         ids_batch = [items[2] for items in batch]
         pad_info_batch = [items[3] for items in batch]
         return img_batch, label_batch, ids_batch, pad_info_batch
+    
+    def to_dataloader(self, **kwargs):
+        return torch.utils.data.DataLoader(self,
+                    collate_fn=Dataset4ObjDet.collate_func, **kwargs)
 
 
 def uniform(a, b):
     return a + np.random.rand() * (b-a)
+
+
+def coco_evaluate_json(dts_json, gt_json_path):
+    json.dump(dts_json, open('./tmp.json','w'), indent=1)
+    print('Initialing validation set...')
+    cocoGt = COCO(gt_json_path)
+    cocoDt = cocoGt.loadRes('./tmp.json')
+    cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
+    cocoEval.evaluate()
+    cocoEval.accumulate()
+    # have to manually get the evaluation string 
+    stdout = sys.stdout
+    s = StringIO()
+    sys.stdout = s
+    cocoEval.summarize()
+    sys.stdout = stdout
+    s.seek(0)
+    s = s.read()
+    print(s)
+    ap, ap50, ap75 = cocoEval.stats[0], cocoEval.stats[1], cocoEval.stats[2]
+    return s, ap, ap50, ap75

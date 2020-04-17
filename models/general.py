@@ -56,13 +56,13 @@ class OneStageBBox(torch.nn.Module):
         if labels is None:
             batch_bbs = torch.cat([d['bbox'] for d in dts_all], dim=1)
             batch_cls_idx = torch.cat([d['class_idx'] for d in dts_all], dim=1)
-            batch_confs = torch.cat([d['conf'] for d in dts_all], dim=1)
+            batch_scores = torch.cat([d['score'] for d in dts_all], dim=1)
 
             batch_pred_objects = []
             # iterate over every image in the batch
-            for bbs, cls_idx, confs in zip(batch_bbs, batch_cls_idx, batch_confs):
+            for bbs, cls_idx, scores in zip(batch_bbs, batch_cls_idx, batch_scores):
                 # initialize the pred objects in current image
-                p_objs = ImageObjects(bboxes=bbs, cats=cls_idx, scores=confs,
+                p_objs = ImageObjects(bboxes=bbs, cats=cls_idx, scores=scores,
                                       bb_format=self.bb_format)
                 batch_pred_objects.append(p_objs)
             return batch_pred_objects

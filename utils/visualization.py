@@ -84,7 +84,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         cat_idx2color = lambda x: COCO_CATEGORY_LIST[x]['color']
     else: raise NotImplementedError()
     # Initialize some drawing parameters
-    line_width = round(im.shape[0] / 250)
+    line_width = round(im.shape[0] / 300)
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = im.shape[0] * im.shape[1] / (700*700)
     font_bold = im.shape[0] // 400
@@ -106,6 +106,9 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
         cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
                     (255,255,255), font_bold, cv2.LINE_AA)
+    if kwargs.get('imshow', False):
+        plt.imshow(im)
+        plt.show()
 
 
 def tensor_to_npimg(tensor_img):

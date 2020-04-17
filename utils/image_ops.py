@@ -71,7 +71,9 @@ def format_tensor_img(t_img: torch.tensor, code: str):
     if code == 'RGB_1':
         pass
     elif code == 'RGB_1_norm':
-        t_img = tvf.normalize(t_img, [0.485,0.456,0.406], [0.229,0.224,0.225])
+        means = [0.485,0.456,0.406]
+        stds = [0.229,0.224,0.225]
+        t_img = tvf.normalize(t_img, means, stds)
     elif code == 'BGR_255_norm':
         # to BGR, to 255
         t_img = t_img[[2,1,0],:,:] * 255
@@ -80,3 +82,20 @@ def format_tensor_img(t_img: torch.tensor, code: str):
     else:
         raise NotImplementedError()
     return t_img
+
+
+def tensor_img_to_pil(t_img: torch.tensor, code: str):
+    assert torch.is_tensor(t_img) and t_img.dim() == 3 and t_img.shape[0] == 3
+    assert 0 < t_img.mean() < 1
+    if code == 'RGB_1':
+        pass
+    elif code == 'RGB_1_norm':
+        means = [0.485,0.456,0.406]
+        stds = [0.229,0.224,0.225]
+        for channel, m, sd in zip(t_img, means, stds):
+            channel.mul_(sd).add_(m)
+    elif code == 'BGR_255_norm':
+        raise NotImplementedError()
+    else:
+        raise NotImplementedError()
+    return tvf.to_pil_image(t_img)

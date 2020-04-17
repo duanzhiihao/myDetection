@@ -63,7 +63,7 @@ class YOLOLayer(nn.Module):
             preds = {
                 'bbox': p_xywh,
                 'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
-                'conf': confs.view(nB, nA*nH*nW).cpu(),
+                'score': confs.view(nB, nA*nH*nW).cpu(),
             }
             return preds, None
             
