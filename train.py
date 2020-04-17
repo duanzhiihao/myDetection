@@ -21,23 +21,23 @@ def main():
     parser.add_argument('--val_set', type=str, default='debug_zebra')
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--optimizer', type=str, default='SGDMR') # TODO
-    parser.add_argument('--lr', type=float, default=0.0002)
+    parser.add_argument('--lr', type=float, default=0.0001)
 
     parser.add_argument('--checkpoint', type=str,
-                        default='efficientdet-d1_debug_zebra512_Apr17_285.pth')
+                        default='')
 
     parser.add_argument('--resolution', type=int, default=512)
     parser.add_argument('--res_min', type=int, default=384)
     parser.add_argument('--res_max', type=int, default=512)
 
     parser.add_argument('--print_interval', type=int, default=10)
-    parser.add_argument('--eval_interval', type=int, default=15)
+    parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
-    parser.add_argument('--demo_interval', type=int, default=10)
+    parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -96,6 +96,7 @@ def main():
         logger = SummaryWriter(f'./logs/{job_name}')
 
     print(f'Initialing optimizer with lr: {lr_SGD}, decay: {decay_SGD}')
+    assert args.optimizer == 'SGDMR'
     params = []
     # set weight decay only on conv.weight
     for key, value in model.named_parameters():

@@ -130,7 +130,7 @@ class RetinaLayer(torch.nn.Module):
                 # debug.draw_on_np(bg)
                 # plt.figure(); plt.imshow(bg); plt.show()
                 # im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :],
-                #                 tgt_xywh[pos_idx, :], beta=0.2, reduction='mean')
+                #                 tgt_xywh[pos_idx, :], beta=0.1, reduction='mean')
                 im_loss_xywh = tnf.mse_loss(t_xywh[b, pos_idx, :],
                                 tgt_xywh[pos_idx, :], reduction='sum')
                 loss_xywh = loss_xywh + im_loss_xywh
