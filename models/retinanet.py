@@ -6,6 +6,8 @@ from utils.bbox_ops import bboxes_iou
 from utils.structures import ImageObjects
 
 
+bce_w_logits = tnf.binary_cross_entropy_with_logits
+
 class RetinaLayer(torch.nn.Module):
     '''
     calculate the output boxes and losses
@@ -84,6 +86,12 @@ class RetinaLayer(torch.nn.Module):
             im_labels = labels[b]
             assert isinstance(im_labels, ImageObjects)
             im_labels.sanity_check()
+
+            if len(im_labels) == 0:
+                tgt_cls = torch.zeros(nA, nH, nW, nCls, device=device)
+                im_loss_cls = bce_w_logits(cls_logits[b], tgt_cls, reduction='sum')
+                loss_cls = loss_cls + im_loss_cls / (num_pos_sample + 1)
+                continue
             
             gt_bbs = im_labels.bboxes
             ious = bboxes_iou(anch_bbs.view(-1, 4), gt_bbs, xyxy=False)
@@ -137,8 +145,7 @@ class RetinaLayer(torch.nn.Module):
             # class loss
             # im_loss_cls = fvcore.nn.sigmoid_focal_loss(cls_logits[b, penalty_mask],
             #             tgt_cls[penalty_mask], alpha=0.25, gamma=2, reduction='sum')
-            loss_func = tnf.binary_cross_entropy_with_logits
-            im_loss_cls = loss_func(cls_logits[b, penalty_mask],
+            im_loss_cls = bce_w_logits(cls_logits[b, penalty_mask],
                             tgt_cls[penalty_mask], reduction='sum')
             loss_cls = loss_cls + im_loss_cls / (num_pos_sample + 1)
         loss = (loss_xywh + loss_cls) / nB

@@ -164,7 +164,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         labels = []
         for _, ann in enumerate(self.imgid2anns[img_id]):
             labels.append(ann['_gt'])
-        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,6)
+        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
         # each row of labels is [category, cx, cy, w, h, (degree)]
         # augmentation
         if self.enable_aug:
@@ -185,7 +185,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             #     blur_func = random.choice(blur)
             #     img = blur_func(img)
             if np.random.rand() > 0.6:
-                img = augUtils.add_saltpepper(img, max_p=0.02)
+                img = augUtils.add_saltpepper(img, max_p=0.01)
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging

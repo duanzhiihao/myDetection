@@ -36,8 +36,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
-    # parser.add_argument('--debug_mode', action='store_true')
-    parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -110,7 +110,7 @@ def main():
     if args.checkpoint and 'optimizer' in previous_state:
         optimizer.load_state_dict(previous_state['optimizer'])
     # Learning rate scheduler
-    warmup_iter = 100 if args.debug_mode else 1000
+    warmup_iter = 40 if args.debug_mode else 1000
     lr_schedule_func = functools.partial(lr_warmup, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
