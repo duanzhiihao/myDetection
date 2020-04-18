@@ -1,7 +1,6 @@
 # This is the main training file we are using
 import os
 import argparse
-import functools
 import random
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -10,7 +9,7 @@ import numpy as np
 import cv2
 
 from models.general import name_to_model
-from utils import timer, image_ops, datasets
+from utils import timer, image_ops, datasets, trainUtils
 import api
 
 
@@ -19,16 +18,15 @@ def main():
     parser.add_argument('--model', type=str, default='efficientdet-d1')
     parser.add_argument('--train_set', type=str, default='debug_zebra')
     parser.add_argument('--val_set', type=str, default='debug_zebra')
-    parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--optimizer', type=str, default='SGDMR') # TODO
+
+    # parser.add_argument('--batch_size', type=int, default=1)
+    # parser.add_argument('--auto_batch_size', action='store_true')
+
+    parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
 
     parser.add_argument('--checkpoint', type=str,
                         default='')
-
-    parser.add_argument('--resolution', type=int, default=512)
-    parser.add_argument('--res_min', type=int, default=384)
-    parser.add_argument('--res_max', type=int, default=512)
 
     parser.add_argument('--print_interval', type=int, default=10)
     parser.add_argument('--eval_interval', type=int, default=200)
@@ -44,20 +42,31 @@ def main():
     model, global_cfg = name_to_model(args.model)
 
     # -------------------------- settings ---------------------------
-    target_size = round(args.resolution / 128) * 128
+    if args.debug_mode:
+        target_size = 640
+        enable_aug = False
+        enable_multiscale = False
+        batch_size = 1
+        num_cpu = 0
+        subdivision = 1
+        warmup_iter = 40
+    else:
+        AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
+        TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']
+        target_size = global_cfg['test.default_input_size']
+        initial_size = TRAIN_RESOLUTIONS[-1]
+        batch_size = AUTO_BATCHSIZE[str(initial_size)]
+        subdivision = 128 // batch_size
+        # data augmentation setting
+        enable_aug = True
+        enable_multiscale = True
+        assert 'train.imgsize_to_batch_size' in global_cfg
+        print('Will automatically select the batch size.')
+        # batch_size = args.batch_size
+        num_cpu = 4
+        warmup_iter = 500
+
     job_name = f'{args.model}_{args.train_set}{target_size}'
-    # multi-scale training setting
-    enable_aug = not args.debug_mode
-    multiscale = not args.debug_mode
-    multiscale_interval = 10
-    # dataloader setting
-    batch_size = args.batch_size
-    num_cpu = 4 if not args.debug_mode else 0
-    subdivision = 128 // batch_size if not args.debug_mode else 1
-    print(f'effective batch size = {batch_size} * {subdivision}')
-    # optimizer setting
-    decay_SGD = global_cfg['train.sgd.weight_decay']
-    lr_SGD = args.lr / subdivision
     
     # Prepare model
     pnum = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -70,7 +79,7 @@ def main():
     kwargs = {
         'dataset_name': args.train_set,
         'input_format': model.input_format,
-        'img_size': args.res_max,
+        'img_size': initial_size,
         'enable_aug': enable_aug
     }
     dataset = datasets.get_trainingset(**kwargs)
@@ -95,23 +104,19 @@ def main():
     else:
         logger = SummaryWriter(f'./logs/{job_name}')
 
-    print(f'Initialing optimizer with lr: {lr_SGD}, decay: {decay_SGD}')
-    assert args.optimizer == 'SGDMR'
-    params = []
+    print(f'Initialing optimizer with lr: {args.lr}')
     # set weight decay only on conv.weight
+    params = []
     for key, value in model.named_parameters():
-        if 'conv' in key:
-            params += [{'params':value, 'weight_decay':decay_SGD}]
-        else:
-            params += [{'params':value, 'weight_decay':0.0}]
+        decay = global_cfg['train.sgd.weight_decay'] if 'conv' in key else 0.0
+        params += [{'params': value, 'weight_decay': decay}]
     # Initialize optimizer
-    optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.9, dampening=0,
-                                weight_decay=decay_SGD)
-    if args.checkpoint and 'optimizer' in previous_state:
-        optimizer.load_state_dict(previous_state['optimizer'])
+    optimizer = trainUtils.get_optimizer(name=args.optimizer, params=params,
+                                         lr=args.lr, cfg=global_cfg)
+    if args.checkpoint and args.optimizer in previous_state:
+        optimizer.load_state_dict(previous_state[args.optimizer])
     # Learning rate scheduler
-    warmup_iter = 40 if args.debug_mode else 500
-    lr_schedule_func = functools.partial(lr_warmup, warm_up=warmup_iter)
+    lr_schedule_func = lambda x: lr_warmup(x, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
 
@@ -138,6 +143,7 @@ def main():
             model.train()
 
         # subdivision loop
+        subdivision = 128 // batch_size
         optimizer.zero_grad()
         for _ in range(subdivision):
             try:
@@ -157,11 +163,14 @@ def main():
             #     # visualization.imshow_tensor(imgs)
             #     loss = model(imgs, targets)
             #     loss.backward()
+        for p in model.parameters:
+            p.grad.data.mul_(1/subdivision)
         optimizer.step()
         scheduler.step()
 
         # logging
         if iter_i % args.print_interval == 0:
+            print(f'effective batch size = {batch_size} * {subdivision}')
             sec_used = timer.tic() - start_time
             time_used = timer.sec2str(sec_used)
             avg_iter = timer.sec2str(sec_used/(iter_i+1-start_iter))
@@ -178,10 +187,17 @@ def main():
         torch.cuda.reset_max_memory_allocated(0)
 
         # random resizing
-        if multiscale and iter_i > 0 and (iter_i % multiscale_interval == 0):
-            Rmin, Rmax = round(args.res_min / 128), round(args.res_max / 128)
-            imgsize = random.randint(Rmin, Rmax) * 128
+        if enable_multiscale and iter_i > 0 and (iter_i % 10 == 0):
+            # Calculate probability distribution according to batch_sizes
+            probs = [AUTO_BATCHSIZE[str(res)] for res in TRAIN_RESOLUTIONS]
+            probs = [np.prod(probs) / p for p in probs]
+            probs = [p / sum(probs) for p in probs]
+            print(probs)
+            # Randomly pick a input resolution
+            imgsize = np.random.choice(TRAIN_RESOLUTIONS, p=probs)
+            # Set the image size in datasets
             dataset.img_size = imgsize
+            batch_size = AUTO_BATCHSIZE[str(imgsize)]
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)
             dataiterator = iter(dataloader)
@@ -191,7 +207,7 @@ def main():
             state_dict = {
                 'iter': iter_i,
                 'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
+                args.optimizer: optimizer.state_dict(),
             }
             save_path = os.path.join('./weights', f'{job_name}_{today}_{iter_i}.pth')
             torch.save(state_dict, save_path)
@@ -221,8 +237,10 @@ def lr_warmup(i, warm_up=1000):
         factor = (i / warm_up)**2
     elif i < 40000:
         factor = 1
+    elif i < 60000:
+        factor = 0.5
     elif i < 80000:
-        factor = 0.4
+        factor = 0.25
     elif i < 100000:
         factor = 0.1
     elif i < 200000:
