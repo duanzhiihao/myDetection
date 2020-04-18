@@ -90,7 +90,7 @@ class RetinaLayer(torch.nn.Module):
             if len(im_labels) == 0:
                 tgt_cls = torch.zeros(nA, nH, nW, nCls, device=device)
                 im_loss_cls = bce_w_logits(cls_logits[b], tgt_cls, reduction='sum')
-                loss_cls = loss_cls + im_loss_cls / (num_pos_sample + 1)
+                loss_cls = loss_cls + im_loss_cls
                 continue
             
             gt_bbs = im_labels.bboxes
@@ -137,10 +137,10 @@ class RetinaLayer(torch.nn.Module):
                 #                 cats=torch.zeros(pos_idx.sum()).long())
                 # debug.draw_on_np(bg)
                 # plt.figure(); plt.imshow(bg); plt.show()
-                # im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :],
-                #                 tgt_xywh[pos_idx, :], beta=0.1, reduction='mean')
-                im_loss_xywh = tnf.mse_loss(t_xywh[b, pos_idx, :],
-                                tgt_xywh[pos_idx, :], reduction='sum')
+                im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :],
+                                tgt_xywh[pos_idx, :], beta=1, reduction='sum')
+                # im_loss_xywh = tnf.mse_loss(t_xywh[b, pos_idx, :],
+                #                 tgt_xywh[pos_idx, :], reduction='sum')
                 loss_xywh = loss_xywh + im_loss_xywh
             # class loss
             # im_loss_cls = fvcore.nn.sigmoid_focal_loss(cls_logits[b, penalty_mask],

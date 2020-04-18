@@ -110,7 +110,7 @@ def main():
     if args.checkpoint and 'optimizer' in previous_state:
         optimizer.load_state_dict(previous_state['optimizer'])
     # Learning rate scheduler
-    warmup_iter = 40 if args.debug_mode else 1000
+    warmup_iter = 40 if args.debug_mode else 500
     lr_schedule_func = functools.partial(lr_warmup, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
@@ -218,7 +218,7 @@ def main():
 # Learning rate setup
 def lr_warmup(i, warm_up=1000):
     if i < warm_up:
-        factor = i / warm_up
+        factor = (i / warm_up)**2
     elif i < 40000:
         factor = 1
     elif i < 80000:
