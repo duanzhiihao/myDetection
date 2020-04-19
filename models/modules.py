@@ -38,9 +38,9 @@ class Swish(nn.Module):
 
 def custom_init(m):
     classname = m.__class__.__name__
-    if 'Conv' in classname:
+    if isinstance(m, nn.Conv2d):
         torch.nn.init.normal_(m.weight.data, 0, 0.01)
-        if 'bias' in m._parameters:
+        if m.bias is not None:
             torch.nn.init.zeros_(m.bias.data)
     elif 'BatchNorm' in classname:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
