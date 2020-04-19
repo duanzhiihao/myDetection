@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from .modules import SeparableConv2d, MemoryEfficientSwish
+from .modules import SeparableConv2d, MemoryEfficientSwish, custom_init
 
 
 class YOLOHead(nn.Module):
@@ -132,6 +132,7 @@ class EfDetHead(nn.Module):
         self.n_anch = n_anch
         self.n_cls = n_cls
         self.with_conf = with_conf
+        self.apply(custom_init)
     
     def forward(self, features: list):
         all_level_preds = []

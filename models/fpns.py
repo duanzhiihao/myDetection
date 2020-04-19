@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 from .backbones import ConvBnLeaky
-from .modules import SeparableConv2d, MemoryEfficientSwish
+from .modules import SeparableConv2d, MemoryEfficientSwish, custom_init
 
 
 class YOLOBranch(nn.Module):
@@ -345,6 +345,8 @@ class BiFPN5(nn.Module):
         self.fuse_6out = fusion_layer(num=3, channels=fpn_ch)
         self.fuse_7out = fusion_layer(num=2, channels=fpn_ch)
 
+        self.apply(custom_init)
+
     def forward(self, features):
         """
             P7in ------------------------- P7out -------->
@@ -405,9 +407,6 @@ class LinearFusion(nn.Module):
 
 def upsample2x(x):
     return tnf.interpolate(x, scale_factor=(2,2), mode='nearest')
-
-# def swish(x):
-#     return x * torch.sigmoid(x)
 
 def conv1x1_bn(in_ch, out_ch):
     return nn.Sequential(
