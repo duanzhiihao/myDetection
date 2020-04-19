@@ -64,7 +64,7 @@ def main():
         print('Will automatically select the batch size.')
         # batch_size = args.batch_size
         num_cpu = 4
-        warmup_iter = 500
+        warmup_iter = 1000
 
     job_name = f'{args.model}_{args.train_set}{target_size}'
     
@@ -163,7 +163,7 @@ def main():
             #     # visualization.imshow_tensor(imgs)
             #     loss = model(imgs, targets)
             #     loss.backward()
-        for p in model.parameters:
+        for p in model.parameters():
             p.grad.data.mul_(1/subdivision)
         optimizer.step()
         scheduler.step()
@@ -178,7 +178,7 @@ def main():
             avg_epoch = avg_img * 118287
             print(f'\nTotal time: {time_used}, 100 imgs: {avg_img*100}, ',
                   f'iter: {avg_iter}, epoch: {avg_epoch}')
-            current_lr = scheduler.get_last_lr()[0] * batch_size * subdivision
+            current_lr = scheduler.get_last_lr()[0]
             print(f'[Iteration {iter_i}] [learning rate {current_lr:.3g}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')
             print(model.loss_str)
@@ -189,12 +189,13 @@ def main():
         # random resizing
         if enable_multiscale and iter_i > 0 and (iter_i % 10 == 0):
             # Calculate probability distribution according to batch_sizes
-            probs = [AUTO_BATCHSIZE[str(res)] for res in TRAIN_RESOLUTIONS]
-            probs = [np.prod(probs) / p for p in probs]
-            probs = [p / sum(probs) for p in probs]
-            print(probs)
-            # Randomly pick a input resolution
-            imgsize = np.random.choice(TRAIN_RESOLUTIONS, p=probs)
+            # probs = [AUTO_BATCHSIZE[str(res)] for res in TRAIN_RESOLUTIONS]
+            # probs = [np.prod(probs) / p for p in probs]
+            # probs = [p / sum(probs) for p in probs]
+            # print(probs)
+            # # Randomly pick a input resolution
+            # imgsize = np.random.choice(TRAIN_RESOLUTIONS, p=probs)
+            imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             dataset.img_size = imgsize
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
@@ -234,12 +235,12 @@ def main():
 # Learning rate setup
 def lr_warmup(i, warm_up=1000):
     if i < warm_up:
-        factor = (i / warm_up)**2
+        factor = i / warm_up
     elif i < 40000:
         factor = 1
-    elif i < 60000:
+    elif i < 70000:
         factor = 0.5
-    elif i < 80000:
+    elif i < 90000:
         factor = 0.25
     elif i < 100000:
         factor = 0.1
