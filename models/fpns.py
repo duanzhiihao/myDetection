@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 from .backbones import ConvBnLeaky
-from .modules import SeparableConv2d
+from .modules import SeparableConv2d, MemoryEfficientSwish
 
 
 class YOLOBranch(nn.Module):
@@ -392,6 +392,7 @@ class LinearFusion(nn.Module):
             SeparableConv2d(channels, channels, 3, 1, padding=1),
             nn.BatchNorm2d(channels, eps=0.001, momentum=0.01)
         )
+        self.swish = MemoryEfficientSwish()
     
     def forward(self, *features):
         assert isinstance(features, (list,tuple)) and len(features) == self.num
@@ -399,14 +400,14 @@ class LinearFusion(nn.Module):
         weighted = [w*x for w,x in zip(weights, features)]
         sum_ = weights.sum() + 0.0001
         fused = sum(weighted) / sum_
-        fused = self.spconv_bn(swish(fused))
+        fused = self.spconv_bn(self.swish(fused))
         return fused
 
 def upsample2x(x):
     return tnf.interpolate(x, scale_factor=(2,2), mode='nearest')
 
-def swish(x):
-    return x * torch.sigmoid(x)
+# def swish(x):
+#     return x * torch.sigmoid(x)
 
 def conv1x1_bn(in_ch, out_ch):
     return nn.Sequential(

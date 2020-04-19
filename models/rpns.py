@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from .modules import SeparableConv2d, Swish
+from .modules import SeparableConv2d, MemoryEfficientSwish
 
 
 class YOLOHead(nn.Module):
@@ -161,5 +161,5 @@ def spconv3x3_bn_swish(inout_ch):
     return nn.Sequential(
         SeparableConv2d(inout_ch, inout_ch, 3, 1, padding=1),
         nn.BatchNorm2d(inout_ch, eps=0.001, momentum=0.01),
-        Swish()
+        MemoryEfficientSwish()
     )

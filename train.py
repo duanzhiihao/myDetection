@@ -16,11 +16,8 @@ import api
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='efficientdet-d1')
-    parser.add_argument('--train_set', type=str, default='debug_zebra')
-    parser.add_argument('--val_set', type=str, default='debug_zebra')
-
-    # parser.add_argument('--batch_size', type=int, default=1)
-    # parser.add_argument('--auto_batch_size', action='store_true')
+    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--val_set', type=str, default='debug3')
 
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
@@ -32,10 +29,10 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -43,6 +40,7 @@ def main():
 
     # -------------------------- settings ---------------------------
     if args.debug_mode:
+        initial_size = 640
         target_size = 640
         enable_aug = False
         enable_multiscale = False
@@ -143,7 +141,6 @@ def main():
             model.train()
 
         # subdivision loop
-        subdivision = 128 // batch_size
         optimizer.zero_grad()
         for _ in range(subdivision):
             try:
@@ -164,7 +161,8 @@ def main():
             #     loss = model(imgs, targets)
             #     loss.backward()
         for p in model.parameters():
-            p.grad.data.mul_(1/subdivision)
+            if p.grad is not None:
+                p.grad.data.mul_(1/subdivision)
         optimizer.step()
         scheduler.step()
 
@@ -199,6 +197,7 @@ def main():
             # Set the image size in datasets
             dataset.img_size = imgsize
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
+            subdivision = 128 // batch_size
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)
             dataiterator = iter(dataloader)

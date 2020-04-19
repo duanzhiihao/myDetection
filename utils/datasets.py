@@ -18,7 +18,7 @@ from utils.structures import ImageObjects
 def get_trainingset(dataset_name, **kwargs):
     if dataset_name == 'debug3':
         training_set_cfg = {
-            'img_dir': '../COCO/val2017',
+            'img_dir': './images/debug3/',
             'json_path': '../COCO/annotations/debug3.json',
             'ann_bbox_format': 'x1y1wh',
             'input_image_format': kwargs['input_format'],
