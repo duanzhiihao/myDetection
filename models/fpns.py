@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 from .backbones import ConvBnLeaky
-from .modules import SeparableConv2d, MemoryEfficientSwish, custom_init
+from .modules import SeparableConv2d, Swish, custom_init
 
 
 class YOLOBranch(nn.Module):
@@ -288,13 +288,13 @@ class BiFPN3(nn.Module):
         self.p5in_out = conv1x1_bn(in_chs[2], fpn_ch) if in_chs else lambda x:x
 
         if fusion_method == 'linear':
-            fusion_layer = LinearFusion
-        elif fusion_method == 'softmax':
+            pass
+        else:
             raise NotImplementedError()
-        self.fuse_4m = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_3out = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_4out = fusion_layer(num=3, channels=fpn_ch)
-        self.fuse_5out = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_4m = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_3out = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_4out = LinearFusion(num=3, channels=fpn_ch)
+        self.fuse_5out = LinearFusion(num=2, channels=fpn_ch)
 
     def forward(self, features):
         """
@@ -324,7 +324,7 @@ class BiFPN5(nn.Module):
         super().__init__()
         if in_chs:
             assert len(in_chs) == 5
-            assert in_chs[3] == fpn_ch and in_chs[4] == fpn_ch
+            assert in_chs[3] == in_chs[4] == fpn_ch
         self.p3in_out = conv1x1_bn(in_chs[0], fpn_ch) if in_chs else lambda x:x
         self.p4in_m = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
         self.p4in_out = conv1x1_bn(in_chs[1], fpn_ch) if in_chs else lambda x:x
@@ -333,17 +333,17 @@ class BiFPN5(nn.Module):
         # self.in_chs = in_chs
 
         if fusion_method == 'linear':
-            fusion_layer = LinearFusion
-        elif fusion_method == 'softmax':
+            pass
+        else:
             raise NotImplementedError()
-        self.fuse_6m = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_5m = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_4m = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_3out = fusion_layer(num=2, channels=fpn_ch)
-        self.fuse_4out = fusion_layer(num=3, channels=fpn_ch)
-        self.fuse_5out = fusion_layer(num=3, channels=fpn_ch)
-        self.fuse_6out = fusion_layer(num=3, channels=fpn_ch)
-        self.fuse_7out = fusion_layer(num=2, channels=fpn_ch)
+        self.fuse_6m = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_5m = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_4m = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_3out = LinearFusion(num=2, channels=fpn_ch)
+        self.fuse_4out = LinearFusion(num=3, channels=fpn_ch)
+        self.fuse_5out = LinearFusion(num=3, channels=fpn_ch)
+        self.fuse_6out = LinearFusion(num=3, channels=fpn_ch)
+        self.fuse_7out = LinearFusion(num=2, channels=fpn_ch)
 
         self.apply(custom_init)
 
@@ -394,16 +394,15 @@ class LinearFusion(nn.Module):
             SeparableConv2d(channels, channels, 3, 1, padding=1),
             nn.BatchNorm2d(channels, eps=0.001, momentum=0.01)
         )
-        self.swish = MemoryEfficientSwish()
+        self.swish = Swish()
     
     def forward(self, *features):
         assert isinstance(features, (list,tuple)) and len(features) == self.num
         weights = tnf.relu(self.weights)
-        weighted = [w*x for w,x in zip(weights, features)]
-        sum_ = weights.sum() + 0.0001
-        fused = sum(weighted) / sum_
-        fused = self.spconv_bn(self.swish(fused))
-        return fused
+        weights = weights / (weights.sum() + 0.0001)
+        fused_feature = sum([w*x for w,x in zip(weights, features)])
+        fused_feature = self.spconv_bn(self.swish(fused_feature))
+        return fused_feature
 
 def upsample2x(x):
     return tnf.interpolate(x, scale_factor=(2,2), mode='nearest')

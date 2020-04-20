@@ -93,7 +93,7 @@ def main():
         weights_path = os.path.join('./weights/', args.checkpoint)
         previous_state = torch.load(weights_path)
         model.load_state_dict(previous_state['model'])
-        start_iter = previous_state['iter'] + 1
+        start_iter = previous_state['iter']
         print(f'Start from iteration: {start_iter}')
 
     print('Initialing tensorboard SummaryWriter...')

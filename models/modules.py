@@ -8,6 +8,9 @@ class SeparableConv2d(nn.Module):
         self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size, stride,
                                    padding=padding, groups=in_ch, bias=False)
         self.pointwise = nn.Conv2d(in_ch, out_ch, 1, 1, padding=0)
+        nn.init.kaiming_normal_(self.depthwise.weight, nonlinearity='relu')
+        nn.init.kaiming_normal_(self.pointwise.weight, nonlinearity='relu')
+        self.pointwise.bias.data.zero_()
 
     def forward(self, x):
         x = self.depthwise(x)
@@ -15,22 +18,22 @@ class SeparableConv2d(nn.Module):
         return x
 
 
-class SwishImplementation(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, i):
-        result = i * torch.sigmoid(i)
-        ctx.save_for_backward(i)
-        return result
+# class SwishImplementation(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, i):
+#         result = i * torch.sigmoid(i)
+#         ctx.save_for_backward(i)
+#         return result
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        i = ctx.saved_variables[0]
-        sigmoid_i = torch.sigmoid(i)
-        return grad_output * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
+#     @staticmethod
+#     def backward(ctx, grad_output):
+#         i = ctx.saved_variables[0]
+#         sigmoid_i = torch.sigmoid(i)
+#         return grad_output * (sigmoid_i * (1 + i * (1 - sigmoid_i)))
 
-class MemoryEfficientSwish(nn.Module):
-    def forward(self, x):
-        return SwishImplementation.apply(x)
+# class MemoryEfficientSwish(nn.Module):
+#     def forward(self, x):
+#         return SwishImplementation.apply(x)
 
 class Swish(nn.Module):
     def forward(self, x):
@@ -41,7 +44,7 @@ def custom_init(m):
     if isinstance(m, nn.Conv2d):
         torch.nn.init.normal_(m.weight.data, 0, 0.01)
         if m.bias is not None:
-            torch.nn.init.zeros_(m.bias.data)
+            m.bias.data.zeros_()
     elif 'BatchNorm' in classname:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
-        torch.nn.init.zeros_(m.bias.data)
+        m.bias.data.zeros_()

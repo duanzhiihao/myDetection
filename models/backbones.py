@@ -3,7 +3,6 @@ import torch.nn as nn
 import torchvision.models
 
 from external_packages.efficientnet.model import EfficientNet
-from .modules import Swish
 
 
 def ConvBnLeaky(in_, out_, k, s):
@@ -16,7 +15,7 @@ def ConvBnLeaky(in_, out_, k, s):
     pad = (k - 1) // 2
     return nn.Sequential(
         nn.Conv2d(in_, out_, k, s, padding=pad, bias=False),
-        nn.BatchNorm2d(out_, eps=1e-5, momentum=0.9),
+        nn.BatchNorm2d(out_, eps=1e-5, momentum=0.01),
         nn.LeakyReLU(0.1)
     )
 
@@ -154,8 +153,12 @@ class EfNetBackbone(nn.Module):
             self.C6C7 = False
         elif cfg['model.backbone.num_levels'] == 5:
             out_ch = cfg['model.backbone.C6C7_out_channels']
-            self.c5_to_c6 = conv1x1_bn_relu_maxp(efnet_chs[-1], out_ch)
-            self.c6_to_c7 = conv1x1_bn_relu_maxp(out_ch, out_ch)
+            self.c5_to_c6 = nn.Sequential(
+                nn.Conv2d(efnet_chs[-1], out_ch, 1, stride=1, padding=0),
+                nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
+                nn.MaxPool2d(3, stride=2, padding=1)
+            )
+            self.c6_to_c7 = nn.MaxPool2d(3, stride=2, padding=1)
             self.feature_chs = efnet_chs + [out_ch, out_ch]
             self.feature_strides = (8, 16, 32, 64, 128)
             self.C6C7 = True
@@ -183,12 +186,3 @@ class EfNetBackbone(nn.Module):
             return [C3, C4, C5, C6, C7]
         else:
             return [C3, C4, C5]
-
-
-def conv1x1_bn_relu_maxp(in_ch, out_ch):
-    return nn.Sequential(
-        nn.Conv2d(in_ch, out_ch, 1, stride=1, padding=0),
-        nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
-        Swish(),
-        nn.MaxPool2d(3, stride=2, padding=1)
-    )
