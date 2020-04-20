@@ -3,6 +3,8 @@
     
     "general.input_format": "RGB_1",
     "general.num_class": 80,
+    "general.pred_bbox_format": "cxcywh",
+    "general.bbox_param": 4,
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,

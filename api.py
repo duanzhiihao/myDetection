@@ -21,6 +21,7 @@ class Detector():
         assert torch.cuda.is_available()
         if model_and_cfg:
             self.model, self.cfg = model_and_cfg
+            # self.model.eval()
         else:
             self.model, self.cfg = name_to_model(model_name)
             self.model = self.model.cuda().eval()
@@ -44,7 +45,6 @@ class Detector():
             img_dir: str
             See _predict_pil() for optinal arguments
         '''
-        self.model.eval()
         img_names = os.listdir(img_dir)
         detection_json = []
         for imname in tqdm(img_names):

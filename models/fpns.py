@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 from .backbones import ConvBnLeaky
-from .modules import SeparableConv2d, Swish, custom_init
+from .modules import SeparableConv2d, Swish
 
 
 class YOLOBranch(nn.Module):
@@ -344,8 +344,6 @@ class BiFPN5(nn.Module):
         self.fuse_5out = LinearFusion(num=3, channels=fpn_ch)
         self.fuse_6out = LinearFusion(num=3, channels=fpn_ch)
         self.fuse_7out = LinearFusion(num=2, channels=fpn_ch)
-
-        self.apply(custom_init)
 
     def forward(self, features):
         """

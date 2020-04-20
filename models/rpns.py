@@ -1,7 +1,7 @@
 import numpy as np
 import torch.nn as nn
 
-from .modules import SeparableConv2d, Swish, custom_init
+from .modules import SeparableConv2d, Swish
 
 
 class YOLOHead(nn.Module):
@@ -127,10 +127,11 @@ class EfDetHead(nn.Module):
             self.bbox_nets.append(bb_net)
 
             cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
-            # Initialize the final layer bias by -np.log((1 - 0.001) / 0.001)
-            # so that the initial confidence are close to 0.001
+            # Initialize the final layer bias by -np.log((1 - 0.01) / 0.01)
+            # so that the initial confidence are close to 0.01
             cls_last = SeparableConv2d(ch, cls_ch, 3, 1, padding=1)
-            cls_last.pointwise.bias.data.fill_(-np.log(1 - 0.001) / 0.001)
+            cls_last.pointwise.weight.data.normal_(mean=0, std=0.1)
+            cls_last.pointwise.bias.data.fill_(-np.log((1 - 0.01) / 0.01))
             cls_net.append(cls_last)
             cls_net = nn.Sequential(*cls_net)
             self.class_nets.append(cls_net)

@@ -16,8 +16,8 @@ import api
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='efficientdet-d1')
-    parser.add_argument('--train_set', type=str, default='debug3')
-    parser.add_argument('--val_set', type=str, default='debug3')
+    parser.add_argument('--train_set', type=str, default='debug_zebra')
+    parser.add_argument('--val_set', type=str, default='debug_zebra')
 
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
     parser.add_argument('--debug_mode', action='store_true')
     # parser.add_argument('--debug_mode', type=bool, default=True)
@@ -124,6 +124,8 @@ def main():
     for iter_i in range(start_iter, 100000):
         # evaluation
         if iter_i > 0 and iter_i % args.eval_interval == 0:
+            if not args.debug_mode:
+                model.eval()
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
@@ -214,6 +216,8 @@ def main():
 
         # save detection
         if iter_i > 0 and iter_i % args.demo_interval == 0:
+            if not args.debug_mode:
+                model.eval()
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
             for imname in os.listdir(args.demo_images_dir):
                 if not imname.endswith('.jpg'): continue

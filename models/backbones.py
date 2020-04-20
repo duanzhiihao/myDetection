@@ -164,15 +164,19 @@ class EfNetBackbone(nn.Module):
             self.C6C7 = True
         else:
             raise NotImplementedError()
+        self.enable_dropout = cfg['model.efficientnet.enable_dropout']
 
     def forward(self, x):
         x = self.model._swish(self.model._bn0(self.model._conv_stem(x)))
         features = []
         for idx, block in enumerate(self.model._blocks):
             # print(block._depthwise_conv.stride)
-            drop_connect_rate = self.model._global_params.drop_connect_rate
-            if drop_connect_rate:
-                drop_connect_rate *= float(idx) / len(self.model._blocks)
+            if self.enable_dropout:
+                drop_connect_rate = self.model._global_params.drop_connect_rate
+                if drop_connect_rate:
+                    drop_connect_rate *= float(idx) / len(self.model._blocks)
+            else:
+                drop_connect_rate = None
             y = block(x, drop_connect_rate=drop_connect_rate)
             if y.shape[-1] != x.shape[-1]:
                 features.append(x)
