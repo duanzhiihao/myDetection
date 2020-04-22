@@ -30,7 +30,9 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
     # resize to target input size (usually smaller)
     resize_scale = target_size / max(ori_w,ori_h)
     if aug:
-        resize_scale = resize_scale * (0.8 + torch.rand(1).item()*0.2)
+        low_ = (target_size - 128) / target_size
+        resize_scale = resize_scale * (low_ + np.random.rand()*(1-low_))
+    assert resize_scale > 0
     nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
     img = tvf.resize(img, (nopad_h,nopad_w))
 
