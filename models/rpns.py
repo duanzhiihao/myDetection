@@ -108,18 +108,18 @@ class FCOSHead(nn.Module):
 
 
 class EfDetHead(nn.Module):
-    # def __init__(self, feature_chs, repeat, with_conf=False, **kwargs):
     def __init__(self, cfg: dict):
         super().__init__()
         n_cls = cfg['general.num_class']
         n_anch = cfg['model.effrpn.num_anchor_per_level']
-        with_conf = cfg['model.effrpn.with_conf']
         feature_chs = cfg['model.fpn.out_channels']
         repeat = cfg['model.effrpn.repeat_num']
         bb_param = cfg.get('general.bbox_param', 4)
+        enable_conf = cfg['model.effrpn.enable_conf']
+
         self.class_nets = nn.ModuleList()
         self.bbox_nets = nn.ModuleList()
-        cls_ch = n_anch * (1 + n_cls) if with_conf else n_anch * n_cls
+        cls_ch = n_anch * (1 + n_cls) if enable_conf else n_anch * n_cls
         for ch in feature_chs:
             bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
             bb_net.append(SeparableConv2d(ch, n_anch*bb_param, 3, 1, padding=1))
@@ -137,7 +137,7 @@ class EfDetHead(nn.Module):
             self.class_nets.append(cls_net)
         self.n_anch = n_anch
         self.n_cls = n_cls
-        self.with_conf = with_conf
+        self.enable_conf = enable_conf
     
     def forward(self, features: list):
         all_level_preds = []
@@ -149,7 +149,7 @@ class EfDetHead(nn.Module):
             nA = self.n_anch
             bbox_pred = bbox_pred.view(nB, nA, 4, nH, nW).permute(0, 1, 3, 4, 2)
             cls_pred = cls_pred.view(nB, nA, -1, nH, nW).permute(0, 1, 3, 4, 2)
-            if self.with_conf:
+            if self.enable_conf:
                 raw = {
                     'bbox': bbox_pred,
                     'conf': cls_pred[..., 0:1],
@@ -170,3 +170,70 @@ def spconv3x3_bn_swish(inout_ch):
         Swish()
     )
     return block
+
+
+class EfDetHead_wCenter(nn.Module):
+    def __init__(self, cfg: dict):
+        super().__init__()
+        n_cls = cfg['general.num_class']
+        n_anch = cfg['model.effrpn.num_anchor_per_level']
+        assert n_anch == 1
+        feature_chs = cfg['model.fpn.out_channels']
+        repeat = cfg['model.effrpn.repeat_num']
+        bb_param = cfg.get('general.bbox_param', 4)
+        assert not cfg.get('model.effrpn.enable_conf', False)
+        assert cfg['model.effrpn.enable_centerscore']
+
+        self.class_nets = nn.ModuleList()
+        self.bbox_nets = nn.ModuleList()
+        self.bbox_lasts = nn.ModuleList()
+        self.center_nets = nn.ModuleList()
+        for ch in feature_chs:
+            bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
+            bb_net = nn.Sequential(*bb_net)
+            self.bbox_nets.append(bb_net)
+            self.bbox_lasts.append(nn.Conv2d(ch, n_anch*bb_param, 3, 1, padding=1))
+
+            ct_net = [
+                spconv3x3_bn_swish(ch),
+                nn.Conv2d(ch, 1, kernel_size=3, stride=1, padding=1)
+            ]
+            ct_net[1].weight.data.normal_(mean=0, std=0.01)
+            ct_net[1].bias.data.fill_(-np.log((1 - 0.05) / 0.05))
+            self.center_nets.append(nn.Sequential(*ct_net))
+
+            cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
+            # Initialize the final layer bias by -np.log((1 - 0.05) / 0.05)
+            # so that the initial confidence are close to 0.05
+            cls_last = nn.Conv2d(ch, n_anch * n_cls, 3, 1, padding=1)
+            cls_last.weight.data.normal_(mean=0, std=0.01)
+            cls_last.bias.data.fill_(-np.log((1 - 0.05) / 0.05))
+            cls_net.append(cls_last)
+            cls_net = nn.Sequential(*cls_net)
+            self.class_nets.append(cls_net)
+        # self.n_anch = n_anch
+        self.n_cls = n_cls
+    
+    def forward(self, features: list):
+        all_level_preds = []
+        for i, x in enumerate(features):
+            cls_pred = self.class_nets[i](x)
+
+            bbox_feats = self.bbox_nets[i](x)
+            bbox_pred = self.bbox_lasts[i](bbox_feats)
+            center_pred = self.center_nets[i](bbox_feats)
+
+            nB, _, nH, nW = bbox_pred.shape
+            assert bbox_pred.shape[1] == 4
+            # nA = self.n_anch
+            bbox_pred = bbox_pred.permute(0, 2, 3, 1)
+            center_pred = center_pred.permute(0, 2, 3, 1)
+            cls_pred = cls_pred.permute(0, 2, 3, 1)
+
+            raw = {
+                'bbox': bbox_pred,
+                'center': center_pred,
+                'class': cls_pred,
+            }
+            all_level_preds.append(raw)
+        return all_level_preds

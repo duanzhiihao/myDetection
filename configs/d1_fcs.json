@@ -20,21 +20,17 @@
     "model.bifpn.repeat_num": 4,
     "model.bifpn.fusion_method": "linear",
 
-    "model.rpn.name": "effrpn",
-    "model.effrpn.enable_conf": false,
+    "model.rpn.name": "effrpn_ct",
     "model.effrpn.repeat_num": 3,
-    "model.effrpn.num_anchor_per_level": 9,
+    "model.effrpn.num_anchor_per_level": 1,
+    "model.effrpn.enable_conf": false,
+    "model.effrpn.enable_centerscore": true,
 
-    "model.pred_layer": "RetinaNet",
+    "model.pred_layer": "FCOS",
 
-    "model.retina.num_anchor_per_level": 9,
-    "model.retina.anchor.base": 4,
-    "model.retina.anchor.scales": [1, 1.26, 1.5874],
-    "model.retina.anchor.ratios": [[1, 1], [1.4, 0.7], [0.7, 1.4]],
-    "model.retina.anchor.positive_threshold": 0.5,
-    "model.retina.anchor.negative_threshold": 0.5,
+    "model.fcos.anchors": [0, 64, 128, 256, 512, 100000000],
 
-    "train.sgd.weight_decay": 0.00004,
+    "train.sgd.weight_decay": 0.0001,
     "train.img_sizes": [512, 640, 768],
     "train.imgsize_to_batch_size": {
         "512": 12,

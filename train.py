@@ -15,7 +15,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='efficientdet-d1')
+    parser.add_argument('--model', type=str, default='d1_fcs')
     parser.add_argument('--train_set', type=str, default='debug_zebra')
     parser.add_argument('--val_set', type=str, default='debug_zebra')
 
@@ -31,8 +31,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -59,7 +59,7 @@ def main():
         enable_aug = True
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
-        print('Will automatically select the batch size.')
+        print('Auto-batchsize enabled. Automatically selecting the batch size.')
         # batch_size = args.batch_size
         num_cpu = 4
         warmup_iter = 1000
@@ -73,7 +73,7 @@ def main():
     model.train()
 
     # Training set and validation set setting
-    print(f'Initialing training set {args.train_set}...')
+    print(f'Initializing training set {args.train_set}...')
     kwargs = {
         'dataset_name': args.train_set,
         'input_format': model.input_format,
@@ -96,13 +96,13 @@ def main():
         start_iter = previous_state['iter']
         print(f'Start from iteration: {start_iter}')
 
-    print('Initialing tensorboard SummaryWriter...')
+    print('Initializing tensorboard SummaryWriter...')
     if args.debug_mode:
         logger = SummaryWriter(f'./logs/debug/{job_name}')
     else:
         logger = SummaryWriter(f'./logs/{job_name}')
 
-    print(f'Initialing optimizer with lr: {args.lr}')
+    print(f'Initializing optimizer with lr: {args.lr}')
     # set weight decay only on conv.weight
     params = []
     for key, value in model.named_parameters():
@@ -118,7 +118,7 @@ def main():
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
 
-    print('Starting training...')
+    print('Start training...')
     today = timer.today()
     start_time = timer.tic()
     for iter_i in range(start_iter, 100000):
@@ -164,7 +164,7 @@ def main():
             #     loss.backward()
         for p in model.parameters():
             if p.grad is not None:
-                p.grad.data.mul_(1/subdivision)
+                p.grad.data.mul_(1.0/subdivision)
         optimizer.step()
         scheduler.step()
 
@@ -197,9 +197,9 @@ def main():
             # imgsize = np.random.choice(TRAIN_RESOLUTIONS, p=probs)
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
-            dataset.img_size = imgsize
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = 128 // batch_size
+            dataset.img_size = imgsize
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)
             dataiterator = iter(dataloader)

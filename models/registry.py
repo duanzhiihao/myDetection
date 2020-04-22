@@ -60,6 +60,9 @@ def get_rpn(cfg: dict):
     elif rpn_name == 'effrpn':
         from .rpns import EfDetHead
         rpn = EfDetHead(cfg)
+    elif rpn_name == 'effrpn_ct':
+        from .rpns import EfDetHead_wCenter
+        rpn = EfDetHead_wCenter(cfg)
     else:
         raise NotImplementedError()
     return rpn
@@ -73,5 +76,8 @@ def get_det_layer(cfg: dict):
     elif det_layer_name == 'RetinaNet':
         from .retinanet import RetinaLayer
         return RetinaLayer
+    elif det_layer_name == 'FCOS':
+        from .fcos2 import FCOSLayer
+        return FCOSLayer
     else:
         raise NotImplementedError()
