@@ -312,9 +312,9 @@ class myCOCOeval(cocoeval.COCOeval):
                 ann['segmentation'] = rle
         p = self.params
         if p.useCats:
-            imgids = dict(p.imgIds)
-            catids = dict(p.catIds)
-            gts = [gt for gt in self.gt_json if \
+            imgids = set(p.imgIds)
+            catids = set(p.catIds)
+            gts = [gt for gt in self.gt_json['annotations'] if \
                    (gt['image_id'] in imgids and gt['category_id'] in catids)]
             dts = [dt for dt in self.dt_json if \
                    (dt['image_id'] in imgids and dt['category_id'] in catids)]
