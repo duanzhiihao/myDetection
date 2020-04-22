@@ -86,7 +86,7 @@ def format_tensor_img(t_img: torch.tensor, code: str):
 
 def tensor_img_to_pil(t_img: torch.tensor, code: str):
     assert torch.is_tensor(t_img) and t_img.dim() == 3 and t_img.shape[0] == 3
-    assert 0 < t_img.mean() < 1
+    # assert 0 < t_img.mean() < 1
     if code == 'RGB_1':
         pass
     elif code == 'RGB_1_norm':

@@ -15,8 +15,8 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_fcs')
-    parser.add_argument('--train_set', type=str, default='debug_zebra')
+    parser.add_argument('--model', type=str, default='efficientdet-d1')
+    parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='debug_zebra')
 
     parser.add_argument('--optimizer', type=str, default='SGDMR')
@@ -40,9 +40,9 @@ def main():
 
     # -------------------------- settings ---------------------------
     if args.debug_mode:
-        initial_size = 640
+        global_cfg['train.img_sizes'] = [640]
         target_size = 640
-        enable_aug = False
+        global_cfg['train.data_augmentation'] = None
         enable_multiscale = False
         batch_size = 1
         num_cpu = 0
@@ -54,10 +54,9 @@ def main():
         target_size = global_cfg['test.default_input_size']
         initial_size = TRAIN_RESOLUTIONS[-1]
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
-        equiv_batchsize = 32
+        equiv_batchsize = global_cfg.get('train.equivalent_batch_size', 32)
         subdivision = equiv_batchsize // batch_size
         # data augmentation setting
-        enable_aug = True
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
@@ -75,13 +74,8 @@ def main():
 
     # Training set and validation set setting
     print(f'Initializing training set {args.train_set}...')
-    kwargs = {
-        'dataset_name': args.train_set,
-        'input_format': model.input_format,
-        'img_size': initial_size,
-        'enable_aug': enable_aug
-    }
-    dataset = datasets.get_trainingset(**kwargs)
+    global_cfg['train.dataset_name'] = args.train_set
+    dataset = datasets.get_trainingset(global_cfg)
     dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True, 
                                        num_workers=num_cpu, pin_memory=True)
     dataiterator = iter(dataloader)

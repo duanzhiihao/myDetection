@@ -11,7 +11,7 @@
     "model.backbone.C6C7_out_channels": 88,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
-    "model.efficientnet.enable_dropout": false,
+    "model.efficientnet.enable_dropout": true,
 
     "model.fpn.name": "bifpn",
     "model.fpn.out_channels": "PLACEHOLDER",
@@ -40,6 +40,14 @@
         "512": 12,
         "640": 8,
         "768": 5
+    },
+    "train.equivalent_batch_size": 32,
+    "train.data_augmentation": {
+        "satpepper_noise_density": 0,
+        "brightness": [1, 1],
+        "contrast": [1, 1],
+        "hue": [0, 0],
+        "saturation": [1, 1]
     },
 
     "test.default_input_size": 640,

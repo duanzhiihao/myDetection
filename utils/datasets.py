@@ -14,33 +14,25 @@ import utils.augmentation as augUtils
 from utils.structures import ImageObjects
 
 
-def get_trainingset(dataset_name, **kwargs):
+def get_trainingset(cfg: dict):
+    dataset_name = cfg['train.dataset_name']
     if dataset_name == 'debug3':
         training_set_cfg = {
             'img_dir': './images/debug3/',
-            'json_path': '../COCO/annotations/debug3.json',
-            'ann_bbox_format': 'x1y1wh',
-            'input_image_format': kwargs['input_format'],
-            'img_size': kwargs['img_size'],
-            'enable_aug': kwargs['enable_aug'],
+            'json_path': './utils/coco/debug3.json',
+            'ann_bbox_format': 'x1y1wh'
         }
     elif dataset_name == 'debug_zebra':
         training_set_cfg = {
-            'img_dir': '../COCO/val2017',
-            'json_path': '../COCO/annotations/debug_zebra.json',
-            'ann_bbox_format': 'x1y1wh',
-            'input_image_format': kwargs['input_format'],
-            'img_size': kwargs['img_size'],
-            'enable_aug': kwargs['enable_aug'],
+            'img_dir': './images/debug_zebra/',
+            'json_path': './utils/coco/debug_zebra.json',
+            'ann_bbox_format': 'x1y1wh'
         }
     elif dataset_name == 'COCO':
         training_set_cfg = {
             'img_dir': '../COCO/train2017',
             'json_path': '../COCO/annotations/instances_train2017.json',
-            'ann_bbox_format': 'x1y1wh',
-            'input_image_format': kwargs['input_format'],
-            'img_size': kwargs['img_size'],
-            'enable_aug': kwargs['enable_aug'],
+            'ann_bbox_format': 'x1y1wh'
         }
     elif dataset_name == 'COCO80-R':
         raise NotImplementedError()
@@ -53,17 +45,17 @@ def get_trainingset(dataset_name, **kwargs):
         }
     else:
         raise NotImplementedError()
-    return Dataset4ObjDet(training_set_cfg)
+    return Dataset4ObjDet(training_set_cfg, cfg)
 
 
 def get_valset(valset_name):
     if valset_name == 'debug3':
         val_img_dir = './images/debug3/'
-        val_json_path = '../COCO/annotations/debug3.json'
+        val_json_path = './utils/coco/debug3.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_zebra':
         val_img_dir = './images/debug_zebra/'
-        val_json_path = '../COCO/annotations/debug_zebra.json'
+        val_json_path = './utils/coco/debug_zebra.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'val2017':
         val_img_dir = '../COCO/val2017'
@@ -86,21 +78,18 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         augmentation: bool, default: True
         debug: bool, if True, only one data id is selected from the dataset
     """
-    # def __init__(self, img_dir, json_path, bb_format, img_size, input_format,
-    #              augmentation=True):
-    def __init__(self, cfg: dict):
-        self.img_dir = cfg['img_dir']
-        self.img_size = cfg['img_size']
-        self.input_format = cfg['input_image_format']
-        self.enable_aug = cfg['enable_aug']
+    def __init__(self, dataset_cfg: dict, glocal_cfg: dict):
+        self.img_dir = dataset_cfg['img_dir']
+        self.img_size = glocal_cfg['train.img_sizes'][-1]
+        self.input_format = glocal_cfg['general.input_format']
+        self.aug_setting = glocal_cfg['train.data_augmentation']
         self.skip_crowd = False
-        self.config = cfg
 
         self.img_ids = []
         self.imgid2info = dict()
         self.imgid2anns = defaultdict(list)
         self.catid2idx = []
-        self.load_json(cfg['json_path'], cfg['ann_bbox_format'])
+        self.load_json(dataset_cfg['json_path'], dataset_cfg['ann_bbox_format'])
 
     def load_json(self, json_path, ann_bbox_format):
         '''
@@ -166,25 +155,27 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
         # each row of labels is [category, cx, cy, w, h, (degree)]
         # augmentation
-        if self.enable_aug:
+        if self.aug_setting is not None:
             img, labels = self.augment_PIL(img, labels)
         # pad to square
+        aug_flag = (self.aug_setting is not None)
         img, labels, pad_info = imgUtils.rect_to_square(img, labels, self.img_size,
-                                        pad_value=0, aug=self.enable_aug)
+                                        pad_value=0, aug=aug_flag)
         # Remove annotations which are too small
         label_areas = labels[:,3] * labels[:,4]
         labels = labels[label_areas >= 50]
         # Convert PIL.image into torch.tensor with shape (3,h,w)
         img = tvf.to_tensor(img)
         # Noise augmentation
-        if self.enable_aug:
+        if self.aug_setting is not None:
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
             #         augUtils.random_gaussian_filter]
             # if np.random.rand() > 0.7:
             #     blur_func = random.choice(blur)
             #     img = blur_func(img)
             if np.random.rand() > 0.6:
-                img = augUtils.add_saltpepper(img, max_p=0.01)
+                p = self.aug_setting.get('satpepper_noise_density', 0.03)
+                img = augUtils.add_saltpepper(img, max_p=p)
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
@@ -202,28 +193,30 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def augment_PIL(self, img, labels):
         if np.random.rand() > 0.5:
-            img = tvf.adjust_brightness(img, uniform(0.6, 1.4))
+            low, high = self.aug_setting.get('brightness', [0.6, 1.4])
+            img = tvf.adjust_brightness(img, uniform(low, high))
         if np.random.rand() > 0.5:
-            img = tvf.adjust_contrast(img, uniform(0.5, 1.5))
+            low, high = self.aug_setting.get('contrast', [0.5, 1.5])
+            img = tvf.adjust_contrast(img, uniform(low, high))
         if np.random.rand() > 0.5:
-            img = tvf.adjust_hue(img, uniform(-0.1, 0.1))
+            low, high = self.aug_setting.get('hue', [-0.1, 0.1])
+            img = tvf.adjust_hue(img, uniform(low, high))
         if np.random.rand() > 0.5:
-            factor = uniform(0,2)
-            if factor > 1:
-                factor = 1 + uniform(0, 2)
-            img = tvf.adjust_saturation(img, factor) # 0 ~ 3
+            low, high = self.aug_setting.get('saturation', [0, 2])
+            img = tvf.adjust_saturation(img, uniform(low, high)) # 0 ~ 3
         # if np.random.rand() > 0.5:
         #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
         # horizontal flip
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
         if self.bb_format in {'cxcywhd'}:
+            raise NotImplementedError()
             # vertical flip
             if np.random.rand() > 0.5:
                 img, labels = augUtils.vflip(img, labels)
             # random rotation
             rand_deg = np.random.rand() * 360
-            if self.config['rotation_expand']:
+            if self.aug_setting['rotation_expand']:
                 img, labels = augUtils.rotate(img, rand_deg, labels, expand=True)
             else:
                 img, labels = augUtils.rotate(img, rand_deg, labels, expand=False)
