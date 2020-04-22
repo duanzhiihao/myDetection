@@ -151,6 +151,7 @@ class YOLOLayer(nn.Module):
         else:
             loss_cls = 0
         loss = loss_xy + 0.5*loss_wh + loss_conf + loss_cls
+        loss = loss / nB
 
         # logging
         ngt = valid_gt_num + 1e-16

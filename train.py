@@ -31,8 +31,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
-    # parser.add_argument('--debug_mode', action='store_true')
-    parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -54,7 +54,8 @@ def main():
         target_size = global_cfg['test.default_input_size']
         initial_size = TRAIN_RESOLUTIONS[-1]
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
-        subdivision = 128 // batch_size
+        equiv_batchsize = 32
+        subdivision = equiv_batchsize // batch_size
         # data augmentation setting
         enable_aug = True
         enable_multiscale = True
@@ -198,7 +199,7 @@ def main():
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
-            subdivision = 128 // batch_size
+            subdivision = equiv_batchsize // batch_size
             dataset.img_size = imgsize
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)
