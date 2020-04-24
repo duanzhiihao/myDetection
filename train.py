@@ -234,18 +234,18 @@ def main():
 def lr_warmup(i, warm_up=1000):
     if i < warm_up:
         factor = i / warm_up
-    elif i < 40000:
-        factor = 1
-    elif i < 70000:
-        factor = 0.5
-    elif i < 90000:
-        factor = 0.25
-    elif i < 100000:
-        factor = 0.1
-    elif i < 200000:
-        factor = 1
     else:
-        factor = 0.01
+        factor = 1
+    # elif i < 70000:
+    #     factor = 0.5
+    # elif i < 90000:
+    #     factor = 0.25
+    # elif i < 100000:
+    #     factor = 0.1
+    # elif i < 200000:
+    #     factor = 1
+    # else:
+    #     factor = 0.01
     return factor
 
 
