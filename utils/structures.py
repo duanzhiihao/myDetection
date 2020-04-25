@@ -19,6 +19,7 @@ class ImageObjects():
                 'x1y1x2y2': (x1,y1,x2,y2)
                 'cxcywhd': (cx,cy,w,h,degree)
                 'cxcywhr': (cx,cy,w,h,radian)
+        img_size: int or (height, width)
     '''
     def __init__(self, bboxes, cats, scores=None,
                        bb_format='cxcywh', img_size=None):

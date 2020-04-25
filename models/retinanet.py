@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn.functional as tnf
 import fvcore.nn
@@ -30,6 +31,12 @@ class RetinaLayer(torch.nn.Module):
         self.negative_thres = cfg['model.retina.anchor.negative_threshold']
         self.stride = stride
         self.n_cls = cfg['general.num_class']
+        self.pred_bbox_format = cfg['general.pred_bbox_format']
+        if self.pred_bbox_format == 'cxcywhd':
+            from .losses import get_angle_loss
+            self.loss_angle = get_angle_loss(cfg['model.angle.loss_name'],
+                                             reduction='mean')
+        self.n_bbparam = cfg['general.bbox_param']
         self.last_img_size = None
 
     def forward(self, raw: dict, img_size, labels=None):
@@ -42,7 +49,7 @@ class RetinaLayer(torch.nn.Module):
         t_xywh = raw['bbox']
         cls_logits = raw['class']
         nB = t_xywh.shape[0] # batch size
-        assert t_xywh.shape == (nB, nA, nH, nW, 4)
+        assert t_xywh.shape == (nB, nA, nH, nW, self.n_bbparam)
         assert cls_logits.shape == (nB, nA, nH, nW, nCls)
         device = t_xywh.device
 
@@ -57,16 +64,18 @@ class RetinaLayer(torch.nn.Module):
             # -------------------- logits to prediction --------------------
             # cx, cy, w, h
             a_cx, a_cy, a_wh = _compute_anchors(dvc=device)
-            p_xywh = torch.empty_like(t_xywh)
+            p_xywh = torch.empty_like(t_xywh).contiguous()
             p_xywh[..., 0] = a_cx + t_xywh[..., 0] * a_wh[..., 0]
             p_xywh[..., 1] = a_cy + t_xywh[..., 1] * a_wh[..., 1]
             p_xywh[..., 2:4] = torch.exp(t_xywh[..., 2:4]) * a_wh
-            p_xywh.clamp_(min=1, max=max(img_size))
+            p_xywh[..., 0:4].clamp_(min=1, max=max(img_size))
+            if self.pred_bbox_format == 'cxcywhd':
+                p_xywh[..., 4] = torch.sigmoid(t_xywh[..., 4])*2*np.pi - np.pi
             # classes
             p_cls = torch.sigmoid(cls_logits)
             cls_score, cls_idx = torch.max(p_cls, dim=-1)
             preds = {
-                'bbox': p_xywh.view(nB, nA*nH*nW, 4).cpu(),
+                'bbox': p_xywh.view(nB, nA*nH*nW, self.n_bbparam).cpu(),
                 'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
                 'score': cls_score.view(nB, nA*nH*nW).cpu(),
             }
@@ -86,6 +95,7 @@ class RetinaLayer(torch.nn.Module):
             im_labels = labels[b]
             assert isinstance(im_labels, ImageObjects)
             im_labels.sanity_check()
+            assert self.pred_bbox_format == im_labels._bb_format
 
             if len(im_labels) == 0:
                 tgt_cls = torch.zeros(nA, nH, nW, nCls, device=device)
@@ -94,7 +104,7 @@ class RetinaLayer(torch.nn.Module):
                 continue
             
             gt_bbs = im_labels.bboxes
-            ious = bboxes_iou(anch_bbs.view(-1, 4), gt_bbs, xyxy=False)
+            ious = bboxes_iou(anch_bbs.view(-1, 4), gt_bbs[:,:4], xyxy=False)
             iou_with_gt, gt_idx = ious.max(dim=1)
             iou_with_gt = iou_with_gt.view(nA, nH, nW)
             gt_idx = gt_idx.view(nA, nH, nW)
@@ -113,7 +123,12 @@ class RetinaLayer(torch.nn.Module):
             tgt_cls = torch.zeros(nA, nH, nW, nCls)
             tgt_cls[pos_idx, im_labels.cats[gt_idx[pos_idx]]] = 1
             cls_penalty_mask = (pos_idx | neg_idx)
-
+            if self.pred_bbox_format == 'cxcywhd':
+                # Set angle target.
+                tgt_angle = torch.zeros(nA, nH, nW)
+                # Use radian when calculating the angle loss
+                tgt_angle = gt_bbs[..., 4] / 180 * np.pi
+                tgt_angle = tgt_angle.to(device)
             tgt_xywh = tgt_xywh.to(device)
             tgt_cls = tgt_cls.to(device)
             # bbox loss
@@ -137,8 +152,12 @@ class RetinaLayer(torch.nn.Module):
                 #                 cats=torch.zeros(pos_idx.sum()).long())
                 # debug.draw_on_np(bg)
                 # plt.figure(); plt.imshow(bg); plt.show()
-                im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :],
-                                tgt_xywh[pos_idx, :], beta=0.1, reduction='sum')
+                im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :4],
+                                tgt_xywh[pos_idx, :], beta=0.1, reduction='mean')
+                if self.pred_bbox_format == 'cxcywhd':
+                    p_angle = torch.sigmoid(t_xywh[b, pos_idx, 4])*2*np.pi - np.pi
+                    im_loss_angle = self.loss_angle(p_angle, tgt_angle[pos_idx])
+                    im_loss_xywh = im_loss_xywh + im_loss_angle
                 # im_loss_xywh = tnf.mse_loss(t_xywh[b, pos_idx, :],
                 #                 tgt_xywh[pos_idx, :], reduction='sum')
                 loss_xywh = loss_xywh + im_loss_xywh

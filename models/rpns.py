@@ -147,8 +147,8 @@ class EfDetHead(nn.Module):
 
             nB, _, nH, nW = bbox_pred.shape
             nA = self.n_anch
-            bbox_pred = bbox_pred.view(nB, nA, 4, nH, nW).permute(0, 1, 3, 4, 2)
-            cls_pred = cls_pred.view(nB, nA, -1, nH, nW).permute(0, 1, 3, 4, 2)
+            bbox_pred = bbox_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
+            cls_pred = cls_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
             if self.enable_conf:
                 raw = {
                     'bbox': bbox_pred,

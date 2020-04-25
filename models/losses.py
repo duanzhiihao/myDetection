@@ -4,6 +4,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def get_angle_loss(name, reduction):
+    if name == 'Periodic_L1':
+        return period_L1(reduction=reduction)
+    elif name == 'Periodic_L2':
+        return period_L2(reduction=reduction)
+    else:
+        raise NotImplementedError()
+
+
 class period_L1(nn.Module):
     def __init__(self, reduction='sum'):
         '''

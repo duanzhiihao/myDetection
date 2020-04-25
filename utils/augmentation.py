@@ -5,6 +5,8 @@ import torch
 import torchvision.transforms.functional as tvf
 import torch.nn.functional as tnf
 
+from .structures import ImageObjects
+
 
 def hflip(image, labels):
     '''
@@ -12,10 +14,13 @@ def hflip(image, labels):
 
     Args:
         image: PIL.Image
-        labels: tensor, shape(N,5), (class,x,y,w,h,...)
     '''
+    assert isinstance(labels, ImageObjects)
     image = tvf.hflip(image)
-    labels[:,1] = image.width - labels[:,1] # class,x,y,w,h,...
+    assert labels._bb_format in {'cxcywh', 'cxcywhd'}
+    labels.bboxes[:,0] = image.width - labels.bboxes[:,0]
+    if labels._bb_format == 'cxcywhd':
+        labels.bboxes[:,4] = -labels.bboxes[:,4]
     return image, labels
 
 
@@ -25,25 +30,28 @@ def vflip(image, labels):
 
     Args:
         image: PIL.Image
-        labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
     '''
+    assert isinstance(labels, ImageObjects)
+    assert labels._bb_format == 'cxcywhd'
     image = tvf.vflip(image)
-    labels[:,1] = image.height - labels[:,1] # x,y,w,h,(angle)
-    labels[:,4] = -labels[:,4]
+    labels.bboxes[:,1] = image.height - labels.bboxes[:,1] # x,y,w,h,(angle)
+    labels.bboxes[:,4] = -labels.bboxes[:,4]
     return image, labels
 
 
 def rotate(image, degrees, labels, expand=False):
     '''
-    image: PIL.Image
-    labels: tensor, shape(N,5), absolute x,y,w,h, angle in degree
+    Args:
+        image: PIL.Image
     '''
+    assert isinstance(labels, ImageObjects)
     img_w, img_h = image.width, image.height
     image = tvf.rotate(image, angle=-degrees, expand=expand)
     new_w, new_h = image.width, image.height
+    labels.img_size = (new_h, new_w)
     # image coordinate to cartesian coordinate
-    x = labels[:,0] - 0.5*img_w
-    y = -(labels[:,1] - 0.5*img_h)
+    x = labels.bboxes[:,0] - 0.5*img_w
+    y = -(labels.bboxes[:,1] - 0.5*img_h)
     # cartesian to polar
     r = (x.pow(2) + y.pow(2)).sqrt()
 
@@ -56,11 +64,11 @@ def rotate(image, degrees, labels, expand=False):
     # polar to cartesian
     x = r * torch.cos(theta)
     y = r * torch.sin(theta)
-    labels[:,0] = x + 0.5*new_w
-    labels[:,1] = -y + 0.5*new_h
-    labels[:,4] += degrees
-    labels[:,4] = torch.remainder(labels[:,4], 180)
-    labels[:,4][labels[:,4]>=90] -= 180
+    labels.bboxes[:,0] = x + 0.5*new_w
+    labels.bboxes[:,1] = -y + 0.5*new_h
+    labels.bboxes[:,4] += degrees
+    labels.bboxes[:,4] = torch.remainder(labels.bboxes[:,4], 180)
+    labels.bboxes[:,4][labels.bboxes[:,4]>=90] -= 180
 
     return image, labels
 

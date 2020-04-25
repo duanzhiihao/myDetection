@@ -2,9 +2,9 @@
     "base": "OneStageBBox",
     
     "general.input_format": "RGB_1_norm",
-    "general.num_class": 80,
-    "general.pred_bbox_format": "cxcywh",
-    "general.bbox_param": 4,
+    "general.num_class": 1,
+    "general.pred_bbox_format": "cxcywhd",
+    "general.bbox_param": 5,
 
     "model.backbone.name": "efficientnet-b1",
     "model.backbone.num_levels": 5,
@@ -33,10 +33,12 @@
     "model.retina.anchor.ratios": [[1, 1], [1.4, 0.7], [0.7, 1.4]],
     "model.retina.anchor.positive_threshold": 0.5,
     "model.retina.anchor.negative_threshold": 0.5,
+    "model.angle.loss_name": "periodic_L1",
 
     "train.sgd.weight_decay": 0.00004,
-    "train.img_sizes": [512, 640, 768],
+    "train.img_sizes": [384, 512, 640, 768],
     "train.imgsize_to_batch_size": {
+        "384": 16,
         "512": 12,
         "640": 8,
         "768": 5
@@ -51,6 +53,6 @@
 
     "test.default_input_size": 640,
     "test.to_square": true,
-    "test.default_conf_thres": 0.5,
-    "test.nms_thres": 0.5
+    "test.default_conf_thres": 0.3,
+    "test.nms_thres": 0.45
 }

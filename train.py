@@ -15,12 +15,14 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='efficientdet-d1')
-    parser.add_argument('--train_set', type=str, default='debug3')
-    parser.add_argument('--val_set', type=str, default='debug_zebra')
+    parser.add_argument('--model', type=str, default='d1_pl1')
+    parser.add_argument('--train_set', type=str, default='debug_lunch31')
+    parser.add_argument('--val_set', type=str, default='debug_lunch31')
 
+    parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--warmup', type=int, default=1000)
 
     parser.add_argument('--checkpoint', type=str,
                         default='')
@@ -29,7 +31,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
     parser.add_argument('--debug_mode', action='store_true')
     # parser.add_argument('--debug_mode', type=bool, default=True)
@@ -54,17 +56,17 @@ def main():
         target_size = global_cfg['test.default_input_size']
         initial_size = TRAIN_RESOLUTIONS[-1]
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
-        equiv_batchsize = global_cfg.get('train.equivalent_batch_size', 32)
-        subdivision = equiv_batchsize // batch_size
+        super_batchsize = args.super_batchsize
+        subdivision = super_batchsize // batch_size
         # data augmentation setting
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
         # batch_size = args.batch_size
         num_cpu = 4
-        warmup_iter = 1000
+        warmup_iter = args.warmup
 
-    job_name = f'{args.model}_{args.train_set}{target_size}'
+    job_name = f'{args.model}_{args.train_set}{target_size}_{args.lr}'
     
     # Prepare model
     pnum = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -193,7 +195,7 @@ def main():
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
-            subdivision = equiv_batchsize // batch_size
+            subdivision = super_batchsize // batch_size
             dataset.img_size = imgsize
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)

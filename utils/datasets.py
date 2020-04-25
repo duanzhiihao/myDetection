@@ -16,51 +16,56 @@ from utils.structures import ImageObjects
 
 def get_trainingset(cfg: dict):
     dataset_name = cfg['train.dataset_name']
-    if dataset_name == 'debug3':
+    if dataset_name == 'COCO':
         training_set_cfg = {
-            'img_dir': './images/debug3/',
-            'json_path': './utils/coco/debug3.json',
+            'img_dir': '../Datasets/COCO/train2017',
+            'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
             'ann_bbox_format': 'x1y1wh'
         }
     elif dataset_name == 'debug_zebra':
         training_set_cfg = {
             'img_dir': './images/debug_zebra/',
-            'json_path': './utils/coco/debug_zebra.json',
+            'json_path': './utils/debug/debug_zebra.json',
             'ann_bbox_format': 'x1y1wh'
         }
-    elif dataset_name == 'COCO':
+    elif dataset_name == 'debug3':
         training_set_cfg = {
-            'img_dir': '../COCO/train2017',
-            'json_path': '../COCO/annotations/instances_train2017.json',
+            'img_dir': './images/debug3/',
+            'json_path': './utils/debug/debug3.json',
             'ann_bbox_format': 'x1y1wh'
         }
-    elif dataset_name == 'COCO80-R':
+    elif dataset_name == 'debug_lunch31':
+        training_set_cfg = {
+            'img_dir': './images/debug_lunch31/',
+            'json_path': './utils/debug/debug_lunch31.json',
+            'ann_bbox_format': 'cxcywhd'
+        }
+        cfg['train.data_augmentation'].update(rotation_expand=False)
+    elif dataset_name == 'COCO-R':
         raise NotImplementedError()
-        training_set_cfg = {
-            'train_img_dir': '../COCO/train2017',
-            'train_json': '../COCO/annotations/instances_train2017.json',
-            'val_img_dir': '../COCO/val2017',
-            'val_json': '../COCO/annotations/instances_val2017.json',
-            'rotated_bbox': True,
-        }
     else:
         raise NotImplementedError()
     return Dataset4ObjDet(training_set_cfg, cfg)
 
 
 def get_valset(valset_name):
-    if valset_name == 'debug3':
+    if valset_name == 'val2017':
+        val_img_dir = '../Datasets/COCO/val2017'
+        val_json_path = '../Datasets/COCO/annotations/instances_val2017.json'
+        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'debug3':
         val_img_dir = './images/debug3/'
-        val_json_path = './utils/coco/debug3.json'
+        val_json_path = './utils/debug/debug3.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_zebra':
         val_img_dir = './images/debug_zebra/'
-        val_json_path = './utils/coco/debug_zebra.json'
+        val_json_path = './utils/debug/debug_zebra.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
-    elif valset_name == 'val2017':
-        val_img_dir = '../COCO/val2017'
-        val_json_path = '../COCO/annotations/instances_val2017.json'
-        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'debug_lunch31':
+        val_img_dir = './images/debug_lunch31/'
+        val_json_path = './utils/debug/debug_lunch31.json'
+        from .cepdof_api import evaluate_json
+        validation_func = lambda x: evaluate_json(x, val_json_path)
     else:
         raise NotImplementedError()
     return val_img_dir, validation_func
@@ -110,12 +115,15 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 ann['bbox'][0] = ann['bbox'][0] + ann['bbox'][2] / 2
                 ann['bbox'][1] = ann['bbox'][1] + ann['bbox'][3] / 2
                 self.bb_format = 'cxcywh'
+                self.bb_param = 4
             elif ann_bbox_format == 'cxcywh':
                 assert len(ann['bbox']) == 4
                 self.bb_format = 'cxcywh'
+                self.bb_param = 4
             elif ann_bbox_format == 'cxcywhd':
                 assert len(ann['bbox']) == 5
                 self.bb_format = 'cxcywhd'
+                self.bb_param = 5
             else: raise Exception('Bounding box format is not supported')
             cat_idx = self.catid2idx[ann['category_id']]
             ann['_gt'] = torch.Tensor([cat_idx] + ann['bbox'])
@@ -152,8 +160,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         labels = []
         for _, ann in enumerate(self.imgid2anns[img_id]):
             labels.append(ann['_gt'])
-        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,5)
-        # each row of labels is [category, cx, cy, w, h, (degree)]
+        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,1+self.bb_param)
+        labels = ImageObjects(bboxes=labels[:,1:], cats=labels[:,0],
+                              bb_format=self.bb_format, img_size=(ori_h, ori_w))
         # augmentation
         if self.aug_setting is not None:
             img, labels = self.augment_PIL(img, labels)
@@ -210,16 +219,13 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         if np.random.rand() > 0.5:
             img, labels = augUtils.hflip(img, labels)
         if self.bb_format in {'cxcywhd'}:
-            raise NotImplementedError()
             # vertical flip
             if np.random.rand() > 0.5:
                 img, labels = augUtils.vflip(img, labels)
             # random rotation
             rand_deg = np.random.rand() * 360
-            if self.aug_setting['rotation_expand']:
-                img, labels = augUtils.rotate(img, rand_deg, labels, expand=True)
-            else:
-                img, labels = augUtils.rotate(img, rand_deg, labels, expand=False)
+            expand = self.aug_setting['rotation_expand']
+            img, labels = augUtils.rotate(img, rand_deg, labels, expand=expand)
             return img, labels
 
         return img, labels
