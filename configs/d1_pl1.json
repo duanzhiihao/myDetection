@@ -38,7 +38,7 @@
     "train.sgd.weight_decay": 0.00004,
     "train.img_sizes": [384, 512, 640, 768],
     "train.imgsize_to_batch_size": {
-        "384": 16,
+        "384": 24,
         "512": 12,
         "640": 8,
         "768": 5

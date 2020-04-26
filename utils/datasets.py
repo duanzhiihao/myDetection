@@ -109,8 +109,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.img_size = glocal_cfg['train.img_sizes'][-1]
         self.input_format = glocal_cfg['general.input_format']
         self.aug_setting = glocal_cfg['train.data_augmentation']
-        self.skip_crowd = False
-        self.skip_empty = True
+        self.skip_crowd_ann = True
+        self.skip_crowd_img = False
+        self.skip_empty_img = True
 
         self.img_ids = []
         self.imgid2info = dict()
@@ -129,36 +130,34 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         catgys = json_data['categories']
         self.catid2idx = dict([(cat['id'],idx) for idx,cat in enumerate(catgys)])
 
+        if ann_bbox_format in {'x1y1wh', 'cxcywh'}:
+            self.bb_format = 'cxcywh'
+            self.bb_param = 4
+        elif ann_bbox_format == 'cxcywhd':
+            self.bb_format = 'cxcywhd'
+            self.bb_param = 5
+        else:
+            raise Exception('Bounding box format is not supported')
         for ann in json_data['annotations']:
             # Parse bounding box annotation
+            assert len(ann['bbox']) == self.bb_param
+            if self.skip_crowd_ann and ann['iscrowd']:
+                continue
             if ann_bbox_format == 'x1y1wh':
-                assert len(ann['bbox']) == 4
                 # The dataset is using (x1,y1,w,h). Converting to (cx,cy,w,h)
                 ann['bbox'][0] = ann['bbox'][0] + ann['bbox'][2] / 2
                 ann['bbox'][1] = ann['bbox'][1] + ann['bbox'][3] / 2
-                self.bb_format = 'cxcywh'
-                self.bb_param = 4
-            elif ann_bbox_format == 'cxcywh':
-                assert len(ann['bbox']) == 4
-                self.bb_format = 'cxcywh'
-                self.bb_param = 4
-            elif ann_bbox_format == 'cxcywhd':
-                assert len(ann['bbox']) == 5
-                self.bb_format = 'cxcywhd'
-                self.bb_param = 5
-            else: raise Exception('Bounding box format is not supported')
             ann['cat_idx'] = self.catid2idx[ann['category_id']]
-            # ann['_gt'] = torch.Tensor([cat_idx] + ann['bbox'])
             self.imgid2anns[ann['image_id']].append(ann)
 
         self.imgId2labels = dict()
         for img in json_data['images']:
             img_id = img['id']
             anns = self.imgid2anns[img_id]
-            if self.skip_crowd and any(ann['iscrowd'] for ann in anns):
+            if self.skip_crowd_img and any(ann['iscrowd'] for ann in anns):
                 # if there is crowd gt, skip this image
                 continue
-            if self.skip_empty and len(anns) == 0:
+            if self.skip_empty_img and len(anns) == 0:
                 # if there is no object in this image, skip this image
                 continue
             self.img_ids.append(img_id)
@@ -173,7 +172,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 bboxes=torch.FloatTensor(bboxes),
                 cats=torch.LongTensor(cat_idxs),
                 bb_format=self.bb_format,
-                img_size=(img['width'], img['height'])
+                img_size=(img['height'], img['width'])
             )
             assert img_id not in self.imgId2labels
             self.imgId2labels[img_id] = labels

@@ -57,7 +57,7 @@ def main():
         initial_size = TRAIN_RESOLUTIONS[-1]
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
         super_batchsize = args.super_batchsize
-        subdivision = super_batchsize // batch_size
+        subdivision = int(np.ceil(super_batchsize / batch_size))
         # data augmentation setting
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
@@ -195,7 +195,7 @@ def main():
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
-            subdivision = super_batchsize // batch_size
+            subdivision = int(np.ceil(super_batchsize / batch_size))
             dataset.img_size = imgsize
             dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
                                             num_workers=num_cpu, pin_memory=True)
