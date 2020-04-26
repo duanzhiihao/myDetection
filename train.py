@@ -33,8 +33,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -82,7 +82,7 @@ def main():
                                        num_workers=num_cpu, pin_memory=True)
     dataiterator = iter(dataloader)
     print(f'Initializing validation set {args.val_set}...')
-    val_img_dir, validation_func = datasets.get_valset(args.val_set)
+    eval_info, validation_func = datasets.get_valset(args.val_set)
 
     start_iter = -1
     if args.checkpoint:
@@ -125,8 +125,8 @@ def main():
                 model.eval()
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
-                dts = model_eval.predict_imgDir(val_img_dir, input_size=target_size,
-                                                to_square=True, conf_thres=0.005)
+                dts = model_eval.evaluation_predict(eval_info,
+                    input_size=target_size, to_square=True, conf_thres=0.005)
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'

@@ -22,6 +22,14 @@ def get_trainingset(cfg: dict):
             'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
             'ann_bbox_format': 'x1y1wh'
         }
+    elif dataset_name == 'personrbb_train2017':
+        training_set_cfg = {
+            'img_dir': '../Datasets/COCO/train2017',
+            'json_path': '../Datasets/COCO/annotations/personrbb_train2017.json',
+            'ann_bbox_format': 'cxcywhd'
+        }
+        if cfg['train.data_augmentation'] is not None:
+            cfg['train.data_augmentation'].update(rotation_expand=True)
     elif dataset_name == 'debug_zebra':
         training_set_cfg = {
             'img_dir': './images/debug_zebra/',
@@ -42,8 +50,6 @@ def get_trainingset(cfg: dict):
         }
         if cfg['train.data_augmentation'] is not None:
             cfg['train.data_augmentation'].update(rotation_expand=False)
-    elif dataset_name == 'COCO-R':
-        raise NotImplementedError()
     else:
         raise NotImplementedError()
     return Dataset4ObjDet(training_set_cfg, cfg)
@@ -51,25 +57,39 @@ def get_trainingset(cfg: dict):
 
 def get_valset(valset_name):
     if valset_name == 'val2017':
-        val_img_dir = '../Datasets/COCO/val2017'
+        raise NotImplementedError()
+        img_dir = '../Datasets/COCO/val2017'
         val_json_path = '../Datasets/COCO/annotations/instances_val2017.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'personrbb_val2017':
+        img_dir = '../Datasets/COCO/val2017'
+        val_json_path = '../Datasets/COCO/annotations/personrbb_val2017.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
+        from .cepdof_api import evaluate_json
+        validation_func = lambda x: evaluate_json(x, val_json_path)
     elif valset_name == 'debug3':
-        val_img_dir = './images/debug3/'
+        raise NotImplementedError()
+        img_dir = './images/debug3/'
         val_json_path = './utils/debug/debug3.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_zebra':
-        val_img_dir = './images/debug_zebra/'
+        raise NotImplementedError()
+        img_dir = './images/debug_zebra/'
         val_json_path = './utils/debug/debug_zebra.json'
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_lunch31':
-        val_img_dir = './images/debug_lunch31/'
+        img_dir = './images/debug_lunch31/'
         val_json_path = './utils/debug/debug_lunch31.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
         from .cepdof_api import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
     else:
         raise NotImplementedError()
-    return val_img_dir, validation_func
+    return eval_info, validation_func
 
 
 class Dataset4ObjDet(torch.utils.data.Dataset):

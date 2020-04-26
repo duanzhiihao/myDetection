@@ -36,6 +36,17 @@ class Detector():
         if weights_path:
             self.model.load_state_dict(torch.load(weights_path)['model'])
 
+    def evaluation_predict(self, eval_info, **kwargs):
+        '''
+        Args:
+            eval_info: list of (img_path, img_id)
+            See _predict_pil() for optinal arguments
+        '''
+        detection_json = []
+        for (impath, imgId) in tqdm(eval_info):
+            detections = self.detect_one(img_path=impath, **kwargs)
+            detection_json += detections.to_json(img_id=imgId)
+        return detection_json
         
     def predict_imgDir(self, img_dir, **kwargs):
         '''
