@@ -228,11 +228,14 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
-        if (labels.bboxes[:,0:4] >= self.img_size).any():
+        if (labels.bboxes[:,0:2] > self.img_size).any():
             print('Warning: some x,y in ground truth are greater than image size')
             print('image path:', img_path)
+        if (labels.bboxes[:,2:4] > self.img_size).any():
+            print('Warning: some w,h in ground truth are greater than image size')
+            print('image path:', img_path)
         if (labels.bboxes[:,0:4] < 0).any():
-            print('Warning: some x,y in ground truth are smaller than 0')
+            print('Warning: some bbox in ground truth are smaller than 0')
             print('image path:', img_path)
         labels.bboxes[:,0:4].clamp_(min=0)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]

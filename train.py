@@ -139,6 +139,7 @@ def main():
             logger.add_scalar('Validation AP[IoU=0.5:0.95]', ap, iter_i)
             model.train()
 
+        torch.cuda.reset_max_memory_allocated(0)
         # subdivision loop
         optimizer.zero_grad()
         for _ in range(subdivision):
@@ -181,7 +182,6 @@ def main():
             print(f'[Iteration {iter_i}] [learning rate {current_lr:.3g}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')
             print(model.loss_str)
-        torch.cuda.reset_max_memory_allocated(0)
 
         # random resizing
         if enable_multiscale and iter_i > 0 and (iter_i % 10 == 0):

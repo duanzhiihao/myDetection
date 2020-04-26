@@ -41,7 +41,7 @@
         "384": 24,
         "512": 12,
         "640": 8,
-        "768": 5
+        "768": 6
     },
     "train.data_augmentation": {
         "satpepper_noise_density": 0,
