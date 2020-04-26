@@ -126,7 +126,8 @@ def main():
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.evaluation_predict(eval_info,
-                    input_size=target_size, to_square=True, conf_thres=0.005)
+                    input_size=target_size, to_square=True,
+                    conf_thres=global_cfg.get('test.ap_conf_thres', 0.005))
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'

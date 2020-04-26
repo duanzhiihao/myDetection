@@ -11,7 +11,7 @@
     "model.backbone.C6C7_out_channels": 88,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
-    "model.efficientnet.enable_dropout": true,
+    "model.efficientnet.enable_dropout": false,
 
     "model.fpn.name": "bifpn",
     "model.fpn.out_channels": "PLACEHOLDER",
@@ -44,15 +44,16 @@
         "768": 6
     },
     "train.data_augmentation": {
-        "satpepper_noise_density": 0,
-        "brightness": [1, 1],
-        "contrast": [1, 1],
-        "hue": [0, 0],
-        "saturation": [1, 1]
+        "satpepper_noise_density": 0.01,
+        "brightness": [0.6, 1.4],
+        "contrast": [0.6, 1.4],
+        "hue": [-0.1, 0.1],
+        "saturation": [0, 1.4]
     },
 
     "test.default_input_size": 640,
     "test.to_square": true,
     "test.default_conf_thres": 0.3,
+    "test.ap_conf_thres": 0.01,
     "test.nms_thres": 0.45
 }

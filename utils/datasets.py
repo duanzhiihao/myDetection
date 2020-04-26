@@ -219,11 +219,11 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         if self.aug_setting is not None:
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
             #         augUtils.random_gaussian_filter]
-            # if np.random.rand() > 0.7:
+            # if torch.rand(1).item() > 0.7:
             #     blur_func = random.choice(blur)
             #     img = blur_func(img)
-            if np.random.rand() > 0.6:
-                p = self.aug_setting.get('satpepper_noise_density', 0.03)
+            if torch.rand(1).item() > 0.7:
+                p = self.aug_setting.get('satpepper_noise_density', 0.02)
                 img = augUtils.add_saltpepper(img, max_p=p)
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
@@ -242,29 +242,29 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return img, labels, img_id, pad_info
 
     def augment_PIL(self, img, labels):
-        if np.random.rand() > 0.5:
+        if torch.rand(1).item() > 0.5:
             low, high = self.aug_setting.get('brightness', [0.6, 1.4])
             img = tvf.adjust_brightness(img, uniform(low, high))
-        if np.random.rand() > 0.5:
+        if torch.rand(1).item() > 0.5:
             low, high = self.aug_setting.get('contrast', [0.5, 1.5])
             img = tvf.adjust_contrast(img, uniform(low, high))
-        if np.random.rand() > 0.5:
+        if torch.rand(1).item() > 0.5:
             low, high = self.aug_setting.get('hue', [-0.1, 0.1])
             img = tvf.adjust_hue(img, uniform(low, high))
-        if np.random.rand() > 0.5:
+        if torch.rand(1).item() > 0.5:
             low, high = self.aug_setting.get('saturation', [0, 2])
             img = tvf.adjust_saturation(img, uniform(low, high)) # 0 ~ 3
-        # if np.random.rand() > 0.5:
+        # if torch.rand(1).item() > 0.5:
         #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
         # horizontal flip
-        if np.random.rand() > 0.5:
+        if torch.rand(1).item() > 0.5:
             img, labels = augUtils.hflip(img, labels)
         if self.bb_format in {'cxcywhd'}:
             # vertical flip
-            if np.random.rand() > 0.5:
+            if torch.rand(1).item() > 0.5:
                 img, labels = augUtils.vflip(img, labels)
             # random rotation
-            rand_deg = np.random.rand() * 360
+            rand_deg = torch.rand(1).item() * 360
             expand = self.aug_setting['rotation_expand']
             img, labels = augUtils.rotate(img, rand_deg, labels, expand=expand)
             return img, labels
@@ -285,7 +285,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
 
 def uniform(a, b):
-    return a + np.random.rand() * (b-a)
+    return a + torch.rand(1).item() * (b-a)
 
 
 def coco_evaluate_json(dts_json, gt_json_path):

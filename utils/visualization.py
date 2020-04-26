@@ -107,6 +107,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
                     (255,255,255), font_bold, cv2.LINE_AA)
     if kwargs.get('imshow', False):
+        plt.figure(figsize=(10,10))
         plt.imshow(im)
         plt.show()
 
