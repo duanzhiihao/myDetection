@@ -28,13 +28,13 @@ def main():
                         default='')
 
     parser.add_argument('--print_interval', type=int, default=20)
-    parser.add_argument('--eval_interval', type=int, default=400)
+    parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
-    # parser.add_argument('--debug_mode', action='store_true')
-    parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
