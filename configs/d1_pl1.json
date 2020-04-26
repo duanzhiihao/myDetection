@@ -33,7 +33,7 @@
     "model.retina.anchor.ratios": [[1, 1], [1.4, 0.7], [0.7, 1.4]],
     "model.retina.anchor.positive_threshold": 0.5,
     "model.retina.anchor.negative_threshold": 0.5,
-    "model.angle.loss_name": "periodic_L1",
+    "model.angle.loss_name": "Periodic_L1",
 
     "train.sgd.weight_decay": 0.00004,
     "train.img_sizes": [384, 512, 640, 768],

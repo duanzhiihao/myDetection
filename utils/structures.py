@@ -179,7 +179,7 @@ class ImageObjects():
         assert self.bboxes.dim() == 2
         draw_bboxes_on_np(im, self, class_map=class_map, **kwargs)
 
-    def to_coco_json(self, img_id):
+    def to_json(self, img_id):
         assert self.bboxes.dim() == 2
         assert self.bboxes.shape[0] == self.cats.shape[0] == self.scores.shape[0]
         list_json = []
@@ -187,7 +187,9 @@ class ImageObjects():
             if self._bb_format == 'cxcywh':
                 cx,cy,w,h = [float(t) for t in bb]
                 bbox = [cx-w/2, cy-h/2, w, h]
-            else: # TODO
+            elif self._bb_format == 'cxcywhd':
+                bbox = [float(t) for t in bb]
+            else:
                 raise NotImplementedError()
             cat_id = COCO_CATEGORY_LIST[int(c)]['id']
             dt_dict = {'image_id': img_id, 'category_id': cat_id,

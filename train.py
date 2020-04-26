@@ -27,14 +27,14 @@ def main():
     parser.add_argument('--checkpoint', type=str,
                         default='')
 
-    parser.add_argument('--print_interval', type=int, default=10)
-    parser.add_argument('--eval_interval', type=int, default=200)
+    parser.add_argument('--print_interval', type=int, default=20)
+    parser.add_argument('--eval_interval', type=int, default=400)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -49,7 +49,7 @@ def main():
         batch_size = 1
         num_cpu = 0
         subdivision = 1
-        warmup_iter = 40
+        warmup_iter = 100
     else:
         AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']

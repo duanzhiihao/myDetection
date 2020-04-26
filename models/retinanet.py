@@ -35,7 +35,7 @@ class RetinaLayer(torch.nn.Module):
         if self.pred_bbox_format == 'cxcywhd':
             from .losses import get_angle_loss
             self.loss_angle = get_angle_loss(cfg['model.angle.loss_name'],
-                                             reduction='mean')
+                                             reduction='sum')
         self.n_bbparam = cfg['general.bbox_param']
         self.last_img_size = None
 
@@ -70,7 +70,7 @@ class RetinaLayer(torch.nn.Module):
             p_xywh[..., 2:4] = torch.exp(t_xywh[..., 2:4]) * a_wh
             p_xywh[..., 0:4].clamp_(min=1, max=max(img_size))
             if self.pred_bbox_format == 'cxcywhd':
-                p_xywh[..., 4] = torch.sigmoid(t_xywh[..., 4])*2*np.pi - np.pi
+                p_xywh[..., 4] = torch.sigmoid(t_xywh[..., 4])*360 - 180
             # classes
             p_cls = torch.sigmoid(cls_logits)
             cls_score, cls_idx = torch.max(p_cls, dim=-1)
@@ -108,9 +108,9 @@ class RetinaLayer(torch.nn.Module):
             iou_with_gt, gt_idx = ious.max(dim=1)
             iou_with_gt = iou_with_gt.view(nA, nH, nW)
             gt_idx = gt_idx.view(nA, nH, nW)
-            pos_idx = (iou_with_gt > self.positive_thres)
-            neg_idx = (iou_with_gt < self.negative_thres)
-            num_pos_sample = pos_idx.sum()
+            M_pos = (iou_with_gt > self.positive_thres) # positive sample mask
+            M_neg = (iou_with_gt < self.negative_thres) # negative sample mask
+            num_pos_sample = M_pos.sum()
             total_pos_num += num_pos_sample
             total_sample_num += nA*nH*nW
 
@@ -121,8 +121,8 @@ class RetinaLayer(torch.nn.Module):
             tgt_xywh[...,2:4] = torch.log(gt_bbs[...,2:4] / anch_bbs[...,2:4] + 1e-8)
             # set class target
             tgt_cls = torch.zeros(nA, nH, nW, nCls)
-            tgt_cls[pos_idx, im_labels.cats[gt_idx[pos_idx]]] = 1
-            cls_penalty_mask = (pos_idx | neg_idx)
+            tgt_cls[M_pos, im_labels.cats[gt_idx[M_pos]]] = 1
+            cls_penalty_mask = (M_pos | M_neg)
             if self.pred_bbox_format == 'cxcywhd':
                 # Set angle target.
                 tgt_angle = torch.zeros(nA, nH, nW)
@@ -133,40 +133,27 @@ class RetinaLayer(torch.nn.Module):
             tgt_cls = tgt_cls.to(device)
             # bbox loss
             if num_pos_sample > 0:
-                # import numpy as np
                 # import matplotlib.pyplot as plt
-                # for i, mask in enumerate(pos_idx):
-                #     print(self.anchor_wh[i])
-                #     plt.figure(); plt.imshow(mask.numpy(), cmap='gray')
+                # for ia in range(nA):
+                #     print(a_wh.squeeze()[ia,:])
+                #     mask = M_pos[ia, :, :].numpy()
+                #     plt.imshow(mask, cmap='gray')
                 #     plt.show()
-                # bg = np.zeros((img_h,img_w,3))
-                # debug = ImageObjects(anch_bbs[pos_idx], 
-                #                      cats=torch.zeros(30).long())
-                # debug_tgt_xywh = tgt_xywh.cpu().unsqueeze(0)
-                # p_xywh = torch.empty_like(debug_tgt_xywh)
-                # p_xywh[..., 0] = a_cx + debug_tgt_xywh[..., 0] * a_wh[..., 0]
-                # p_xywh[..., 1] = a_cy + debug_tgt_xywh[..., 1] * a_wh[..., 1]
-                # p_xywh[..., 2:4] = torch.exp(debug_tgt_xywh[..., 2:4]) * a_wh
-                # p_xywh.clamp_(min=1, max=max(img_size))
-                # debug = ImageObjects(p_xywh.squeeze(0)[pos_idx].view(-1,4),
-                #                 cats=torch.zeros(pos_idx.sum()).long())
-                # debug.draw_on_np(bg)
-                # plt.figure(); plt.imshow(bg); plt.show()
-                im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b, pos_idx, :4],
-                                tgt_xywh[pos_idx, :], beta=0.1, reduction='mean')
+                im_loss_xywh = fvcore.nn.smooth_l1_loss(t_xywh[b][M_pos][:,0:4],
+                                tgt_xywh[M_pos, :], beta=0.1, reduction='sum')
                 if self.pred_bbox_format == 'cxcywhd':
-                    p_angle = torch.sigmoid(t_xywh[b, pos_idx, 4])*2*np.pi - np.pi
-                    im_loss_angle = self.loss_angle(p_angle, tgt_angle[pos_idx])
+                    p_angle = torch.sigmoid(t_xywh[b][M_pos][:,4])*2*np.pi - np.pi
+                    im_loss_angle = self.loss_angle(p_angle, tgt_angle[M_pos])
                     im_loss_xywh = im_loss_xywh + im_loss_angle
-                # im_loss_xywh = tnf.mse_loss(t_xywh[b, pos_idx, :],
-                #                 tgt_xywh[pos_idx, :], reduction='sum')
+                # im_loss_xywh = tnf.mse_loss(t_xywh[b, M_pos, :],
+                #                 tgt_xywh[M_pos, :], reduction='sum')
                 loss_xywh = loss_xywh + im_loss_xywh
             # class loss
             # im_loss_cls = fvcore.nn.sigmoid_focal_loss(cls_logits[b, cls_penalty_mask],
             #         tgt_cls[cls_penalty_mask], alpha=0.25, gamma=2, reduction='sum')
             im_loss_cls = bce_w_logits(cls_logits[b, cls_penalty_mask],
                             tgt_cls[cls_penalty_mask], reduction='sum')
-            loss_cls = loss_cls + im_loss_cls / (num_pos_sample + 1)
+            loss_cls = loss_cls + im_loss_cls # / (num_pos_sample + 1)
         loss = (loss_xywh + loss_cls) / nB
 
         # logging

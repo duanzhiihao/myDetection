@@ -4,6 +4,8 @@ import random
 import torch
 import torchvision.transforms.functional as tvf
 
+from .structures import ImageObjects
+
 
 def imread_pil(img_path):
     img = PIL.Image.open(img_path)
@@ -19,7 +21,7 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
     '''
     Arguments:
     img: PIL image
-    labels: torch.tensor, shape(N,5), NOT normalized [class,x,y,w,h,...]
+    labels: ImageObjects
     target_size: int, e.g. 608
     pad_value: int
     aug: bool
@@ -55,9 +57,11 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
 
     # modify labels
     if labels is not None:
-        labels[:,1:5] *= resize_scale
-        labels[:,1] += left
-        labels[:,2] += top
+        assert isinstance(labels, ImageObjects)
+        assert labels._bb_format in {'cxcywh', 'cxcywhd'}
+        labels.bboxes[:,:4] *= resize_scale
+        labels.bboxes[:,0] += left
+        labels.bboxes[:,1] += top
     
     pad_info = torch.Tensor((ori_w, ori_h) + img_tl + img_wh)
     return img, labels, pad_info

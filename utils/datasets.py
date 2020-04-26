@@ -40,7 +40,8 @@ def get_trainingset(cfg: dict):
             'json_path': './utils/debug/debug_lunch31.json',
             'ann_bbox_format': 'cxcywhd'
         }
-        cfg['train.data_augmentation'].update(rotation_expand=False)
+        if cfg['train.data_augmentation'] is not None:
+            cfg['train.data_augmentation'].update(rotation_expand=False)
     elif dataset_name == 'COCO-R':
         raise NotImplementedError()
     else:
@@ -89,6 +90,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.input_format = glocal_cfg['general.input_format']
         self.aug_setting = glocal_cfg['train.data_augmentation']
         self.skip_crowd = False
+        self.skip_empty = True
 
         self.img_ids = []
         self.imgid2info = dict()
@@ -125,19 +127,36 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 self.bb_format = 'cxcywhd'
                 self.bb_param = 5
             else: raise Exception('Bounding box format is not supported')
-            cat_idx = self.catid2idx[ann['category_id']]
-            ann['_gt'] = torch.Tensor([cat_idx] + ann['bbox'])
+            ann['cat_idx'] = self.catid2idx[ann['category_id']]
+            # ann['_gt'] = torch.Tensor([cat_idx] + ann['bbox'])
             self.imgid2anns[ann['image_id']].append(ann)
 
+        self.imgId2labels = dict()
         for img in json_data['images']:
             img_id = img['id']
             anns = self.imgid2anns[img_id]
-            if self.skip_crowd:
+            if self.skip_crowd and any(ann['iscrowd'] for ann in anns):
                 # if there is crowd gt, skip this image
-                if any(ann['iscrowd'] for ann in anns):
-                    continue
+                continue
+            if self.skip_empty and len(anns) == 0:
+                # if there is no object in this image, skip this image
+                continue
             self.img_ids.append(img_id)
             self.imgid2info[img['id']] = img
+            # convert annotations from json format to ImageObjects format
+            bboxes = []
+            cat_idxs = []
+            for ann in anns:
+                bboxes.append(ann['bbox'])
+                cat_idxs.append(ann['cat_idx'])
+            labels = ImageObjects(
+                bboxes=torch.FloatTensor(bboxes),
+                cats=torch.LongTensor(cat_idxs),
+                bb_format=self.bb_format,
+                img_size=(img['width'], img['height'])
+            )
+            assert img_id not in self.imgId2labels
+            self.imgId2labels[img_id] = labels
         debug = 1
 
     def __len__(self):
@@ -157,12 +176,14 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img = imgUtils.imread_pil(img_path)
         ori_w, ori_h = img.width, img.height
 
-        labels = []
-        for _, ann in enumerate(self.imgid2anns[img_id]):
-            labels.append(ann['_gt'])
-        labels = torch.stack(labels, dim=0) if labels else torch.zeros(0,1+self.bb_param)
-        labels = ImageObjects(bboxes=labels[:,1:], cats=labels[:,0],
-                              bb_format=self.bb_format, img_size=(ori_h, ori_w))
+        _labels = self.imgId2labels[img_id]
+        assert _labels.img_size == (ori_h, ori_w)
+        labels = ImageObjects(
+            bboxes=_labels.bboxes.clone(),
+            cats=_labels.cats.clone(),
+            bb_format=_labels._bb_format,
+            img_size=(ori_h, ori_w)
+        )
         # augmentation
         if self.aug_setting is not None:
             img, labels = self.augment_PIL(img, labels)
@@ -171,7 +192,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img, labels, pad_info = imgUtils.rect_to_square(img, labels, self.img_size,
                                         pad_value=0, aug=aug_flag)
         # Remove annotations which are too small
-        label_areas = labels[:,3] * labels[:,4]
+        label_areas = labels.bboxes[:,2] * labels.bboxes[:,3]
         labels = labels[label_areas >= 50]
         # Convert PIL.image into torch.tensor with shape (3,h,w)
         img = tvf.to_tensor(img)
@@ -188,15 +209,13 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
-        if (labels[:,1:5] >= self.img_size).any():
+        if (labels.bboxes[:,0:4] >= self.img_size).any():
             print('Warning: some x,y in ground truth are greater than image size')
             print('image path:', img_path)
-        if (labels[:,1:5] < 0).any():
+        if (labels.bboxes[:,0:4] < 0).any():
             print('Warning: some x,y in ground truth are smaller than 0')
             print('image path:', img_path)
-        labels[:,1:5].clamp_(min=0)
-        labels = ImageObjects(bboxes=labels[:,1:], cats=labels[:,0].long(),
-                              bb_format=self.bb_format, img_size=img.shape[1:3])
+        labels.bboxes[:,0:4].clamp_(min=0)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 

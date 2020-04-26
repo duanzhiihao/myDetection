@@ -13,7 +13,7 @@ def get_angle_loss(name, reduction):
         raise NotImplementedError()
 
 
-class period_L1(nn.Module):
+class period_L1():
     def __init__(self, reduction='sum'):
         '''
         periodic Squared Error
@@ -21,14 +21,14 @@ class period_L1(nn.Module):
         super().__init__()
         self.reduction = reduction
 
-    def forward(self, theta_pred, theta_gt):
+    def __call__(self, theta_pred, theta_gt):
         # assert theta_pred.shape == theta_gt.shape
         dt = theta_pred - theta_gt
 
         # periodic SE
         dt = torch.abs(torch.remainder(dt-np.pi/2,np.pi) - np.pi/2)
         
-        assert (dt >= 0).all()
+        # assert (dt >= 0).all()
         if self.reduction == 'sum':
             loss = dt.sum()
         elif self.reduction == 'mean':
@@ -38,7 +38,7 @@ class period_L1(nn.Module):
         return loss
 
 
-class period_L2(nn.Module):
+class period_L2():
     def __init__(self, reduction='sum'):
         '''
         periodic Squared Error
@@ -53,13 +53,13 @@ class period_L2(nn.Module):
         else:
             raise Exception('unknown reduction')
 
-    def forward(self, theta_pred, theta_gt):
+    def __call__(self, theta_pred, theta_gt):
         # assert theta_pred.shape == theta_gt.shape
         dt = theta_pred - theta_gt
         # periodic SE
         loss = (torch.remainder(dt-np.pi/2,np.pi) - np.pi/2) ** 2
         
-        assert (loss >= 0).all()
+        # assert (loss >= 0).all()
         loss = self.reduction(loss)
         return loss
 
