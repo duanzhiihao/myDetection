@@ -45,10 +45,10 @@
     },
     "train.data_augmentation": {
         "satpepper_noise_density": 0.01,
-        "brightness": [0.6, 1.4],
-        "contrast": [0.6, 1.4],
+        "brightness": [0.3, 1.5],
+        "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
-        "saturation": [0, 1.4]
+        "saturation": [0, 1.5]
     },
 
     "test.default_input_size": 640,

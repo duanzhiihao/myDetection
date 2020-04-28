@@ -122,9 +122,15 @@ class RetinaLayer(torch.nn.Module):
             # set class target
             tgt_cls = torch.zeros(nA, nH, nW, nCls)
             tgt_cls[M_pos, im_labels.cats[gt_idx[M_pos]]] = 1
-            cls_penalty_mask = (M_pos | M_neg)
+            # find the predictions which are not good enough
+            high_enough = np.log(0.95 / (1 - 0.95))
+            need_higher = M_pos & (cls_logits[b] < high_enough)
+            low_enough = np.log(0.01 / (1 - 0.01))
+            need_lower = M_neg & (cls_logits[b] > low_enough)
+            # ignore the predictions which are already good enough
+            cls_penalty_mask = need_higher | need_lower
+            # Set angle target.
             if self.pred_bbox_format == 'cxcywhd':
-                # Set angle target.
                 tgt_angle = torch.zeros(nA, nH, nW)
                 # Use radian when calculating the angle loss
                 tgt_angle = gt_bbs[..., 4] / 180 * np.pi

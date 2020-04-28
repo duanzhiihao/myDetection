@@ -9,6 +9,8 @@ def get_angle_loss(name, reduction):
         return period_L1(reduction=reduction)
     elif name == 'Periodic_L2':
         return period_L2(reduction=reduction)
+    elif name == 'Periodic_smoothL1':
+        return period_smoothL1(reduction=reduction)
     else:
         raise NotImplementedError()
 
@@ -35,6 +37,36 @@ class period_L1():
             loss = dt.mean()
         elif self.reduction == 'none':
             loss = dt
+        return loss
+
+
+class period_smoothL1():
+    def __init__(self, reduction='sum', beta=0.4):
+        '''
+        periodic Squared Error
+        '''
+        super().__init__()
+        self.reduction = reduction
+        self.beta = beta
+
+    def __call__(self, theta_pred, theta_gt):
+        dth = theta_pred - theta_gt
+        dth = torch.remainder(dth-np.pi/2, np.pi) - np.pi/2
+
+        beta = self.beta
+        if beta < 1e-5:
+            loss = torch.abs(dth)
+        else:
+            n = torch.abs(dth)
+            cond = n < beta
+            loss = torch.where(cond, 0.5 * n**2 / beta, n - 0.5 * beta)
+        
+        if self.reduction == 'sum':
+            loss = loss.sum()
+        elif self.reduction == 'mean':
+            loss = loss.mean()
+        elif self.reduction == 'none':
+            loss = loss
         return loss
 
 
