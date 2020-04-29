@@ -123,10 +123,11 @@ class RetinaLayer(torch.nn.Module):
             tgt_cls = torch.zeros(nA, nH, nW, nCls)
             tgt_cls[M_pos, im_labels.cats[gt_idx[M_pos]]] = 1
             # find the predictions which are not good enough
+            cls_logits_copy_ = cls_logits[b].detach().cpu().squeeze(-1)
             high_enough = np.log(0.95 / (1 - 0.95))
-            need_higher = M_pos & (cls_logits[b] < high_enough)
+            need_higher = M_pos & (cls_logits_copy_ < high_enough)
             low_enough = np.log(0.01 / (1 - 0.01))
-            need_lower = M_neg & (cls_logits[b] > low_enough)
+            need_lower = M_neg & (cls_logits_copy_ > low_enough)
             # ignore the predictions which are already good enough
             cls_penalty_mask = need_higher | need_lower
             # Set angle target.
