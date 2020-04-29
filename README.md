@@ -7,5 +7,6 @@
 - [x] EfficentNet backbone
 - [x] EfficientNet + BiFPN + YOLO
 - [x] EfficientDet
-- [ ] EfficientDet prediction layer vs YOLO prediction layer
+- [ ] EfficientDet + FCOS
+- [ ] RetinaNet prediction layer vs. YOLOv3 prediction layer vs. FCOS prediction layer
 - [ ] EfficientDet + FCOS + ATSS
