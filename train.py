@@ -15,7 +15,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_yv3')
+    parser.add_argument('--model', type=str, default='d1_fcs')
     parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='debug3')
 

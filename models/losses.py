@@ -167,9 +167,9 @@ def smooth_L1_loss(pred, target, beta=1, weight=None, reduction='none'):
     '''
     Smooth L1 Loss. Original: https://github.com/facebookresearch/fvcore
     '''
-    assert beta > 1e-5, 'If beta is smaller than 1e-5, use L1 instead'
+    assert beta > 1e-5, 'beta should not be smaller than 1e-5'
     err = torch.abs(pred - target)
-    loss = torch.where(err <= beta, 0.5*err*err/beta, err - 0.5*beta)
+    loss = torch.where(err <= beta, 0.5*err.pow(2)/beta, err - 0.5*beta)
     if weight is not None:
         loss = weight * loss
 

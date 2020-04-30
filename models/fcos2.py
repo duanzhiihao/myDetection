@@ -47,8 +47,13 @@ class FCOSLayer(torch.nn.Module):
                 p_ltrb = t_ltrb * stride
             else:
                 raise Exception('Unknown ltrb_setting')
-            # Translate from ltrb to cxcywh
-            p_ltrb = _ltrb_to_xywh(p_ltrb, nH, nW, stride)
+            # Force the prediction to be in the image
+            p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
+            p_xyxy[..., 0].clamp_(min=0, max=img_w)
+            p_xyxy[..., 1].clamp_(min=0, max=img_h)
+            p_xyxy[..., 2].clamp_(min=0, max=img_w)
+            p_xyxy[..., 3].clamp_(min=0, max=img_h)
+            p_xywh = _xyxy_to_xywh(p_xyxy)
             # Logistic activation for 'centerness'
             p_center = torch.sigmoid(center_logits)
             # Logistic activation for categories
@@ -56,7 +61,7 @@ class FCOSLayer(torch.nn.Module):
             cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
             confs = torch.sqrt(p_center * cls_score)
             preds = {
-                'bbox': p_ltrb.view(nB, nH*nW, 4),
+                'bbox': p_xywh.view(nB, nH*nW, 4),
                 'class_idx': cls_idx.view(nB, nH*nW),
                 'score': confs.view(nB, nH*nW),
             }
@@ -106,13 +111,14 @@ class FCOSLayer(torch.nn.Module):
                 # 1. sample the center part of the bounding box
                 Cx1, Cy1, Cx2, Cy2 = _xywh_to_xyxy(bb, cr=self.center_region)
                 center_mask = (gx > Cx1) & (gx < Cx2) & (gy > Cy1) & (gy < Cy2)
-                anch_mask = (self.anch_min < tgt_ltrb) & (tgt_ltrb < self.anch_max)
-                anch_mask = torch.prod(anch_mask, dim=-1).bool()
+                max_tgt_ltrb, _ = torch.max(tgt_ltrb, dim=-1)
+                anch_mask = (self.anch_min < max_tgt_ltrb) & (max_tgt_ltrb < self.anch_max)
                 pos_mask = center_mask & anch_mask
+                if cidx == 0 and bb[2]*bb[3] > 100*100:
+                    debug = 1
                 if not pos_mask.any():
                     continue
-                # import matplotlib.pyplot as plt
-                # plt.imshow(mask.numpy(), cmap='gray'); plt.show()
+                # set target for ltrb
                 TargetLTRB[b, pos_mask, :] = tgt_ltrb[pos_mask, :]
                 # compute target for center score
                 tgt_center = torch.min(tgt_l, tgt_r) / torch.max(tgt_l, tgt_r) * \
@@ -120,63 +126,13 @@ class FCOSLayer(torch.nn.Module):
                 tgt_center.mul_(bbox_mask).sqrt_()
                 # import matplotlib.pyplot as plt
                 # plt.imshow(tgt_center.numpy(), cmap='gray'); plt.show()
-                TargetCtr[b, bbox_mask] = tgt_center[bbox_mask]
+                assert TargetCtr.shape[-1] == 1
+                TargetCtr[b, bbox_mask] = tgt_center[bbox_mask].unsqueeze(-1)
                 # set target for category classification
-                TargetCls[b, pos_mask, cidx] = 1
+                _Hidx, _Widx = pos_mask.nonzero(as_tuple=True)
+                TargetCls[b, _Hidx, _Widx, cidx] = 1
                 # Update the batch positive sample mask
                 PositiveMask[b] = PositiveMask[b] | pos_mask
-
-
-            # Determine this layer is responsible for which gt BBs
-            # gt_ltrb_all = _xywh_to_ltrb(labels[b][:,1:5], stride)
-            # max_reg, _ = torch.max(gt_ltrb_all, dim=1)
-            # valid_mask = (max_reg > self.anch_min) & (max_reg <= self.anch_max)
-
-            # Only use the gt BBs that this layer is responsible for
-            # gt_num = valid_mask.sum()
-            # ValidGTnum += gt_num
-            # valid_gts = labels[b][valid_mask,:]
-            # Sort the gt BBs by their area in descending order
-            # areas = valid_gts[:,3] * valid_gts[:,4]
-            # aidx = torch.argsort(areas, descending=True)
-            # Below are the labels used in this branch/feature level
-            # gt_cls = valid_gts[aidx, 0].long()
-            # gt_xywh = valid_gts[aidx, 1:5]
-
-            # Determine which grid cell is responsible for which gt BB
-            # gt_xywh = im_labels.bboxes
-            # gt_masks, gt_ltrb, gt_conf = xywh2target(gt_xywh, (nH,nW), img_size,
-            #                                          self.center_region)
-            # for i, mask in enumerate(gt_masks):
-            #     print(f'{mask.sum()} cells is responsible for the current BB.')
-            #     print(gt_xywh[i,:], img_size)
-            #     import matplotlib.pyplot as plt
-            #     plt.figure()
-            #     plt.imshow(mask.numpy().astype('float32'), cmap='gray')
-            #     plt.figure()
-            #     plt.imshow(gt_conf[i].numpy().astype('float32'), cmap='gray')
-            #     plt.show()
-            
-            # Since the gt labels are already sorted by area (descending), \
-            # small objects are set later so they get higher priority
-            # for i, duty_mask in enumerate(gt_masks):
-            # # for duty_mask, ltrb_matrix, cls_ in zip(gt_masks, gt_ltrb, gt_cls):
-            #     # Get non-zeros indices
-            #     indices = duty_mask.nonzero()
-            #     di1, di2 = indices[:,0], indices[:,1]
-            #     # Calculate target ltrb for each location
-                
-            #     # Set regression target
-            #     ltrb_ = gt_ltrb[i][duty_mask]
-            #     if self.ltrb_setting.startswith('exp'):
-            #         TargetLTRB[b,di1,di2,:] = torch.log(ltrb_/stride + 1e-8)
-            #     else:
-            #         raise NotImplementedError()
-            #     TargetCtr[b, di1, di2] = gt_conf[i][duty_mask].unsqueeze_(-1)
-            #     if self.n_cls > 0:
-            #         TargetCls[b, di1, di2, gt_cls[i]] = 1
-            # # update the responsibility mask of the whole batch
-            # PenaltyMask[b] = (torch.sum(gt_masks, dim=0) > 0.5)
 
         # Transfer targets to GPU
         PositiveMask = PositiveMask.to(device=device)
@@ -188,21 +144,22 @@ class FCOSLayer(torch.nn.Module):
         pLTRB, tgtLTRB = t_ltrb[PositiveMask], TargetLTRB[PositiveMask]
         assert (tgtLTRB > 0).all() # Sanity check
         if self.ltrb_setting.startswith('exp'):
-            tgtLTRB = torch.log(tgtLTRB/stride + 1e-8)
+            tgtLTRB = torch.log(tgtLTRB / stride)
+        else: raise NotImplementedError()
         if self.ltrb_setting.endswith('sl1'):
             # smooth L1 loss for l,t,r,b
-            loss_bbox = lossLib.smooth_L1_loss(pLTRB, tgtLTRB, beta=1,
-                            weight=TargetCtr[PositiveMask], reduction='sum')
-            # loss_bbox = tnf.smooth_l1_loss(pLTRB, tgtLTRB, reduction='mean')
-            # loss_bbox = 0.5 * smooth_l1_loss(pLTRB, gtLTRB, 1, reduction='sum')
+            loss_bbox = lossLib.smooth_L1_loss(pLTRB, tgtLTRB, beta=0.2,
+                                               reduction='sum')
+            # loss_bbox = lossLib.smooth_L1_loss(pLTRB, tgtLTRB, beta=1,
+            #             weight=TargetCtr[PositiveMask], reduction='sum')
         elif self.ltrb_setting.endswith('l2'):
-            loss_bbox = tnf.mse_loss(pLTRB, tgtLTRB, reduction='mean')
+            loss_bbox = tnf.mse_loss(pLTRB, tgtLTRB, reduction='sum')
         else: raise NotImplementedError()
         # Binary cross entropy for center score and classes
         bce_logits = tnf.binary_cross_entropy_with_logits
-        loss_center = bce_logits(center_logits, TargetCtr, reduction='mean')
+        loss_center = bce_logits(center_logits, TargetCtr, reduction='sum')
         loss_cls = bce_logits(cls_logits, TargetCls, reduction='sum')
-        loss = loss_bbox + loss_center + loss_cls / (PositiveMask.sum() + 1)
+        loss = loss_bbox + loss_center + loss_cls # / (PositiveMask.sum() + 1)
         
         # logging
         pos_num = PositiveMask.sum().cpu().item()
@@ -213,39 +170,39 @@ class FCOSLayer(torch.nn.Module):
         return None, loss
 
 
-def xywh2target(xywh, mask_size, resolution, center_region=0.5):
-    '''
-    Args:
-        xywh: torch.tensor, rows of (cx,cy,w,h)
-        mask_size: tuple, (h,w)
-        resolution: the range of xywh. resolution=(1,1) means xywh is normalized
-    '''
-    assert xywh.dim() == 2 and xywh.shape[-1] == 4
-    if torch.rand(1) > 0.99:
-        if (xywh <= 0).any() or (xywh >= max(resolution)).any():
-            print('Warning: some xywh are out of range')
-    device = xywh.device
-    mh, mw = mask_size
-    imgh, imgw = resolution
+# def xywh2target(xywh, mask_size, resolution, center_region=0.5):
+#     '''
+#     Args:
+#         xywh: torch.tensor, rows of (cx,cy,w,h)
+#         mask_size: tuple, (h,w)
+#         resolution: the range of xywh. resolution=(1,1) means xywh is normalized
+#     '''
+#     assert xywh.dim() == 2 and xywh.shape[-1] == 4
+#     if torch.rand(1) > 0.99:
+#         if (xywh <= 0).any() or (xywh >= max(resolution)).any():
+#             print('Warning: some xywh are out of range')
+#     device = xywh.device
+#     mh, mw = mask_size
+#     imgh, imgw = resolution
 
-    x1, y1, x2, y2 = _xywh2xyxy(xywh, cr=center_region)
-    x_ = torch.linspace(0,imgw,steps=mw+1, device=device)[:-1]
-    y_ = torch.linspace(0,imgh,steps=mh+1, device=device)[:-1]
-    gy, gx = torch.meshgrid(x_, y_)
-    gx = gx.unsqueeze_(0) + imgw / (2*mw) # x meshgrid of size (1,mh,mw)
-    gy = gy.unsqueeze_(0) + imgh / (2*mh) # y meshgrid of size (1,mh,mw)
-    # build mask
-    masks = (gx > x1) & (gx < x2) & (gy > y1) & (gy < y2)
+#     x1, y1, x2, y2 = _xywh2xyxy(xywh, cr=center_region)
+#     x_ = torch.linspace(0,imgw,steps=mw+1, device=device)[:-1]
+#     y_ = torch.linspace(0,imgh,steps=mh+1, device=device)[:-1]
+#     gy, gx = torch.meshgrid(x_, y_)
+#     gx = gx.unsqueeze_(0) + imgw / (2*mw) # x meshgrid of size (1,mh,mw)
+#     gy = gy.unsqueeze_(0) + imgh / (2*mh) # y meshgrid of size (1,mh,mw)
+#     # build mask
+#     masks = (gx > x1) & (gx < x2) & (gy > y1) & (gy < y2)
 
-    # calculate regression targets at each location
-    x1, y1, x2, y2 = _xywh2xyxy(xywh, cr=1)
-    t_l, t_t, t_r, t_b = gx-x1, gy-y1, x2-gx, y2-gy
-    ltrb_target = torch.stack([t_l, t_t, t_r, t_b], dim=-1)
-    ltrb_target *= masks.unsqueeze(-1)
-    center_target = torch.min(t_l, t_r) / torch.max(t_l, t_r) * \
-                    torch.min(t_t, t_b) / torch.max(t_t, t_b)
-    center_target.mul_(masks).sqrt_()
-    return masks, ltrb_target, center_target
+#     # calculate regression targets at each location
+#     x1, y1, x2, y2 = _xywh2xyxy(xywh, cr=1)
+#     t_l, t_t, t_r, t_b = gx-x1, gy-y1, x2-gx, y2-gy
+#     ltrb_target = torch.stack([t_l, t_t, t_r, t_b], dim=-1)
+#     ltrb_target *= masks.unsqueeze(-1)
+#     center_target = torch.min(t_l, t_r) / torch.max(t_l, t_r) * \
+#                     torch.min(t_t, t_b) / torch.max(t_t, t_b)
+#     center_target.mul_(masks).sqrt_()
+#     return masks, ltrb_target, center_target
 
 
 def _xywh_to_xyxy(_xywh, cr: float):
@@ -257,22 +214,32 @@ def _xywh_to_xyxy(_xywh, cr: float):
     return (x1, y1, x2, y2)
 
 
-def _xywh2xyxy(_xywh: torch.tensor, cr: float):
-    '''
-    cr: center region
-    '''
-    raise Exception()
-    # boundaries
-    shape = _xywh.shape[:-1]
-    x1 = (_xywh[..., 0] - _xywh[..., 2] * cr / 2).view(*shape,1,1)
-    y1 = (_xywh[..., 1] - _xywh[..., 3] * cr / 2).view(*shape,1,1)
-    x2 = (_xywh[..., 0] + _xywh[..., 2] * cr / 2).view(*shape,1,1)
-    y2 = (_xywh[..., 1] + _xywh[..., 3] * cr / 2).view(*shape,1,1)
-    # create meshgrid
-    return x1, y1, x2, y2
+def _xyxy_to_xywh(_xyxy):
+    x1, y1, x2, y2 = _xyxy[...,0], _xyxy[...,1], _xyxy[...,2], _xyxy[...,3]
+    _xywh = torch.empty_like(_xyxy)
+    _xywh[..., 0] = (x1 + x2) / 2 # cx
+    _xywh[..., 1] = (y1 + y2) / 2 # cy
+    _xywh[..., 2] = x2 - x1 # w
+    _xywh[..., 3] = y2 - y1 # h
+    return _xywh
 
 
-def _ltrb_to_xywh(ltrb, nH, nW, stride):
+# def _xywh2xyxy(_xywh: torch.tensor, cr: float):
+#     '''
+#     cr: center region
+#     '''
+#     raise Exception()
+#     # boundaries
+#     shape = _xywh.shape[:-1]
+#     x1 = (_xywh[..., 0] - _xywh[..., 2] * cr / 2).view(*shape,1,1)
+#     y1 = (_xywh[..., 1] - _xywh[..., 3] * cr / 2).view(*shape,1,1)
+#     x2 = (_xywh[..., 0] + _xywh[..., 2] * cr / 2).view(*shape,1,1)
+#     y2 = (_xywh[..., 1] + _xywh[..., 3] * cr / 2).view(*shape,1,1)
+#     # create meshgrid
+#     return x1, y1, x2, y2
+
+
+def _ltrb_to(ltrb, nH, nW, stride, out_format):
     '''
     transform (top,left,bottom,right) to (cx,cy,w,h)
     '''
@@ -288,12 +255,22 @@ def _ltrb_to_xywh(ltrb, nH, nW, stride):
     y_ = y_ * stride + stride / 2
     x_ = x_ * stride + stride / 2
 
-    xywh = torch.empty_like(ltrb)
-    xywh[..., 0] = x_ + (ltrb[..., 2] - ltrb[..., 0]) / 2 # cx
-    xywh[..., 1] = y_ + (ltrb[..., 3] - ltrb[..., 1]) / 2 # cy
-    xywh[..., 2] = ltrb[...,0] + ltrb[...,2] # w
-    xywh[..., 3] = ltrb[...,1] + ltrb[...,3] # h
-    return xywh
+    if out_format == 'cxcywh':
+        xywh = torch.empty_like(ltrb)
+        xywh[..., 0] = x_ + (ltrb[..., 2] - ltrb[..., 0]) / 2 # cx
+        xywh[..., 1] = y_ + (ltrb[..., 3] - ltrb[..., 1]) / 2 # cy
+        xywh[..., 2] = ltrb[...,0] + ltrb[...,2] # w
+        xywh[..., 3] = ltrb[...,1] + ltrb[...,3] # h
+        return xywh
+    elif out_format == 'x1y1x2y2':
+        xyxy = torch.empty_like(ltrb)
+        xyxy[..., 0] = x_ - ltrb[..., 0]
+        xyxy[..., 1] = y_ - ltrb[..., 1]
+        xyxy[..., 2] = x_ + ltrb[..., 2]
+        xyxy[..., 3] = y_ + ltrb[..., 3]
+        return xyxy
+    else:
+        raise Exception('Umknown bounding box format')
 
 
 def _xywh_to_ltrb(xywh, stride):

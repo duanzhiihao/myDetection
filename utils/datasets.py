@@ -36,6 +36,12 @@ def get_trainingset(cfg: dict):
             'json_path': './utils/debug/debug_zebra.json',
             'ann_bbox_format': 'x1y1wh'
         }
+    elif dataset_name == 'debug_kitchen':
+        training_set_cfg = {
+            'img_dir': './images/debug_kitchen/',
+            'json_path': './utils/debug/debug_kitchen.json',
+            'ann_bbox_format': 'x1y1wh'
+        }
     elif dataset_name == 'debug3':
         training_set_cfg = {
             'img_dir': './images/debug3/',
@@ -92,6 +98,13 @@ def get_valset(valset_name):
     elif valset_name == 'debug_zebra':
         img_dir = './images/debug_zebra/'
         val_json_path = './utils/debug/debug_zebra.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
+        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
+    elif valset_name == 'debug_kitchen':
+        img_dir = './images/debug_kitchen/'
+        val_json_path = './utils/debug/debug_kitchen.json'
         gt_json = json.load(open(val_json_path, 'r'))
         eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
                      for imi in gt_json['images']]
@@ -436,7 +449,7 @@ class myCOCOeval(cocoeval.COCOeval):
             else:
                 mean_s = np.mean(s[s>-1])
             summ_str = iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)
-            print(summ_str)
+            # print(summ_str)
             self.summary += summ_str + '\n'
             return mean_s
         def _summarizeDets():
