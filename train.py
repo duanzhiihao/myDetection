@@ -15,9 +15,9 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_psL1')
-    parser.add_argument('--train_set', type=str, default='debug_lunch31')
-    parser.add_argument('--val_set', type=str, default='debug_lunch31')
+    parser.add_argument('--model', type=str, default='d1_yv3')
+    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--val_set', type=str, default='debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
     
     parser.add_argument('--debug_mode', action='store_true')
     # parser.add_argument('--debug_mode', type=bool, default=True)
@@ -50,10 +50,11 @@ def main():
         num_cpu = 0
         subdivision = 1
         warmup_iter = 100
+        to_square = True
     else:
+        # training setting
         AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']
-        target_size = global_cfg['test.default_input_size']
         initial_size = TRAIN_RESOLUTIONS[-1]
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
         super_batchsize = args.super_batchsize
@@ -62,9 +63,12 @@ def main():
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
-        # batch_size = args.batch_size
+        # optimizer setting
         num_cpu = 4
         warmup_iter = args.warmup
+        # testing setting
+        target_size = global_cfg['test.default_input_size']
+        to_square = global_cfg.get('test.to_square', True)
 
     job_name = f'{args.model}_{args.train_set}{target_size}_{args.lr}'
     
@@ -126,7 +130,7 @@ def main():
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.evaluation_predict(eval_info,
-                    input_size=target_size, to_square=True,
+                    input_size=target_size, to_square=to_square,
                     conf_thres=global_cfg.get('test.ap_conf_thres', 0.005))
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
@@ -221,7 +225,8 @@ def main():
                 if not imname.endswith('.jpg'): continue
                 impath = os.path.join(args.demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                                        conf_thres=0.3, input_size=target_size)
+                                        conf_thres=0.3, input_size=target_size,
+                                        to_square=to_square)
                 if args.debug_mode:
                     cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
                     log_dir = f'./logs/{args.model}_debug/'

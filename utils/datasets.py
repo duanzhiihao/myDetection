@@ -81,14 +81,18 @@ def get_valset(valset_name):
         from .cepdof_api import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
     elif valset_name == 'debug3':
-        raise NotImplementedError()
         img_dir = './images/debug3/'
         val_json_path = './utils/debug/debug3.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_zebra':
-        raise NotImplementedError()
         img_dir = './images/debug_zebra/'
         val_json_path = './utils/debug/debug_zebra.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'debug_lunch31':
         img_dir = './images/debug_lunch31/'

@@ -29,7 +29,7 @@ class OneStageBBox(torch.nn.Module):
         for level_i in range(len(cfg['model.fpn.out_channels'])):
             self.det_layers.append(det_layer(level_i=level_i, cfg=cfg))
 
-        self.check_gt_assignment = cfg.get('general.check_gt_assignment', False)
+        self.check_gt_assignment = cfg.get('train.check_gt_assignment', False)
         self.bb_format = cfg.get('general.pred_bbox_format', 'cxcywh')
         self.input_format = cfg['general.input_format']
 
@@ -68,7 +68,7 @@ class OneStageBBox(torch.nn.Module):
             return batch_pred_objects
         else:
             if self.check_gt_assignment:
-                total_gt_num = sum([t.shape[0] for t in labels])
+                total_gt_num = sum([len(t) for t in labels])
                 assigned = sum(branch._assigned_num for branch in self.det_layers)
                 assert assigned == total_gt_num
             self.loss_str = ''

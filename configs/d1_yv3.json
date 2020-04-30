@@ -20,17 +20,28 @@
     "model.bifpn.repeat_num": 4,
     "model.bifpn.fusion_method": "linear",
 
-    "model.rpn.name": "effrpn_ct",
+    "model.rpn.name": "effrpn",
+    "model.effrpn.enable_conf": true,
     "model.effrpn.repeat_num": 3,
-    "model.effrpn.num_anchor_per_level": 1,
-    "model.effrpn.enable_conf": false,
-    "model.effrpn.enable_centerscore": true,
+    "model.effrpn.num_anchor_per_level": 3,
 
-    "model.pred_layer": "FCOS",
+    "model.pred_layer": "YOLO",
 
-    "model.fcos.anchors": [0, 64, 128, 256, 512, 100000000],
+    "model.yolo.num_anchor_per_level": 3,
+    "model.yolo.anchors": [
+        [12.6, 13.2], [23.5, 38.1], [57.3, 32.3],
+        [42.9, 75.5], [106.6, 61.2], [60.4, 123.5],
+        [84.5, 191.6], [131.9, 123.9], [212.4, 85.6],
+        [125.4, 278.9], [179.6, 196.4], [347.0, 107.1],
+        [272.3, 199.2], [238.8, 321.5], [373.1, 258.9]
+    ],
+    "model.yolo.anchor_indices": [
+        [0,1,2], [3,4,5], [6,7,8], [9,10,11], [12,13,14]
+    ],
+    "model.yolo.anchor.negative_threshold": 0.6,
 
-    "train.sgd.weight_decay": 0.0001,
+    "train.check_gt_assignment": true,
+    "train.sgd.weight_decay": 0.0005,
     "train.img_sizes": [512, 640, 768],
     "train.imgsize_to_batch_size": {
         "512": 12,
@@ -46,7 +57,7 @@
     },
 
     "test.default_input_size": 640,
-    "test.to_square": false,
+    "test.to_square": true,
     "test.default_conf_thres": 0.5,
     "test.nms_thres": 0.5
 }
