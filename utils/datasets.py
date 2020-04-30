@@ -69,6 +69,17 @@ def get_valset(valset_name):
                      for imi in gt_json['images']]
         from .cepdof_api import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
+    elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
+                        'High_activity', 'All_off', 'IRfilter', 'IRill',
+                        'MW',
+                        'Meeting1', 'Meeting2', 'Lunch1', 'Lunch2'}:
+        img_dir = f'../Datasets/COSSY/frames/{valset_name}'
+        val_json_path = f'../Datasets/COSSY/annotations/{valset_name}.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
+        from .cepdof_api import evaluate_json
+        validation_func = lambda x: evaluate_json(x, val_json_path)
     elif valset_name == 'debug3':
         raise NotImplementedError()
         img_dir = './images/debug3/'
