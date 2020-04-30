@@ -16,7 +16,7 @@ from utils.structures import ImageObjects
 
 def get_trainingset(cfg: dict):
     dataset_name = cfg['train.dataset_name']
-    if dataset_name == 'COCO':
+    if dataset_name == 'COCOtrain2017':
         training_set_cfg = {
             'img_dir': '../Datasets/COCO/train2017',
             'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
@@ -56,10 +56,12 @@ def get_trainingset(cfg: dict):
 
 
 def get_valset(valset_name):
-    if valset_name == 'val2017':
-        raise NotImplementedError()
+    if valset_name == 'COCOval2017':
         img_dir = '../Datasets/COCO/val2017'
         val_json_path = '../Datasets/COCO/annotations/instances_val2017.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
         validation_func = lambda x: coco_evaluate_json(x, val_json_path)
     elif valset_name == 'personrbb_val2017':
         img_dir = '../Datasets/COCO/val2017'
@@ -121,7 +123,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
     """
     def __init__(self, dataset_cfg: dict, glocal_cfg: dict):
         self.img_dir = dataset_cfg['img_dir']
-        self.img_size = glocal_cfg['train.img_sizes'][-1]
+        self.img_size = glocal_cfg['train.initial_imgsize']
         self.input_format = glocal_cfg['general.input_format']
         self.aug_setting = glocal_cfg['train.data_augmentation']
         self.skip_crowd_ann = True

@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--val_set', type=str, default='debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
+    parser.add_argument('--initial_imgsize', type=int, default=None)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--warmup', type=int, default=1000)
@@ -43,6 +44,7 @@ def main():
     # -------------------------- settings ---------------------------
     if args.debug_mode:
         global_cfg['train.img_sizes'] = [640]
+        global_cfg['train.initial_imgsize'] = 640
         target_size = 640
         global_cfg['train.data_augmentation'] = None
         enable_multiscale = False
@@ -55,7 +57,12 @@ def main():
         # training setting
         AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']
-        initial_size = TRAIN_RESOLUTIONS[-1]
+        if args.initial_imgsize is not None:
+            initial_size = args.initial_imgsize
+            assert initial_size in TRAIN_RESOLUTIONS
+        else:
+            initial_size = TRAIN_RESOLUTIONS[-1]
+        global_cfg['train.initial_imgsize'] = initial_size
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
         super_batchsize = args.super_batchsize
         subdivision = int(np.ceil(super_batchsize / batch_size))
