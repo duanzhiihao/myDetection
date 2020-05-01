@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import cv2
-from PIL import Image
+import PIL.Image
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from random import randint
@@ -20,21 +20,29 @@ class Detector():
                        weights_path:str=None):
         assert torch.cuda.is_available()
         if model_and_cfg:
-            self.model, self.cfg = model_and_cfg
+            self.model, cfg = model_and_cfg
             # self.model.eval()
         else:
-            self.model, self.cfg = name_to_model(model_name)
+            self.model, cfg = name_to_model(model_name)
             self.model = self.model.cuda().eval()
 
-        self.input_size = self.cfg['test.default_input_size']
-        self.to_square = self.cfg['test.to_square']
-        self.conf_thres = self.cfg['test.default_conf_thres']
-        self.nms_thres = self.cfg['test.nms_thres']
+        self._init_preprocess(cfg)
+        self._init_postprocess(cfg)
         
         n_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         print('Number of parameters:', n_params)
         if weights_path:
             self.model.load_state_dict(torch.load(weights_path)['model'])
+    
+    def _init_preprocess(self, cfg):
+        preprocess_name = cfg['test.preprocessing']
+        self.divisibe = cfg['general.input_divisibility']
+        self.input_size = cfg.get('test.default_input_size', None)
+        self.preprocess = preprocess_name
+    
+    def _init_postprocess(self, cfg):
+        self.conf_thres = cfg['test.default_conf_thres']
+        self.nms_thres = cfg['test.nms_thres']
 
     def evaluation_predict(self, eval_info, **kwargs):
         '''
@@ -100,22 +108,18 @@ class Detector():
             input_size: int, default: 640
             conf_thres: float, confidence threshold
         '''
-        assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
+        assert isinstance(pil_img, PIL.Image.Image), 'input must be a PIL.Image'
         # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
+        pre_proc = kwargs.get('preprocessing', self.preprocess)
         input_size = kwargs.get('input_size', self.input_size)
-        to_square = kwargs.get('to_square', self.to_square)
         conf_thres = kwargs.get('conf_thres', self.conf_thres)
         nms_thres = kwargs.get('nms_thres', self.nms_thres)
+        self.pad_info = None
 
-        # resize such that the shorter side = input_size
-        ori_shorter = min(pil_img.height, pil_img.width)
-        if to_square:
-            assert input_size > 0
-            pil_img, _, pad_info = imgUtils.rect_to_square(pil_img, None, input_size)
-        elif input_size:
-            pil_img = tvf.resize(pil_img, input_size)
+        # pre-process the input image
+        pil_img =  self._preprocess_pil(pil_img, input_size)
         # convert to tensor
-        t_img = tvf.to_tensor(pil_img)
+        t_img = tvf.to_tensor(pil_img) # (H,W,3), 0-1 float
         t_img = imgUtils.format_tensor_img(t_img, code=self.model.input_format)
 
         input_ = t_img.unsqueeze(0)
@@ -135,8 +139,36 @@ class Detector():
         # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
         # plt.imshow(np_img)
         # plt.show()
-        if to_square:
-            dts.bboxes_to_original_(pad_info.squeeze())
-        elif input_size:
-            dts.bboxes = dts.bboxes / input_size * ori_shorter
+        if self.pad_info is not None:
+            dts.bboxes_to_original_(self.pad_info)
         return dts
+
+    def _preprocess_pil(self, pil_img, input_size=None) -> PIL.Image.Image:
+        assert isinstance(pil_img, PIL.Image.Image), 'input must be a PIL.Image'
+        assert isinstance(self.divisibe, int)
+        ori_h, ori_w = pil_img.height, pil_img.width
+        
+        if self.preprocess == 'pad_divisible':
+            # zero-padding at the right and bottom such that
+            # both side of the image are divisible by `div`
+            pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
+            self.pad_info = None
+        elif self.preprocess == 'resize_pad_divisible':
+            assert input_size is not None
+            # resize the image such that the SHORTER side of the image
+            # equals to desired input size; then pad it to be divisible
+            pil_img = tvf.resize(pil_img, input_size)
+            pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
+            new_h, new_w = pil_img.height, pil_img.width
+            assert min(new_h, new_w) == input_size
+            self.pad_info = (ori_w, ori_h, 0, 0, new_w, new_h)
+        elif self.preprocess == 'resize_pad_square':
+            assert input_size is not None
+            # resize the image such that the LONGER side of the image
+            # equals to desired input size; then pad it to be square
+            pil_img, _, pad_info = imgUtils.rect_to_square(pil_img, None,
+                                    input_size, pad_value=0, aug=False)
+            self.pad_info = pad_info
+        else:
+            raise Exception('Unknown preprocessing name')
+        return pil_img

@@ -45,14 +45,14 @@ def main():
     if args.debug_mode:
         global_cfg['train.img_sizes'] = [640]
         global_cfg['train.initial_imgsize'] = 640
+        global_cfg['test.preprocessing'] = 'resize_pad_square'
         target_size = 640
         global_cfg['train.data_augmentation'] = None
         enable_multiscale = False
         batch_size = 1
         num_cpu = 0
         subdivision = 1
-        warmup_iter = 100
-        to_square = True
+        warmup_iter = 40
     else:
         # training setting
         AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
@@ -74,8 +74,7 @@ def main():
         num_cpu = 4
         warmup_iter = args.warmup
         # testing setting
-        target_size = global_cfg['test.default_input_size']
-        to_square = global_cfg.get('test.to_square', True)
+        target_size = global_cfg.get('test.default_input_size', None)
 
     job_name = f'{args.model}_{args.train_set}{target_size}_{args.lr}'
     
@@ -137,7 +136,7 @@ def main():
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.evaluation_predict(eval_info,
-                    input_size=target_size, to_square=to_square,
+                    input_size=target_size,
                     conf_thres=global_cfg.get('test.ap_conf_thres', 0.005))
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
@@ -232,8 +231,7 @@ def main():
                 if not imname.endswith('.jpg'): continue
                 impath = os.path.join(args.demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
-                                        conf_thres=0.3, input_size=target_size,
-                                        to_square=to_square)
+                                        conf_thres=0.3, input_size=target_size)
                 if args.debug_mode:
                     cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
                     log_dir = f'./logs/{args.model}_debug/'

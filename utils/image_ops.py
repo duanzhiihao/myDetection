@@ -17,14 +17,32 @@ def imread_pil(img_path):
     return img
 
 
-def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
+def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
     '''
-    Arguments:
-    img: PIL image
-    labels: ImageObjects
-    target_size: int, e.g. 608
-    pad_value: int
-    aug: bool
+    Zero-pad at the right and bottom of the image such that width and height
+    are divisible by `denom`
+    
+    Args:
+        img: PIL.Image.Image
+        denom: int, the desired denominator
+    '''
+    img_h, img_w = img.height, img.width
+    pad_bottom = int(np.ceil(img_h/denom) * denom) - img_h
+    pad_right = int(np.ceil(img_w/denom) * denom) - img_w
+    assert 0 <= pad_bottom < denom and 0 <= pad_right < denom
+    pil_img = tvf.pad(img, padding=(0,0,pad_right,pad_bottom), fill=0)
+    return pil_img
+
+
+def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
+                   target_size:int, pad_value:int=0, aug:bool=False):
+    '''
+    Args:
+        img: PIL.Image
+        labels: ImageObjects
+        target_size: int, e.g. 608
+        pad_value: int
+        aug: bool
     '''
     assert isinstance(img, PIL.Image.Image) and img.mode == 'RGB'
     ori_h, ori_w = img.height, img.width
@@ -63,7 +81,8 @@ def rect_to_square(img, labels, target_size, pad_value=0, aug=False):
         labels.bboxes[:,0] += left
         labels.bboxes[:,1] += top
     
-    pad_info = torch.Tensor((ori_w, ori_h) + img_tl + img_wh)
+    pad_info = (ori_w, ori_h) + img_tl + img_wh
+    assert isinstance(pad_info, tuple)
     return img, labels, pad_info
 
 
