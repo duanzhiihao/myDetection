@@ -116,6 +116,7 @@ class EfDetHead(nn.Module):
         repeat = cfg['model.effrpn.repeat_num']
         bb_param = cfg.get('general.bbox_param', 4)
         enable_conf = cfg['model.effrpn.enable_conf']
+        cls_last_type = cfg.get('model.effrpn.cls_last', 'spconv')
 
         self.class_nets = nn.ModuleList()
         self.bbox_nets = nn.ModuleList()
@@ -129,7 +130,11 @@ class EfDetHead(nn.Module):
             cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
             # Initialize the final layer bias by -np.log((1 - 0.01) / 0.01)
             # so that the initial confidence are close to 0.01
-            cls_last = SeparableConv2d(ch, cls_ch, 3, 1, padding=1)
+            if cls_last_type == 'spconv':
+                cls_last = SeparableConv2d(ch, cls_ch, 3, 1, padding=1)
+            elif cls_last_type == 'conv':
+                cls_last = nn.Conv2d(ch, cls_ch, 3, 1, padding=1)
+            else: raise NotImplementedError()
             cls_last.pointwise.weight.data.normal_(mean=0, std=0.1)
             cls_last.pointwise.bias.data.fill_(-np.log((1 - 0.01) / 0.01))
             cls_net.append(cls_last)

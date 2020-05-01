@@ -12,7 +12,7 @@
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
     "model.efficientnet.enable_dropout": true,
-    "model.efficientnet.C6C7_downsample": "spconv",
+    "model.efficientnet.C6C7_downsample": "conv",
 
     "model.fpn.name": "bifpn",
     "model.fpn.out_channels": "PLACEHOLDER",
@@ -25,6 +25,7 @@
     "model.effrpn.repeat_num": 3,
     "model.effrpn.num_anchor_per_level": 1,
     "model.effrpn.enable_conf": true,
+    "model.effrpn.cls_last": "conv",
 
     "model.pred_layer": "FCOS2",
 

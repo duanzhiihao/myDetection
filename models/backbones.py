@@ -154,22 +154,22 @@ class EfNetBackbone(nn.Module):
             self.C6C7 = False
         elif cfg['model.backbone.num_levels'] == 5:
             out_ch = cfg['model.backbone.C6C7_out_channels']
-            downsample_method = cfg.get('model.efficientnet.C6C7_downsample', 'maxpool')
-            if downsample_method == 'maxpool':
+            downsample_layer = cfg.get('model.efficientnet.C6C7_downsample', 'maxpool')
+            if downsample_layer == 'maxpool':
                 self.c5_to_c6 = nn.Sequential(
                     nn.Conv2d(efnet_chs[-1], out_ch, 1, stride=1, padding=0),
                     nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
                     nn.MaxPool2d(3, stride=2, padding=1)
                 )
                 self.c6_to_c7 = nn.MaxPool2d(3, stride=2, padding=1)
-            elif downsample_method == 'spconv':
+            elif downsample_layer == 'conv':
                 self.c5_to_c6 = nn.Sequential(
-                    SeparableConv2d(efnet_chs[-1], out_ch, 3, stride=1, padding=1),
+                    nn.Conv2d(efnet_chs[-1], out_ch, 3, stride=1, padding=1),
                     nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
                     nn.MaxPool2d(3, stride=2, padding=1)
                 )
                 self.c6_to_c7 = nn.Sequential(
-                    SeparableConv2d(out_ch, out_ch, 3, stride=1, padding=1),
+                    nn.Conv2d(out_ch, out_ch, 3, stride=1, padding=1),
                     nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
                     nn.MaxPool2d(3, stride=2, padding=1)
                 )
