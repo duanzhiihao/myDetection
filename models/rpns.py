@@ -132,11 +132,13 @@ class EfDetHead(nn.Module):
             # so that the initial confidence are close to 0.01
             if cls_last_type == 'spconv':
                 cls_last = SeparableConv2d(ch, cls_ch, 3, 1, padding=1)
+                cls_last.pointwise.weight.data.normal_(mean=0, std=0.1)
+                cls_last.pointwise.bias.data.fill_(-np.log((1 - 0.01) / 0.01))
             elif cls_last_type == 'conv':
                 cls_last = nn.Conv2d(ch, cls_ch, 3, 1, padding=1)
+                cls_last.weight.data.normal_(mean=0, std=0.1)
+                cls_last.bias.data.fill_(-np.log((1 - 0.01) / 0.01))
             else: raise NotImplementedError()
-            cls_last.pointwise.weight.data.normal_(mean=0, std=0.1)
-            cls_last.pointwise.bias.data.fill_(-np.log((1 - 0.01) / 0.01))
             cls_net.append(cls_last)
             cls_net = nn.Sequential(*cls_net)
             self.class_nets.append(cls_net)
