@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torchvision.models
 
-from external_packages.efficientnet.model import EfficientNet
+from external_packages.efficientnet.model import EfficientNet, MemoryEfficientSwish
+from .modules import SeparableConv2d
 
 
 def ConvBnLeaky(in_, out_, k, s):
@@ -153,12 +154,26 @@ class EfNetBackbone(nn.Module):
             self.C6C7 = False
         elif cfg['model.backbone.num_levels'] == 5:
             out_ch = cfg['model.backbone.C6C7_out_channels']
-            self.c5_to_c6 = nn.Sequential(
-                nn.Conv2d(efnet_chs[-1], out_ch, 1, stride=1, padding=0),
-                nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
-                nn.MaxPool2d(3, stride=2, padding=1)
-            )
-            self.c6_to_c7 = nn.MaxPool2d(3, stride=2, padding=1)
+            downsample_method = cfg.get('model.efficientnet.C6C7_downsample', 'maxpool')
+            if downsample_method == 'maxpool':
+                self.c5_to_c6 = nn.Sequential(
+                    nn.Conv2d(efnet_chs[-1], out_ch, 1, stride=1, padding=0),
+                    nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
+                    nn.MaxPool2d(3, stride=2, padding=1)
+                )
+                self.c6_to_c7 = nn.MaxPool2d(3, stride=2, padding=1)
+            elif downsample_method == 'spconv':
+                self.c5_to_c6 = nn.Sequential(
+                    SeparableConv2d(efnet_chs[-1], out_ch, 3, stride=1, padding=1),
+                    nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
+                    nn.MaxPool2d(3, stride=2, padding=1)
+                )
+                self.c6_to_c7 = nn.Sequential(
+                    SeparableConv2d(out_ch, out_ch, 3, stride=1, padding=1),
+                    nn.BatchNorm2d(out_ch, eps=0.001, momentum=0.01),
+                    nn.MaxPool2d(3, stride=2, padding=1)
+                )
+            else: raise NotImplementedError()
             self.feature_chs = efnet_chs + [out_ch, out_ch]
             self.feature_strides = (8, 16, 32, 64, 128)
             self.C6C7 = True

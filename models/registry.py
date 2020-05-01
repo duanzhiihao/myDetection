@@ -77,6 +77,9 @@ def get_det_layer(cfg: dict):
         from .retinanet import RetinaLayer
         return RetinaLayer
     elif det_layer_name == 'FCOS':
+        from .fcos import FCOSLayer
+        return FCOSLayer
+    elif det_layer_name == 'FCOS2':
         from .fcos2 import FCOSLayer
         return FCOSLayer
     else:

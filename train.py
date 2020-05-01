@@ -15,7 +15,7 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_fcs')
+    parser.add_argument('--model', type=str, default='d1_fcs2')
     parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='debug3')
 
@@ -34,8 +34,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')

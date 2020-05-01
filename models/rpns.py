@@ -147,15 +147,23 @@ class EfDetHead(nn.Module):
 
             nB, _, nH, nW = bbox_pred.shape
             nA = self.n_anch
-            bbox_pred = bbox_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
-            cls_pred = cls_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
+            if nA >= 2:
+                bbox_pred = bbox_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
+                cls_pred = cls_pred.view(nB,nA,-1,nH,nW).permute(0,1,3,4,2)
+            elif nA == 1:
+                assert bbox_pred.shape[1] == 4
+                bbox_pred = bbox_pred.permute(0, 2, 3, 1)
+                cls_pred = cls_pred.permute(0, 2, 3, 1)
+            else: raise Exception()
             if self.enable_conf:
+                assert cls_pred.shape[-1] == self.n_cls + 1
                 raw = {
                     'bbox': bbox_pred,
                     'conf': cls_pred[..., 0:1],
                     'class': cls_pred[..., 1:],
                 }
             else:
+                assert cls_pred.shape[-1] == self.n_cls
                 raw = {
                     'bbox': bbox_pred,
                     'class': cls_pred,
@@ -173,6 +181,9 @@ def spconv3x3_bn_swish(inout_ch):
 
 
 class EfDetHead_wCenter(nn.Module):
+    '''
+    EfficientDet head for FCOS
+    '''
     def __init__(self, cfg: dict):
         super().__init__()
         n_cls = cfg['general.num_class']
@@ -181,7 +192,7 @@ class EfDetHead_wCenter(nn.Module):
         feature_chs = cfg['model.fpn.out_channels']
         repeat = cfg['model.effrpn.repeat_num']
         bb_param = cfg.get('general.bbox_param', 4)
-        assert not cfg.get('model.effrpn.enable_conf', False)
+        enable_conf = cfg.get('model.effrpn.enable_conf', False)
         assert cfg['model.effrpn.enable_centerscore']
 
         self.class_nets = nn.ModuleList()
@@ -205,7 +216,10 @@ class EfDetHead_wCenter(nn.Module):
             cls_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
             # Initialize the final layer bias by -np.log((1 - 0.05) / 0.05)
             # so that the initial confidence are close to 0.05
-            cls_last = nn.Conv2d(ch, n_anch * n_cls, 3, 1, padding=1)
+            if enable_conf:
+                cls_last = nn.Conv2d(ch, n_anch * (1+n_cls), 3, 1, padding=1)
+            else:
+                cls_last = nn.Conv2d(ch, n_anch * n_cls, 3, 1, padding=1)
             cls_last.weight.data.normal_(mean=0, std=0.01)
             cls_last.bias.data.fill_(-np.log((1 - 0.05) / 0.05))
             cls_net.append(cls_last)
@@ -213,6 +227,7 @@ class EfDetHead_wCenter(nn.Module):
             self.class_nets.append(cls_net)
         # self.n_anch = n_anch
         self.n_cls = n_cls
+        self.enable_conf = enable_conf
     
     def forward(self, features: list):
         all_level_preds = []
@@ -230,10 +245,20 @@ class EfDetHead_wCenter(nn.Module):
             center_pred = center_pred.permute(0, 2, 3, 1)
             cls_pred = cls_pred.permute(0, 2, 3, 1)
 
-            raw = {
-                'bbox': bbox_pred,
-                'center': center_pred,
-                'class': cls_pred,
-            }
+            if self.enable_conf:
+                assert cls_pred.shape[-1] == self.n_cls + 1
+                raw = {
+                    'bbox': bbox_pred,
+                    'center': center_pred,
+                    'conf': cls_pred[..., 0:1],
+                    'class': cls_pred[..., 1:],
+                }
+            else:
+                assert cls_pred.shape[-1] == self.n_cls
+                raw = {
+                    'bbox': bbox_pred,
+                    'center': center_pred,
+                    'class': cls_pred,
+                }
             all_level_preds.append(raw)
         return all_level_preds
