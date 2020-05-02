@@ -34,7 +34,7 @@
     "model.atss.topk_per_level": 9,
     "model.fcos2.ignored_threshold": 0.7,
 
-    "train.sgd.weight_decay": 0.0001,
+    "train.sgd.weight_decay": 0.00004,
     "train.img_sizes": [512, 640, 768],
     "train.imgsize_to_batch_size": {
         "512": 14,
@@ -52,5 +52,6 @@
     "test.preprocessing": "resize_pad_divisible",
     "test.default_input_size": 640,
     "test.default_conf_thres": 0.5,
+    "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.5
 }
