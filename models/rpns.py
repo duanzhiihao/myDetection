@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import torch.nn as nn
 
 from .modules import SeparableConv2d, Swish
@@ -116,6 +117,7 @@ class EfDetHead(nn.Module):
         repeat = cfg['model.effrpn.repeat_num']
         bb_param = cfg.get('general.bbox_param', 4)
         enable_conf = cfg['model.effrpn.enable_conf']
+        bbox_last_type = cfg.get('model.effrpn.bbox_last', 'default')
         cls_last_type = cfg.get('model.effrpn.cls_last', 'spconv')
 
         self.class_nets = nn.ModuleList()
@@ -123,7 +125,13 @@ class EfDetHead(nn.Module):
         cls_ch = n_anch * (1 + n_cls) if enable_conf else n_anch * n_cls
         for ch in feature_chs:
             bb_net = [spconv3x3_bn_swish(ch) for _ in range(repeat)]
-            bb_net.append(SeparableConv2d(ch, n_anch*bb_param, 3, 1, padding=1))
+            if bbox_last_type == 'default':
+                bbox_last = SeparableConv2d(ch, n_anch*bb_param, 3, 1, padding=1)
+            elif bbox_last_type == 'lr_tb':
+                assert n_anch == 1 and bb_param == 4
+                bbox_last = _LR_TB_last(ch)
+            else: raise NotImplementedError()
+            bb_net.append(bbox_last)
             bb_net = nn.Sequential(*bb_net)
             self.bbox_nets.append(bb_net)
 
@@ -185,6 +193,30 @@ def spconv3x3_bn_swish(inout_ch):
         Swish()
     )
     return block
+
+
+class _LR_TB_last(nn.Module):
+    '''
+    Custom bounding box head for FCOS
+    '''
+    def __init__(self, in_ch):
+        super().__init__()
+        self._lr = nn.Sequential(
+            nn.Conv2d(in_ch, in_ch, 3, 1, padding=1, groups=in_ch, bias=False),
+            nn.Conv2d(in_ch, 2, (1,3), stride=1, padding=(0,1))
+        )
+        self._tb = nn.Sequential(
+            nn.Conv2d(in_ch, in_ch, 3, 1, padding=1, groups=in_ch, bias=False),
+            nn.Conv2d(in_ch, 2, (3,1), stride=1, padding=(1,0))
+        )
+    
+    def forward(self, x):
+        lr = self._lr(x)
+        tb = self._tb(x)
+        ltrb = torch.stack([
+            lr[:,0,:,:], tb[:,0,:,:], lr[:,1,:,:], tb[:,1,:,:]
+        ], dim=1)
+        return ltrb
 
 
 class EfDetHead_wCenter(nn.Module):
