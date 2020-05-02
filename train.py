@@ -164,6 +164,7 @@ def main():
             # labels[0].draw_on_np(np_im, imshow=True)
             imgs = imgs.cuda()
             loss = model(imgs, labels)
+            assert not torch.isnan(loss)
             loss.backward()
             # if args.adversarial:
             #     imgs = imgs + imgs.grad*0.05
