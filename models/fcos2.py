@@ -267,8 +267,8 @@ class FCOS_ATSS_Layer(torch.nn.Module):
             _x = torch.linspace(0, img_w, steps=_sdW+1)[:-1] + 0.5 * s
             _y = torch.linspace(0, img_h, steps=_sdH+1)[:-1] + 0.5 * s
             _gy, _gx = torch.meshgrid(_y, _x)
-            if s == stride:
-                assert (_gy == gy).all() and (_gx == gx).all()
+            # if s == stride:
+            #     assert (_gy == gy).all() and (_gx == gx).all()
             assert _gy.shape == _gx.shape == (_sdH, _sdW)
             anch_wh = torch.ones(_sdH*_sdW, 2) * self.anchors_all[li]
             anch_bbs = torch.cat(
