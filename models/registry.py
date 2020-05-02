@@ -82,5 +82,8 @@ def get_det_layer(cfg: dict):
     elif det_layer_name == 'FCOS2':
         from .fcos2 import FCOSLayer
         return FCOSLayer
+    elif det_layer_name == 'FCOS2_ATSS':
+        from .fcos2 import FCOS_ATSS_Layer
+        return FCOS_ATSS_Layer
     else:
         raise NotImplementedError()

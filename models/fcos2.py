@@ -112,17 +112,19 @@ class FCOSLayer(torch.nn.Module):
                 Tx1, Ty1, Tx2, Ty2 = _xywh_to_xyxy(bb, cr=1)
                 # regression target at each location
                 tgt_l, tgt_t, tgt_r, tgt_b = gx-Tx1, gy-Ty1, Tx2-gx, Ty2-gy
-                # stacking them together, we get target for xywh
+                # stacking them together, we get target for ltrb
                 tgt_ltrb = torch.stack([tgt_l, tgt_t, tgt_r, tgt_b], dim=-1)
                 assert tgt_ltrb.shape == (nH, nW, 4)
                 # full bounding box mask
                 bbox_mask = torch.prod((tgt_ltrb > 0), dim=-1).bool()
                 # Find positive samples for this bounding box
-                # 1. sample the center part of the bounding box
+                # 1. the center part of the bounding box
                 Cx1, Cy1, Cx2, Cy2 = _xywh_to_xyxy(bb, cr=self.center_region)
                 center_mask = (gx > Cx1) & (gx < Cx2) & (gy > Cy1) & (gy < Cy2)
+                # 2. max predicted ltrb within the range
                 max_tgt_ltrb, _ = torch.max(tgt_ltrb, dim=-1)
                 anch_mask = (self.anch_min < max_tgt_ltrb) & (max_tgt_ltrb < self.anch_max)
+                # 3. positive samples must satisfy both 1 and 2
                 pos_mask = center_mask & anch_mask
                 if not pos_mask.any():
                     continue
@@ -184,6 +186,221 @@ class FCOSLayer(torch.nn.Module):
                         f'bbox/gt {loss_bbox:.3f}, conf {loss_conf:.3f}, ' \
                         f'class/gt {loss_cls:.3f}'
         return None, loss
+
+
+class FCOS_ATSS_Layer(torch.nn.Module):
+    def __init__(self, level_i: int, cfg: dict):
+        super().__init__()
+        self.strides_all = cfg['model.fpn.out_strides']
+        self.stride = cfg['model.fpn.out_strides'][level_i]
+        self.n_cls = cfg['general.num_class']
+
+        self.anchors_all = cfg['model.atss.anchors']
+        self.anchor = self.anchors_all[level_i]
+        self.topk = cfg['model.atss.topk_per_level']
+        self.ltrb_setting = 'exp_sl1'
+        self.ignore_thre = cfg['model.fcos2.ignored_threshold']
+    
+    def forward(self, raw, img_size, labels=None):
+        stride = self.stride
+        img_h, img_w = img_size
+        nH, nW = int(img_h / stride), int(img_w / stride)
+        nCls = self.n_cls
+        assert isinstance(raw, dict)
+
+        t_ltrb = raw['bbox']
+        conf_logits = raw['conf']
+        cls_logits = raw['class']
+        nB = t_ltrb.shape[0] # batch size
+        assert t_ltrb.shape == (nB, nH, nW, 4)
+        assert conf_logits.shape == (nB, nH, nW, 1)
+        assert cls_logits.shape == (nB, nH, nW, nCls)
+        device = t_ltrb.device
+        
+        # activation function for left, top, right, bottom
+        if self.ltrb_setting.startswith('exp'):
+            p_ltrb = torch.exp(t_ltrb.detach()) * stride
+        elif self.ltrb_setting.startswith('relu'):
+            p_ltrb = tnf.relu(t_ltrb.detach()) * stride
+        else:
+            raise Exception('Unknown ltrb_setting')
+
+        # When testing, calculate and return the final predictions
+        if labels is None:
+            # ---------------------------- testing ----------------------------
+            # Force the prediction to be in the image
+            p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
+            p_xyxy[..., 0].clamp_(min=0, max=img_w)
+            p_xyxy[..., 1].clamp_(min=0, max=img_h)
+            p_xyxy[..., 2].clamp_(min=0, max=img_w)
+            p_xyxy[..., 3].clamp_(min=0, max=img_h)
+            p_xywh = _xyxy_to_xywh(p_xyxy)
+            # Logistic activation for 'centerness'
+            p_conf = torch.sigmoid(conf_logits)
+            # Logistic activation for categories
+            p_cls = torch.sigmoid(cls_logits)
+            cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
+            confs = torch.sqrt(p_conf * cls_score)
+            preds = {
+                'bbox': p_xywh.view(nB, nH*nW, 4),
+                'class_idx': cls_idx.view(nB, nH*nW),
+                'score': confs.view(nB, nH*nW),
+            }
+            return preds, None
+
+        p_xywh = _ltrb_to(p_ltrb, nH, nW, stride, 'cxcywh').cpu()
+        # ------------------------------ training ------------------------------
+        assert isinstance(labels, list)
+        # Build x,y meshgrid with size (1,nH,nW)
+        x_ = torch.linspace(0, img_w, steps=nW+1)[:-1] + 0.5 * stride
+        y_ = torch.linspace(0, img_h, steps=nH+1)[:-1] + 0.5 * stride
+        gy, gx = torch.meshgrid(y_, x_)
+        gy, gx = gy.contiguous(), gx.contiguous()
+        # Build x,y meshgrid for all levels
+        # Calculating this at each level is not very efficient
+        # Ideally this should be done only once
+        # But to achieve that, code structure must be changed.
+        all_anchor_bbs = []
+        for li, s in enumerate(self.strides_all):
+            assert img_w % s == 0 and img_h % s == 0
+            _sdH, _sdW = img_h // s, img_w // s
+            _x = torch.linspace(0, img_w, steps=_sdW+1)[:-1] + 0.5 * s
+            _y = torch.linspace(0, img_h, steps=_sdH+1)[:-1] + 0.5 * s
+            _gy, _gx = torch.meshgrid(_y, _x)
+            if s == stride:
+                assert (_gy == gy).all() and (_gx == gx).all()
+            assert _gy.shape == _gx.shape == (_sdH, _sdW)
+            anch_wh = torch.ones(_sdH*_sdW, 2) * self.anchors_all[li]
+            anch_bbs = torch.cat(
+                [_gx.reshape(-1,1), _gy.reshape(-1,1), anch_wh], dim=1)
+            all_anchor_bbs.append(anch_bbs)
+        # Initialize the prediction target of the batch
+        # positive: at the center region and max(tgt_ltrb) in (min, max)
+        # ignored: predicted bbox IoU with GT > 0.6
+        # Conf: positive or (not ignored)
+        # LTRB, Ctr, CLs: positive
+        PositiveMask = torch.zeros(nB, nH, nW, dtype=torch.bool)
+        IgnoredMask = torch.zeros(nB, nH, nW, dtype=torch.bool)
+        TargetConf = torch.zeros(nB, nH, nW, 1)
+        TargetLTRB = torch.zeros(nB, nH, nW, 4)
+        # TargetCtr = torch.zeros(nB, nH, nW, 1)
+        TargetCls = torch.zeros(nB, nH, nW, self.n_cls) if self.n_cls > 0 else None
+        assert self.n_cls > 0
+        # traverse all images in a batch
+        for b in range(nB):
+            im_labels = labels[b]
+            assert isinstance(im_labels, ImageObjects)
+            if len(im_labels) == 0:
+                continue
+            im_labels.sanity_check()
+
+            gt_xywh = im_labels.bboxes
+            areas = gt_xywh[:,2] * gt_xywh[:,3]
+            lg2sml_idx = torch.argsort(areas, descending=True)
+            gt_xywh = gt_xywh[lg2sml_idx, :]
+            gt_cls_idx = im_labels.cats[lg2sml_idx]
+
+            # ignore the conf of a pred BB if it matches a gt more than 0.7
+            ious = bboxes_iou(p_xywh[b].view(-1,4), gt_xywh, xyxy=False)
+            iou_with_gt, _ = torch.max(ious, dim=1)
+            IgnoredMask[b] = (iou_with_gt > self.ignore_thre).view(nH, nW)
+
+            # Since the gt labels are sorted by area (descending), \
+            # small object targets are set later so they get higher priority
+            for bb, cidx in zip(gt_xywh, gt_cls_idx):
+                # Convert cxcywh to x1y1x2y2
+                Tx1, Ty1, Tx2, Ty2 = _xywh_to_xyxy(bb, cr=1)
+                # regression target at each location
+                tgt_l, tgt_t, tgt_r, tgt_b = gx-Tx1, gy-Ty1, Tx2-gx, Ty2-gy
+                # stacking them together, we get target for ltrb
+                tgt_ltrb = torch.stack([tgt_l, tgt_t, tgt_r, tgt_b], dim=-1)
+                assert tgt_ltrb.shape == (nH, nW, 4)
+                # full bounding box mask
+                bbox_mask = torch.prod((tgt_ltrb > 0), dim=-1).bool()
+                # Find positive samples for this bounding box
+                thres = _get_atss_threshold(bb, all_anchor_bbs, self.topk)
+                anch_bbs = torch.stack([gx, gy], dim=-1)
+                anch_bbs = torch.cat(
+                    [anch_bbs, torch.ones(nH,nW,2)*self.anchor], dim=-1
+                ).view(nH*nW, 4)
+                ious = bboxes_iou(anch_bbs, bb.view(1,4), xyxy=False).squeeze()
+                pos_mask = (ious > thres).view(nH, nW)
+                pos_mask = pos_mask & bbox_mask
+                if not pos_mask.any():
+                    continue
+                # set target for ltrb
+                TargetLTRB[b, pos_mask, :] = tgt_ltrb[pos_mask, :]
+                # the target for confidence socre is 1
+                TargetConf[b, pos_mask] = 1
+                # set target for category classification
+                _Hidx, _Widx = pos_mask.nonzero(as_tuple=True)
+                TargetCls[b, _Hidx, _Widx, cidx] = 1
+                # Update the batch positive sample mask
+                PositiveMask[b] = PositiveMask[b] | pos_mask
+
+        # Transfer targets to GPU
+        PositiveMask = PositiveMask.to(device=device)
+        IgnoredMask = IgnoredMask.to(device=device)
+        TargetConf = TargetConf.to(device=device)
+        TargetLTRB = TargetLTRB.to(device=device)
+        # TargetCtr = TargetCtr.to(device=device)
+        TargetCls = TargetCls.to(device=device) if self.n_cls > 0 else None
+
+        # Compute loss
+        pLTRB, tgtLTRB = t_ltrb[PositiveMask], TargetLTRB[PositiveMask]
+        assert (tgtLTRB > 0).all() # Sanity check
+        if self.ltrb_setting.startswith('exp'):
+            tgtLTRB = torch.log(tgtLTRB / stride)
+        else: raise NotImplementedError()
+        if self.ltrb_setting.endswith('sl1'):
+            # smooth L1 loss for l,t,r,b
+            loss_bbox = lossLib.smooth_L1_loss(pLTRB, tgtLTRB, beta=0.2,
+                                               reduction='sum')
+        elif self.ltrb_setting.endswith('l2'):
+            loss_bbox = tnf.mse_loss(pLTRB, tgtLTRB, reduction='sum')
+        else: raise NotImplementedError()
+        bce_logits = tnf.binary_cross_entropy_with_logits
+        # Binary cross entropy for confidence score
+        _penalty = PositiveMask | (~IgnoredMask)
+        _pConf, _tgtConf = conf_logits[_penalty], TargetConf[_penalty]
+        loss_conf = bce_logits(_pConf, _tgtConf, reduction='sum')
+        # Binary cross entropy for category classification
+        _pCls, _tgtCls = cls_logits[PositiveMask], TargetCls[PositiveMask]
+        loss_cls = bce_logits(_pCls, _tgtCls, reduction='sum')
+        loss = loss_bbox + loss_conf + loss_cls
+        
+        # logging
+        pos_num = PositiveMask.sum().cpu().item()
+        total_sample_num = nB * nH * nW
+        ignored_num = (IgnoredMask & (~PositiveMask)).sum().cpu().item()
+        self.loss_str = f'level_{nH}x{nW}, pos {pos_num}/{total_sample_num}, ' \
+                        f'ignored {ignored_num}/{total_sample_num}: ' \
+                        f'bbox/gt {loss_bbox:.3f}, conf {loss_conf:.3f}, ' \
+                        f'class/gt {loss_cls:.3f}'
+        return None, loss
+
+
+def _get_atss_threshold(gtbb, all_anchors, k):
+    '''
+    1. Choose the nearest k anchors from each level based on the L2 distance
+    2. Put them together, calculate the IoU with ground truth
+    3. Adaptive threshold = mean + standard deviation
+    '''
+    assert isinstance(all_anchors, list) and isinstance(k, int)
+    cx, cy, w, h = gtbb
+    all_candidates = []
+    for anchors in all_anchors:
+        l2_2 = (cx - anchors[:,0]).pow(2) + (cy - anchors[:,1]).pow(2)
+        _, idxs = torch.topk(l2_2, k, largest=False, sorted=False)
+        all_candidates.append(anchors[idxs,:])
+    all_candidates = torch.cat(all_candidates, dim=0)
+    assert all_candidates.shape == (len(all_anchors)*k, 4)
+    ious = bboxes_iou(gtbb.view(1,4), all_candidates, xyxy=False).squeeze()
+    assert ious.dim() == 1
+    mean, std = ious.mean(), ious.std()
+    atss_thres = mean + std
+    # debug = ious > atss_thres
+    return atss_thres
 
 
 def _xywh_to_xyxy(_xywh, cr: float):

@@ -3,7 +3,7 @@ from math import pi
 from pycocotools import mask as maskUtils
 
 
-def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
+def bboxes_iou(bboxes_a, bboxes_b, xyxy=False):
     """Calculate the Intersection of Unions (IoUs) between bounding boxes.
     IoU is calculated as a ratio of area of the intersection
     and area of the union.
