@@ -7,8 +7,9 @@
 - [x] EfficientNet + BiFPN + YOLO
 - [x] EfficientDet
 - [x] EfficientDet + FCOS
+- [x] EfficientDet + FCOS + spatial convolution
+- [x] EfficientDet + FCOS + ATSS
+- [ ] UCB
 - [ ] RetinaNet prediction layer vs. YOLOv3 prediction layer vs. FCOS prediction layer
 - [ ] EfficientDet + FCOS + angle
-- [ ] EfficientDet + FCOS + spatial convolution
-- [ ] EfficientDet + FCOS + ATSS
 - [ ] EfficientDet + FCOS + mask
