@@ -135,10 +135,9 @@ class Detector():
             _, idx = torch.topk(dts.scores, k=1000)
             dts = dts[idx]
         dts = dts.nms(nms_thres=nms_thres)
-        # np_img = np.array(tvf.to_pil_image(input_.squeeze()))
-        # visualization.draw_cocobb_on_np(np_img, dts, print_dt=True)
-        # plt.imshow(np_img)
-        # plt.show()
+        # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
+        # np_im = np.array(pil_img)
+        # dts.draw_on_np(np_im, imshow=True)
         if self.pad_info is not None:
             dts.bboxes_to_original_(self.pad_info)
         return dts
@@ -158,8 +157,8 @@ class Detector():
             # resize the image such that the SHORTER side of the image
             # equals to desired input size; then pad it to be divisible
             pil_img = tvf.resize(pil_img, input_size)
-            pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
             new_h, new_w = pil_img.height, pil_img.width
+            pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
             assert min(new_h, new_w) == input_size
             self.pad_info = (ori_w, ori_h, 0, 0, new_w, new_h)
         elif self.preprocess == 'resize_pad_square':
