@@ -128,7 +128,7 @@ def main():
     print('Start training...')
     today = timer.today()
     start_time = timer.tic()
-    for iter_i in range(start_iter, 100000):
+    for iter_i in range(start_iter, 1000000):
         # evaluation
         if iter_i > 0 and iter_i % args.eval_interval == 0:
             if not args.debug_mode:
