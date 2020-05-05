@@ -100,7 +100,7 @@ class FCOSLayer(torch.nn.Module):
             gt_xywh = gt_xywh[lg2sml_idx, :]
             gt_cls_idx = im_labels.cats[lg2sml_idx]
 
-            # ignore the conf of a pred BB if it matches a gt more than 0.7
+            # ignore the conf of a pred BB if it matches a gt more than self.thres
             ious = bboxes_iou(p_xywh[b].view(-1,4), gt_xywh, xyxy=False)
             iou_with_gt, _ = torch.max(ious, dim=1)
             IgnoredMask[b] = (iou_with_gt > self.ignore_thre).view(nH, nW)

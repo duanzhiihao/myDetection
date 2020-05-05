@@ -75,17 +75,17 @@ class ImageObjects():
 
         if dts._bb_format == 'cxcywh':
             # converting to x1y1x2y2
-            bbs = dts.bboxes.clone()
-            bbs[:,0] = dts.bboxes[:,0] - dts.bboxes[:,2]/2
-            bbs[:,1] = dts.bboxes[:,1] - dts.bboxes[:,3]/2
-            bbs[:,2] = dts.bboxes[:,0] + dts.bboxes[:,2]/2
-            bbs[:,3] = dts.bboxes[:,1] + dts.bboxes[:,3]/2
+            _bbs = dts.bboxes.clone()
+            _bbs[:,0] = dts.bboxes[:,0] - dts.bboxes[:,2]/2
+            _bbs[:,1] = dts.bboxes[:,1] - dts.bboxes[:,3]/2
+            _bbs[:,2] = dts.bboxes[:,0] + dts.bboxes[:,2]/2
+            _bbs[:,3] = dts.bboxes[:,1] + dts.bboxes[:,3]/2
             single_cls_nms_func = torchvision.ops.nms
         elif dts._bb_format == 'x1y1x2y2':
-            bbs = dts.bboxes.clone()
+            _bbs = dts.bboxes.clone()
             single_cls_nms_func = torchvision.ops.nms
         elif dts._bb_format == 'cxcywhd':
-            bbs = dts.bboxes.clone()
+            _bbs = dts.bboxes.clone()
             def single_cls_nms_func(boxes, socres, nms_thres):
                 img_size = dts.img_size or 1024
                 return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,
@@ -94,12 +94,16 @@ class ImageObjects():
             raise NotImplementedError()
 
         scores, categories = dts.scores, dts.cats
+        # keep_idxs = single_cls_nms_func(_bbs, scores, nms_thres)
+        # out_bbs = dts.bboxes[keep_idxs, :]
+        # out_scores = scores[keep_idxs]
+        # out_cats = categories[keep_idxs]
         out_bbs, out_scores, out_cats = [], [], []
         unique_labels = categories.unique()
         for cat_idx in unique_labels:
             cls_mask = (categories==cat_idx)
 
-            keep_indices = single_cls_nms_func(bbs[cls_mask,:], scores[cls_mask],
+            keep_indices = single_cls_nms_func(_bbs[cls_mask,:], scores[cls_mask],
                                                nms_thres)
 
             out_bbs.append(dts.bboxes[cls_mask,:][keep_indices,:])
