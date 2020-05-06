@@ -7,14 +7,14 @@ import models.losses as lossLib
 from utils.bbox_ops import iou_rle
 
 
-class YOLOLayer(nn.Module):
+class RAPiDLayer(nn.Module):
     '''
     calculate the output boxes and losses
     '''
     def __init__(self, level_i: int, cfg: dict):
         super().__init__()
-        anchors_all = torch.Tensor(cfg['model.yolo.anchors'])
-        indices = cfg['model.yolo.anchor_indices'][level_i]
+        anchors_all = torch.Tensor(cfg['model.rapid.anchors'])
+        indices = cfg['model.rapid.anchor_indices'][level_i]
         indices = torch.Tensor(indices).long()
         self.indices = indices
         # anchors: tensor, e.g. shape(3,2), [[116, 90], [156, 198], [373, 326]]
@@ -84,13 +84,13 @@ class YOLOLayer(nn.Module):
                 preds = {
                     'bbox': p_xywha,
                     'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
-                    'conf': confs.view(nB, nA*nH*nW).cpu(),
+                    'score': confs.view(nB, nA*nH*nW).cpu(),
                 }
             else:
                 preds = {
                     'bbox': p_xywha,
                     'class_idx': torch.zeros(nB, nA*nH*nW, dtype=torch.int64),
-                    'conf': p_conf.view(nB, nA*nH*nW).cpu(),
+                    'score': p_conf.view(nB, nA*nH*nW).cpu(),
                 }
             return preds, None
 
@@ -209,7 +209,7 @@ class YOLOLayer(nn.Module):
 
         # logging
         ngt = valid_gt_num + 1e-16
-        self.loss_str = f'yolo_{nH}x{nW} total {int(ngt)} objects: ' \
+        self.loss_str = f'level_{nH}x{nW} total {int(ngt)} objects: ' \
                         f'xy/gt {loss_xy/ngt:.3f}, wh/gt {loss_wh/ngt:.3f}, ' \
                         f'angle/gt {loss_angle/ngt:.3f}, conf {loss_obj:.3f}, ' \
                         f'class {loss_cls:.3f}'

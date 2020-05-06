@@ -114,10 +114,9 @@ class Detector():
         input_size = kwargs.get('input_size', self.input_size)
         conf_thres = kwargs.get('conf_thres', self.conf_thres)
         nms_thres = kwargs.get('nms_thres', self.nms_thres)
-        self.pad_info = None
 
         # pre-process the input image
-        pil_img =  self._preprocess_pil(pil_img, input_size)
+        pil_img, pad_info = self._preprocess_pil(pil_img, pre_proc, input_size)
         # convert to tensor
         t_img = tvf.to_tensor(pil_img) # (H,W,3), 0-1 float
         t_img = imgUtils.format_tensor_img(t_img, code=self.model.input_format)
@@ -138,21 +137,22 @@ class Detector():
         # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
         # np_im = np.array(pil_img)
         # dts.draw_on_np(np_im, imshow=True)
-        if self.pad_info is not None:
-            dts.bboxes_to_original_(self.pad_info)
+        if pad_info is not None:
+            dts.bboxes_to_original_(pad_info)
         return dts
 
-    def _preprocess_pil(self, pil_img, input_size=None) -> PIL.Image.Image:
+    def _preprocess_pil(self, pil_img, pre_proc_name,
+                        input_size=None) -> PIL.Image.Image:
         assert isinstance(pil_img, PIL.Image.Image), 'input must be a PIL.Image'
         assert isinstance(self.divisibe, int)
         ori_h, ori_w = pil_img.height, pil_img.width
         
-        if self.preprocess == 'pad_divisible':
+        if pre_proc_name == 'pad_divisible':
             # zero-padding at the right and bottom such that
             # both side of the image are divisible by `div`
             pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
-            self.pad_info = None
-        elif self.preprocess == 'resize_pad_divisible':
+            pad_info = None
+        elif pre_proc_name == 'resize_pad_divisible':
             assert input_size is not None
             # resize the image such that the SHORTER side of the image
             # equals to desired input size; then pad it to be divisible
@@ -160,14 +160,14 @@ class Detector():
             new_h, new_w = pil_img.height, pil_img.width
             pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
             assert min(new_h, new_w) == input_size
-            self.pad_info = (ori_w, ori_h, 0, 0, new_w, new_h)
-        elif self.preprocess == 'resize_pad_square':
+            pad_info = (ori_w, ori_h, 0, 0, new_w, new_h)
+        elif pre_proc_name == 'resize_pad_square':
             assert input_size is not None
             # resize the image such that the LONGER side of the image
             # equals to desired input size; then pad it to be square
             pil_img, _, pad_info = imgUtils.rect_to_square(pil_img, None,
                                     input_size, pad_value=0, aug=False)
-            self.pad_info = pad_info
+            pad_info = pad_info
         else:
             raise Exception('Unknown preprocessing name')
-        return pil_img
+        return pil_img, pad_info

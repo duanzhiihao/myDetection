@@ -27,7 +27,7 @@ def get_backbone(cfg: dict):
 
 def get_fpn(cfg: dict):
     fpn_name = cfg['model.fpn.name']
-    if fpn_name == 'yolo3':
+    if fpn_name == 'yolov3':
         from .fpns import YOLOv3FPN
         fpn = YOLOv3FPN(cfg)
         out_feature_channels = cfg['model.backbone.out_channels']
@@ -54,7 +54,7 @@ def get_fpn(cfg: dict):
 
 def get_rpn(cfg: dict):
     rpn_name = cfg['model.rpn.name']
-    if rpn_name == 'yv3':
+    if rpn_name == 'yolov3':
         from .rpns import YOLOHead
         rpn = YOLOHead(cfg)
     elif rpn_name == 'effrpn':
@@ -71,19 +71,22 @@ def get_rpn(cfg: dict):
 def get_det_layer(cfg: dict):
     det_layer_name = cfg['model.pred_layer']
     if det_layer_name == 'YOLO':
-        from .yolov3 import YOLOLayer
+        from .detlayers.yolov3 import YOLOLayer
         return YOLOLayer
     elif det_layer_name == 'RetinaNet':
-        from .retinanet import RetinaLayer
+        from .detlayers.retinanet import RetinaLayer
         return RetinaLayer
     elif det_layer_name == 'FCOS':
-        from .fcos import FCOSLayer
+        from .detlayers.fcos import FCOSLayer
         return FCOSLayer
     elif det_layer_name == 'FCOS2':
-        from .fcos2 import FCOSLayer
+        from .detlayers.fcos2 import FCOSLayer
         return FCOSLayer
     elif det_layer_name == 'FCOS2_ATSS':
-        from .fcos2 import FCOS_ATSS_Layer
+        from .detlayers.fcos2 import FCOS_ATSS_Layer
         return FCOS_ATSS_Layer
+    elif det_layer_name == 'RAPiD':
+        from .detlayers.rapid import RAPiDLayer
+        return RAPiDLayer
     else:
         raise NotImplementedError()

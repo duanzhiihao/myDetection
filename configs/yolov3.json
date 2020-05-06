@@ -12,11 +12,11 @@
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
 
-    "model.fpn.name": "yolo3",
+    "model.fpn.name": "yolov3",
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
-    "model.rpn.name": "yv3",
+    "model.rpn.name": "yolov3",
     
     "model.pred_layer": "YOLO",
 
