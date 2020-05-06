@@ -76,7 +76,7 @@ def iou_rle(boxes1, boxes2, bb_format='cxcywhd', **kwargs):
         boxes2 = boxes2.unsqueeze(0)
     assert boxes1.shape[1] == boxes2.shape[1] == 5
     
-    size = kwargs.get('img_size', 2048)
+    size = kwargs.get('img_hw', 2048)
     imh, imw = (size, size) if isinstance(size, int) else size
     if kwargs.get('normalized', False):
         # the [x,y,w,h] are between 0~1

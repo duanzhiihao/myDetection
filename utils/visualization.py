@@ -70,6 +70,7 @@ def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
 
 def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
     print_dt = kwargs.get('print_dt', False)
+    color = kwargs.get('color', None)
     # Extract bboxes, scores, and category indices
     obj_num = img_objs.bboxes.shape[0]
     if obj_num == 0: return
@@ -97,19 +98,44 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
             cx, cy, w, h, a = bb
         else: raise NotImplementedError()
         cat_name = cat_idx2name(c_idx)
-        cat_color = cat_idx2color(c_idx)
+        if color is None:
+            cat_color = cat_idx2color(c_idx)
+        else:
+            cat_color = color
         if print_dt:
             print(f'category:{cat_name}, score: {conf},',
                   f'[{cx:.1f} {cy:.1f} {w:.1f} {h:.1f} {a:.1f}].')
         _draw_xywha(im, cx, cy, w, h, a, color=cat_color, linewidth=line_width)
-        x1, y1 = cx - w/2, cy - h/2
-        text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
-        cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
-                    (255,255,255), font_bold, cv2.LINE_AA)
+        if kwargs.get('put_text', True):
+            x1, y1 = cx - w/2, cy - h/2
+            text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
+            cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
+                        (255,255,255), font_bold, cv2.LINE_AA)
     if kwargs.get('imshow', False):
         plt.figure(figsize=(10,10))
         plt.imshow(im)
         plt.show()
+
+
+def random_colors(num, order='rgb', dtype='uint8') -> np.ndarray:
+    '''
+    Generate random distinct colors
+    '''
+    assert isinstance(num, int) and num >= 1
+    hues = np.linspace(0, 360, num+1, dtype=np.float32)
+    np.random.shuffle(hues)
+    hsvs = np.ones((1,num,3), dtype=np.float32)
+    hsvs[0,:,0] = 2 if num==1 else hues[:-1]
+    if order == 'rgb':
+        colors = cv2.cvtColor(hsvs, cv2.COLOR_HSV2RGB)
+    elif order == 'bgr':
+        colors = cv2.cvtColor(hsvs, cv2.COLOR_HSV2BGR)
+    if dtype == 'uint8':
+        colors = (colors * 255).astype(np.uint8)
+    else:
+        assert dtype == 'float' or dtype == 'float32'
+    colors = colors.reshape(num,3)
+    return colors
 
 
 def tensor_to_npimg(tensor_img):

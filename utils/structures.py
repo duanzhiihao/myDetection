@@ -1,10 +1,12 @@
-import functools
+import numpy as np
 import torch
 import torchvision
 
 from .bbox_ops import nms_rotbb
+from . import tracking as trackUtils
 from .visualization import draw_bboxes_on_np
 from .constants import COCO_CATEGORY_LIST
+
 
 class ImageObjects():
     '''
@@ -19,10 +21,10 @@ class ImageObjects():
                 'x1y1x2y2': (x1,y1,x2,y2)
                 'cxcywhd': (cx,cy,w,h,degree)
                 'cxcywhr': (cx,cy,w,h,radian)
-        img_size: int or (height, width)
+        img_hw: int or (height, width)
     '''
     def __init__(self, bboxes, cats, scores=None,
-                       bb_format='cxcywh', img_size=None):
+                       bb_format='cxcywh', img_hw=None):
         # format check
         assert bboxes.dim() == 2 and bboxes.shape[0] == cats.shape[0]
         assert cats.dtype == torch.int64, 'Incorrect data type of categories'
@@ -39,13 +41,18 @@ class ImageObjects():
         self.cats = cats
         self.scores = scores
         self._bb_format = bb_format
-        self.img_size = img_size
+        self.img_hw = img_hw
     
     def __getitem__(self, idx):
+        if isinstance(idx, int):
+            b = self.bboxes[idx:idx+1,:]
+            c = self.cats[idx:idx+1]
+            s = self.scores[idx:idx+1] if self.scores is not None else None
+            return ImageObjects(b, c, s, self._bb_format, self.img_hw)
         b = self.bboxes[idx,:]
         c = self.cats[idx]
         s = self.scores[idx] if self.scores is not None else None
-        return ImageObjects(b, c, s, self._bb_format)
+        return ImageObjects(b, c, s, self._bb_format, self.img_hw)
     
     def __len__(self):
         obj_num = self.bboxes.shape[0]
@@ -55,6 +62,16 @@ class ImageObjects():
         self.bboxes = self.bboxes.cpu()
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
+
+    def sort_by_score_(self, descending=True):
+        '''
+        Sort the bounding boxes by scores in-place
+        '''
+        assert self.scores is not None
+        idxs = torch.argsort(self.scores, descending=descending)
+        self.bboxes = self.bboxes[idxs, :]
+        self.cats = self.cats[idxs]
+        self.scores = self.scores[idxs]
 
     def nms(self, nms_thres=0.45):
         return ImageObjects.non_max_suppression(self, nms_thres)
@@ -87,9 +104,9 @@ class ImageObjects():
         elif dts._bb_format == 'cxcywhd':
             _bbs = dts.bboxes.clone()
             def single_cls_nms_func(boxes, socres, nms_thres):
-                img_size = dts.img_size or 1024
+                img_hw = dts.img_hw or 1024
                 return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,
-                                 img_size=img_size, majority=None)
+                                 img_size=img_hw, majority=None)
         else:
             raise NotImplementedError()
 
@@ -113,7 +130,8 @@ class ImageObjects():
         out_bbs = torch.cat(out_bbs, dim=0)
         out_scores = torch.cat(out_scores, dim=0)
         out_cats = torch.cat(out_cats, dim=0)
-        return ImageObjects(out_bbs, out_cats, out_scores, dts._bb_format)
+        return ImageObjects(out_bbs, out_cats, out_scores, dts._bb_format,
+                            img_hw=dts.img_hw)
     
     # def _bbox_cvt_format(self, target_format: str):
     #     '''
@@ -161,14 +179,14 @@ class ImageObjects():
         self.bboxes[:,1] = (self.bboxes[:,1] - tl_y) / imh * ori_h
         self.bboxes[:,2] = self.bboxes[:,2] / imw * ori_w
         self.bboxes[:,3] = self.bboxes[:,3] / imh * ori_h
+        self.img_hw = (ori_h, ori_w)
     
     def sanity_check(self):
         # Check dimension and length
-        assert self.bboxes.dim() == 2
-        bbox_num = self.bboxes.shape[0]
-        assert self.cats.shape[0] == bbox_num
+        assert self.bboxes.dim() == 2 and self.cats.dim() == 1
+        assert self.cats.shape[0] == self.bboxes.shape[0]
         if self.scores is not None:
-            assert self.scores.shape[0] == bbox_num
+            assert self.scores.shape[0] == self.bboxes.shape[0]
         # Check bbox format
         if self._bb_format == 'cxcywh':
             assert self.bboxes.shape[1] == 4
@@ -178,6 +196,8 @@ class ImageObjects():
             raise NotImplementedError()
         # Check dtype
         assert self.cats.dtype == torch.int64, 'Incorrect data type of categories'
+        # Check image size
+        assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
     
     def draw_on_np(self, im, class_map='COCO', **kwargs):
         assert self.bboxes.dim() == 2
@@ -200,3 +220,118 @@ class ImageObjects():
                        'bbox': bbox, 'score': float(s)}
             list_json.append(dt_dict)
         return list_json
+
+
+class OnlineTracklet():
+    '''
+    Args:
+        prev_len: int, previous length that will be filled with None
+        cur_obj: ImageObjects, should have a length of 1,
+                 representing one object in the current image
+    '''
+    def __init__(self, prev_len: int, cur_obj: ImageObjects,
+                 buf_len: int=100, color=None):
+        assert isinstance(cur_obj, ImageObjects) and len(cur_obj) == 1
+
+        # list of past and current bounding boxes
+        self._bboxes = torch.zeros(prev_len+buf_len, cur_obj.bboxes.shape[1])
+        self._bboxes[prev_len, :] = cur_obj.bboxes.squeeze(0)
+        # list of past and currrent scores (if any)
+        if cur_obj.scores is None:
+            self._scores = None
+        else:
+            self._scores = torch.zeros(prev_len+buf_len)
+            self._scores[prev_len] = cur_obj.scores
+        # int that indicate the current time of the tracklet
+        self.length = prev_len + 1
+        # attributes that shoud apply to all the frames
+        self.category = cur_obj.cats[0] # torch.LongTensor
+        self._bb_format = cur_obj._bb_format
+        self.img_hw = cur_obj.img_hw
+
+        self.buf_len = buf_len
+        if color is not None:
+            self.color = color
+        else:
+            self.color = tuple([np.random.randint(256) for _ in range(3)])
+        # self.sanity_check()
+    
+    def get_bboxes(self):
+        return self._bboxes[:self.length, :]
+    
+    def get_scores(self):
+        return self._scores[:self.length, :]
+
+    def __len__(self):
+        return self.length
+    
+    def append(self, cur_obj: ImageObjects):
+        assert isinstance(cur_obj, ImageObjects) and len(cur_obj) == 1
+        assert cur_obj._bb_format == self._bb_format
+        if cur_obj.img_hw is not None:
+            if self.img_hw is not None:
+                assert cur_obj.img_hw == self.img_hw
+            else:
+                self.img_hw = cur_obj.img_hw
+        assert cur_obj.cats == self.category
+
+        # check if the buffer overflows
+        if self.length >= self._bboxes.shape[0]:
+            self._bboxes = torch.cat([
+                self._bboxes, torch.zeros(self.buf_len, self._bboxes.shape[1])
+            ], dim=0)
+            if self._scores is not None:
+                self._scores = torch.cat([self._scores, torch.zeros(self.buf_len)])
+
+        self._bboxes[self.length, :] = cur_obj.bboxes.squeeze(0)
+        if cur_obj.scores is None:
+            assert self._scores is None
+        else:
+            self._scores[self.length] = cur_obj.scores
+
+        # update self.length
+        self.length += 1
+    
+    def predict(self, xy_mode=None, wh_mode=None, angle_mode=None):
+        assert self._bb_format in {'cxcywh', 'cxcywhd'}
+        _bbs = self.get_bboxes()
+        last_appear_idx = (_bbs.prod(dim=1) != 0).nonzero()[-1]
+        _bbs = _bbs[last_appear_idx:, :]
+        if xy_mode == wh_mode == angle_mode == 'linear':
+            pred_bb = trackUtils.linear_predict(_bbs)
+        else:
+            raise NotImplementedError()
+        if self._bb_format == 'cxcywhd':
+            pred_bb[4] = pred_bb[4] % 180
+        return pred_bb
+
+    def sanity_check(self, history_len: int=None):
+        raise NotImplementedError()
+
+        # if history_len is None:
+        #     # check all data
+        #     _bb2check = self.bboxes
+        #     _score2check = self.scores
+        # else:
+        #     # check recent data only
+        #     assert isinstance(history_len, int)
+        #     history_len = int(history_len) # just to pass the pylint check
+        #     _bb2check = self.bboxes[-history_len:]
+        #     _score2check = self.scores[-history_len:]
+        # assert len(_bb2check) == len(_score2check)
+
+        # # check bounding box format
+        # if self._bb_format == 'cxcywh':
+        #     bb_param = 4
+        # elif self._bb_format == 'cxcywhd':
+        #     bb_param = 5
+        # else: raise NotImplementedError()
+        # assert all(filter(lambda b: b is None or len(b)==bb_param, _bb2check))
+
+        # if there are scores, num of score must equal to num of bounding box
+        # if any(filter(lambda x: x is not None, _score2check)):
+        #     assert all(map(lambda bs: (bs[0] is None)==(bs[1] is None), 
+        #                    zip(_bb2check,_score2check)))
+
+        # Check image size
+        # assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))

@@ -86,7 +86,9 @@ class Detector():
             show_img (default: False): bool
             See _predict_pil() for more optinal arguments
         '''
-        img = kwargs.get('pil_img', imgUtils.imread_pil(kwargs.get('img_path', None)))
+        assert 'pil_img' in kwargs or 'img_path' in kwargs
+        img = kwargs.pop('pil_img', None) or \
+              imgUtils.imread_pil(kwargs.pop('img_path'))
 
         detections = self._predict_pil(img, **kwargs)
 
