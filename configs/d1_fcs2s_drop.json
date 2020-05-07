@@ -32,7 +32,7 @@
     "model.pred_layer": "FCOS2",
 
     "model.fcos.anchors": [0, 64, 128, 256, 512, 100000000],
-    "model.fcos2.ignored_threshold": 0.7,
+    "model.fcos2.ignored_threshold": 0.8,
 
     "train.sgd.weight_decay": 0.00004,
     "train.img_sizes": [512, 640, 768],
@@ -53,5 +53,5 @@
     "test.default_input_size": 640,
     "test.default_conf_thres": 0.5,
     "test.ap_conf_thres": 0.005,
-    "test.nms_thres": 0.5
+    "test.nms_thres": 0.45
 }

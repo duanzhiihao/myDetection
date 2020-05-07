@@ -12,7 +12,7 @@
     "model.backbone.C6C7_out_channels": 88,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
-    "model.efficientnet.enable_dropout": false,
+    "model.efficientnet.enable_dropout": true,
     "model.efficientnet.C6C7_downsample": "conv",
 
     "model.fpn.name": "bifpn",
