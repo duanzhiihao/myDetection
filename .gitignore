@@ -1,5 +1,6 @@
 
 script.py
+run_*
 test_*
 debug_*
 tmp.json

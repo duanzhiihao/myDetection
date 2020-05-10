@@ -202,7 +202,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 bboxes=torch.FloatTensor(bboxes),
                 cats=torch.LongTensor(cat_idxs),
                 bb_format=self.bb_format,
-                img_size=(img['height'], img['width'])
+                img_hw=(img['height'], img['width'])
             )
             assert img_id not in self.imgId2labels
             self.imgId2labels[img_id] = labels
@@ -231,7 +231,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             bboxes=_labels.bboxes.clone(),
             cats=_labels.cats.clone(),
             bb_format=_labels._bb_format,
-            img_size=(ori_h, ori_w)
+            img_hw=(ori_h, ori_w)
         )
         # augmentation
         if self.aug_setting is not None:

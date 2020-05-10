@@ -228,6 +228,8 @@ class OnlineTracklet():
         prev_len: int, previous length that will be filled with None
         cur_obj: ImageObjects, should have a length of 1,
                  representing one object in the current image
+        buf_len: int, buffer length. Each tracklet will reserve some buffer \
+                 in order not to frequently call the torch.cat method.
     '''
     def __init__(self, prev_len: int, cur_obj: ImageObjects,
                  buf_len: int=100, color=None):
@@ -242,7 +244,7 @@ class OnlineTracklet():
         else:
             self._scores = torch.zeros(prev_len+buf_len)
             self._scores[prev_len] = cur_obj.scores
-        # int that indicate the current time of the tracklet
+        # self.length indicates the current valid length of the tracklet
         self.length = prev_len + 1
         # attributes that shoud apply to all the frames
         self.category = cur_obj.cats[0] # torch.LongTensor
@@ -335,3 +337,61 @@ class OnlineTracklet():
 
         # Check image size
         # assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
+
+
+from .kalman_filter import XYWHKalmanFilter
+class KFTracklet():
+    '''
+    Tracklet with Kalman Filter (KF).
+
+    The notation of the KF parameters are consistent with the wikipedia page: \
+    https://en.wikipedia.org/wiki/Kalman_filter
+
+    Args:
+        bbox: initial bounding box
+    '''
+    def __init__(self, bbox, object_id, global_step=0, img_hw=None):
+        assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
+        self.kf = XYWHKalmanFilter(nparam=4)
+        self.kf.initiate(bbox[:4])
+        self.bbox = bbox
+        self._angles = [bbox[4]]
+
+        self.object_id = object_id
+        self.step = global_step
+        self.img_hw = img_hw
+        self._pred_count = 0
+
+    def predict(self):
+        cxcywh = self.kf.predict()
+        bbox = np.r_[cxcywh, self.predict_angle()]
+        self.bbox = bbox
+
+        self.step += 1
+        self._pred_count += 1
+        return bbox.copy()
+    
+    def update(self, bbox) -> np.ndarray:
+        assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
+        assert self._pred_count > 0, 'Please call predict() before update()'
+        cxcywh = self.kf.update(bbox[:4])
+        bbox = np.r_[cxcywh, bbox[4]]
+        self.bbox = bbox
+        self._angles.append(bbox[4])
+
+        self._pred_count = 0
+        return bbox.copy()
+
+    def is_feasible(self):
+        imh, imw = self.img_hw
+        bbox = self.bbox
+        if (bbox[:4] < 0).any():
+            return False
+        if (bbox[0] > imw) or (bbox[1] > imh) or (bbox[2] > imw) or (bbox[3] > imh):
+            return False
+        return True
+    
+    def predict_angle(self):
+        if len(self._angles) == 1:
+            return self._angles[-1]
+        return 2*self._angles[-1] - self._angles[-2]

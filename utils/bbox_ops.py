@@ -63,7 +63,6 @@ def iou_rle(boxes1, boxes2, bb_format='cxcywhd', **kwargs):
     assert bb_format == 'cxcywhd'
 
     if not (torch.is_tensor(boxes1) and torch.is_tensor(boxes2)):
-        print('Warning: bounding boxes are np.array. converting to torch.tensor')
         # convert to tensor, (batch, (x,y,w,h,a))
         boxes1 = torch.from_numpy(boxes1).float()
         boxes2 = torch.from_numpy(boxes2).float()
@@ -78,17 +77,6 @@ def iou_rle(boxes1, boxes2, bb_format='cxcywhd', **kwargs):
     
     size = kwargs.get('img_hw', 2048)
     imh, imw = (size, size) if isinstance(size, int) else size
-    if kwargs.get('normalized', False):
-        # the [x,y,w,h] are between 0~1
-        # assert (boxes1[:,:4] <= 1).all() and (boxes2[:,:4] <= 1).all()
-        boxes1[:,0] *= imw
-        boxes1[:,1] *= imh
-        boxes1[:,2] *= imw
-        boxes1[:,3] *= imh
-        boxes2[:,0] *= imw
-        boxes2[:,1] *= imh
-        boxes2[:,2] *= imw
-        boxes2[:,3] *= imh
     if bb_format == 'cxcywhd':
         # convert to radian
         boxes1[:,4] = boxes1[:,4] * pi / 180
@@ -96,12 +84,13 @@ def iou_rle(boxes1, boxes2, bb_format='cxcywhd', **kwargs):
 
     b1 = xywha2vertex(boxes1, is_degree=False, stack=False).tolist()
     b2 = xywha2vertex(boxes2, is_degree=False, stack=False).tolist()
-    debug = 1
     
     b1 = maskUtils.frPyObjects(b1, imh, imw)
     b2 = maskUtils.frPyObjects(b2, imh, imw)
     ious = maskUtils.iou(b1, b2, [0 for _ in b2])
 
+    if kwargs.get('return_numpy', False):
+        return ious
     return torch.from_numpy(ious).to(device=device)
 
 
