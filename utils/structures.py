@@ -339,6 +339,12 @@ class OnlineTracklet():
         # assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
 
 
+# Q_cov=[0.05, 0.05, 0.05, 0.05, 0.01, 0.01, 0.01, 0.01],
+# R_cov=[0.01, 0.01, 0.05, 0.05]
+
+# Edge_cases:
+# Q = [0.04929452, 0.03181672, 0.05152841, 0.09702075, 13.61979758]
+# R = [0.07263693, 0.06385201, 0.12444371, 0.16264272, 24.38639988]
 from .kalman_filter import KalmanFilter
 class KFTracklet():
     '''
@@ -354,8 +360,9 @@ class KFTracklet():
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
         self.kf = KalmanFilter(nparam=4,
             initial_P_cov=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-            Q_cov=[0.05, 0.05, 0.05, 0.05, 0.01, 0.01, 0.01, 0.01],
-            R_cov=[0.01, 0.01, 0.05, 0.05])
+            Q_cov=[0.049, 0.032, 0.052, 0.097, 0.01, 0.01, 0.01, 0.01],
+            R_cov=[0.073, 0.064, 0.124, 0.163],
+            auto_noise=[True, True, True, True])
         self.kf.initiate(bbox[:4])
         self.bbox = bbox
         self._angles = [bbox[4]]
