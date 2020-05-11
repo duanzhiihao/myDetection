@@ -358,14 +358,16 @@ class KFTracklet():
     '''
     def __init__(self, bbox, object_id, global_step=0, img_hw=None):
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
-        self.kf = KalmanFilter(nparam=4,
-            initial_P_cov=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-            Q_cov=[0.049, 0.032, 0.052, 0.097, 0.01, 0.01, 0.01, 0.01],
-            R_cov=[0.073, 0.064, 0.124, 0.163],
-            auto_noise=[True, True, True, True])
-        self.kf.initiate(bbox[:4])
+        self.kf = KalmanFilter(nparam=5,
+            initial_P_cov=[0.1, 0.1, 0.1, 0.1, 10, 0.1, 0.1, 0.1, 0.1, 10],
+            Q_cov=[0.049, 0.032, 0.052, 0.097, 13.62, 0.01, 0.01, 0.01, 0.01, 1],
+            R_cov=[0.073, 0.064, 0.124, 0.163, 24.39],
+            auto_noise=[True, True, True, True, False])
+        # self.kf.initiate(bbox[:4])
+        bbox[4] = bbox[4] % 180
+        self.kf.initiate(bbox)
         self.bbox = bbox
-        self._angles = [bbox[4]]
+        # self._angles = [bbox[4]]
 
         self.object_id = object_id
         self.step = global_step
@@ -373,8 +375,10 @@ class KFTracklet():
         self._pred_count = 0
 
     def predict(self):
-        cxcywh = self.kf.predict()
-        bbox = np.r_[cxcywh, self.predict_angle()]
+        # cxcywh = self.kf.predict()
+        # bbox = np.r_[cxcywh, self.predict_angle()]
+        bbox = self.kf.predict()
+        self.kf.x[4] = self.kf.x[4] % 180
         self.bbox = bbox
 
         self.step += 1
@@ -384,10 +388,17 @@ class KFTracklet():
     def update(self, bbox) -> np.ndarray:
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
         assert self._pred_count > 0, 'Please call predict() before update()'
-        cxcywh = self.kf.update(bbox[:4])
-        bbox = np.r_[cxcywh, bbox[4]]
+        # cxcywh = self.kf.update(bbox[:4])
+        # bbox = np.r_[cxcywh, bbox[4]]
+        bbox = bbox.copy()
+        z = bbox[4] % 180 # measurement
+        angle_state = self.kf.x[4]
+        assert 0 <= angle_state < 180
+        bbox[4] = min(z, z-180, z+180, key=lambda x:abs(x-angle_state))
+        bbox = self.kf.update(bbox)
+        self.kf.x[4] = self.kf.x[4] % 180
         self.bbox = bbox
-        self._angles.append(bbox[4])
+        # self._angles.append(bbox[4])
 
         self._pred_count = 0
         return bbox.copy()
@@ -401,7 +412,7 @@ class KFTracklet():
             return False
         return True
     
-    def predict_angle(self):
-        if len(self._angles) == 1:
-            return self._angles[-1]
-        return 2*self._angles[-1] - self._angles[-2]
+    # def predict_angle(self):
+    #     if len(self._angles) == 1:
+    #         return self._angles[-1]
+    #     return 2*self._angles[-1] - self._angles[-2]
