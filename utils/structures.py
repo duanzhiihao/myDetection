@@ -339,7 +339,7 @@ class OnlineTracklet():
         # assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
 
 
-from .kalman_filter import XYWHKalmanFilter
+from .kalman_filter import KalmanFilter
 class KFTracklet():
     '''
     Tracklet with Kalman Filter (KF).
@@ -352,7 +352,10 @@ class KFTracklet():
     '''
     def __init__(self, bbox, object_id, global_step=0, img_hw=None):
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
-        self.kf = XYWHKalmanFilter(nparam=4)
+        self.kf = KalmanFilter(nparam=4,
+            initial_P_cov=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+            Q_cov=[0.05, 0.05, 0.05, 0.05, 0.01, 0.01, 0.01, 0.01],
+            R_cov=[0.01, 0.01, 0.05, 0.05])
         self.kf.initiate(bbox[:4])
         self.bbox = bbox
         self._angles = [bbox[4]]
