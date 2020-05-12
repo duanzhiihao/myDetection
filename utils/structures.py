@@ -232,7 +232,7 @@ class OnlineTracklet():
                  in order not to frequently call the torch.cat method.
     '''
     def __init__(self, prev_len: int, cur_obj: ImageObjects,
-                 buf_len: int=100, color=None):
+                 buf_len: int=100, color=None, obj_id=None):
         assert isinstance(cur_obj, ImageObjects) and len(cur_obj) == 1
 
         # list of past and current bounding boxes
@@ -257,6 +257,9 @@ class OnlineTracklet():
         else:
             self.color = tuple([np.random.randint(256) for _ in range(3)])
         # self.sanity_check()
+        self._pred_count = 0
+        assert obj_id is not None
+        self.obj_id = obj_id
     
     def get_bboxes(self):
         return self._bboxes[:self.length, :]
@@ -270,6 +273,7 @@ class OnlineTracklet():
     def append(self, cur_obj: ImageObjects):
         assert isinstance(cur_obj, ImageObjects) and len(cur_obj) == 1
         assert cur_obj._bb_format == self._bb_format
+        assert self._pred_count > 0
         if cur_obj.img_hw is not None:
             if self.img_hw is not None:
                 assert cur_obj.img_hw == self.img_hw
@@ -285,19 +289,20 @@ class OnlineTracklet():
             if self._scores is not None:
                 self._scores = torch.cat([self._scores, torch.zeros(self.buf_len)])
 
-        self._bboxes[self.length, :] = cur_obj.bboxes.squeeze(0)
+        self._bboxes[self.length-1, :] = cur_obj.bboxes.squeeze(0)
         if cur_obj.scores is None:
             assert self._scores is None
         else:
-            self._scores[self.length] = cur_obj.scores
+            self._scores[self.length-1] = cur_obj.scores
 
         # update self.length
-        self.length += 1
+        # self.length += 1
+        self._pred_count = 0
     
     def predict(self, xy_mode=None, wh_mode=None, angle_mode=None):
         assert self._bb_format in {'cxcywh', 'cxcywhd'}
         _bbs = self.get_bboxes()
-        last_appear_idx = (_bbs.prod(dim=1) != 0).nonzero()[-1]
+        last_appear_idx = (_bbs.prod(dim=1) != 0).nonzero()[0]
         _bbs = _bbs[last_appear_idx:, :]
         if xy_mode == wh_mode == angle_mode == 'linear':
             pred_bb = trackUtils.linear_predict(_bbs)
@@ -305,7 +310,28 @@ class OnlineTracklet():
             raise NotImplementedError()
         if self._bb_format == 'cxcywhd':
             pred_bb[4] = pred_bb[4] % 180
+        self._pred_count += 1
+
+        # check if the buffer overflows
+        if self.length >= self._bboxes.shape[0]:
+            self._bboxes = torch.cat([
+                self._bboxes, torch.zeros(self.buf_len, self._bboxes.shape[1])
+            ], dim=0)
+            if self._scores is not None:
+                self._scores = torch.cat([self._scores, torch.zeros(self.buf_len)])
+        
+        self._bboxes[self.length, :] = pred_bb
+        self.length += 1
         return pred_bb
+
+    def is_feasible(self):
+        imh, imw = self.img_hw
+        bbox = self._bboxes[self.length-1, :]
+        if (bbox[:4] < 0).any():
+            return False
+        if (bbox[0] > imw) or (bbox[1] > imh) or (bbox[2] > imw) or (bbox[3] > imh):
+            return False
+        return True
 
     def sanity_check(self, history_len: int=None):
         raise NotImplementedError()

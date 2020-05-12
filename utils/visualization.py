@@ -87,8 +87,8 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
     # Initialize some drawing parameters
     line_width = round(im.shape[0] / 300)
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = im.shape[0] * im.shape[1] / (700*700)
-    font_bold = im.shape[0] // 400
+    font_scale = np.sqrt(im.shape[0] * im.shape[1]) / 2048
+    font_bold = im.shape[0] // 600
     # Interate over all bounding boxes
     for bb, conf, c_idx in zip(bboxes, scores, class_indices):
         if img_objs._bb_format == 'cxcywh':
@@ -109,7 +109,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         if kwargs.get('put_text', True):
             x1, y1 = cx - w/2, cy - h/2
             text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
-            cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
+            cv2.putText(im, text, (int(x1),int(y1)), font, font_scale,
                         (255,255,255), font_bold, cv2.LINE_AA)
     if kwargs.get('imshow', False):
         plt.figure(figsize=(10,10))
