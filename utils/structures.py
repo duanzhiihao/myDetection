@@ -371,7 +371,7 @@ class OnlineTracklet():
 # Edge_cases:
 # Q = [0.04929452, 0.03181672, 0.05152841, 0.09702075, 13.61979758]
 # R = [0.07263693, 0.06385201, 0.12444371, 0.16264272, 24.38639988]
-from .kalman_filter import KalmanFilter
+from .kalman_filter import RotBBoxKalmanFilter
 class KFTracklet():
     '''
     Tracklet with Kalman Filter (KF).
@@ -382,22 +382,22 @@ class KFTracklet():
     Args:
         bbox: initial bounding box
     '''
-    def __init__(self, bbox, object_id, global_step=0, img_hw=None):
+    def __init__(self, bbox, score, object_id, global_step=0, img_hw=None):
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
-        self.kf = KalmanFilter(nparam=5,
+        self.kf = RotBBoxKalmanFilter(
             initial_P_cov=[0.1, 0.1, 0.1, 0.1, 10, 0.1, 0.1, 0.1, 0.1, 10],
             Q_cov=[0.049, 0.032, 0.052, 0.097, 13.62, 0.01, 0.01, 0.01, 0.01, 1],
-            R_cov=[0.073, 0.064, 0.124, 0.163, 24.39],
-            auto_noise=[True, True, True, True, False])
+            R_cov=[0.073, 0.064, 0.124, 0.163, 24.39])
         # self.kf.initiate(bbox[:4])
         bbox[4] = bbox[4] % 180
         self.kf.initiate(bbox)
         self.bbox = bbox
-        # self._angles = [bbox[4]]
+        self.score = score
 
         self.object_id = object_id
         self.step = global_step
         self.img_hw = img_hw
+        self.momentum = 0.9
         self._pred_count = 0
 
     def predict(self):
@@ -408,10 +408,12 @@ class KFTracklet():
         self.bbox = bbox
 
         self.step += 1
+        if self._pred_count >= 1:
+            self.score = self.momentum*self.score # + (1-self.momentum) * 0
         self._pred_count += 1
         return bbox.copy()
     
-    def update(self, bbox) -> np.ndarray:
+    def update(self, bbox, score) -> np.ndarray:
         assert isinstance(bbox, np.ndarray) and bbox.shape[0] == 5
         assert self._pred_count > 0, 'Please call predict() before update()'
         # cxcywh = self.kf.update(bbox[:4])
@@ -424,7 +426,7 @@ class KFTracklet():
         bbox = self.kf.update(bbox)
         self.kf.x[4] = self.kf.x[4] % 180
         self.bbox = bbox
-        # self._angles.append(bbox[4])
+        self.score = self.momentum*self.score + (1-self.momentum)*score
 
         self._pred_count = 0
         return bbox.copy()
@@ -432,6 +434,8 @@ class KFTracklet():
     def is_feasible(self):
         imh, imw = self.img_hw
         bbox = self.bbox
+        if self.score < 0.2:
+            return False
         if (bbox[:4] < 0).any():
             return False
         if (bbox[0] > imw) or (bbox[1] > imh) or (bbox[2] > imw) or (bbox[3] > imh):
@@ -442,3 +446,14 @@ class KFTracklet():
     #     if len(self._angles) == 1:
     #         return self._angles[-1]
     #     return 2*self._angles[-1] - self._angles[-2]
+
+    def likelihood(self, xywha: np.ndarray):
+        assert xywha.ndim == 2 and xywha.shape[1] == 5
+        mean = self.kf.x[:5].reshape(1,5)
+        cov = self.kf.P[:5,:5]
+
+        numerator = (xywha-mean) @ np.linalg.inv(cov)
+        numerator = (numerator * (xywha-mean)).sum(axis=1)
+        denom = np.sqrt((2*np.pi)**5 * np.linalg.det(cov))
+        p = np.exp(-0.5 *  numerator) / denom
+        return p

@@ -64,6 +64,7 @@ class Detector():
             img_dir: str
             See _predict_pil() for optinal arguments
         '''
+        raise DeprecationWarning()
         img_names = os.listdir(img_dir)
         detection_json = []
         for imname in tqdm(img_names):
