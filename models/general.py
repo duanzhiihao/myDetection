@@ -44,6 +44,16 @@ class OneStageBBox(torch.nn.Module):
         # go through the backbone and the feature payamid network
         features = self.backbone(x)
         features = self.fpn(features)
+        # for fi, f in enumerate(features):
+        #     import cv2
+        #     import matplotlib.pyplot as plt
+        #     import numpy as np
+        #     wh = f.shape[2]
+        #     f[:,:,wh//3-3:wh//3+3,wh//3-3:wh//3+3] /= 10
+        #     sum_f = f.abs().sum(dim=1).squeeze().cpu().numpy()
+        #     plt.imshow(sum_f, cmap='gray'); plt.show()
+        #     debug = 1
+        #     break
         all_branch_preds = self.rpn(features)
         
         dts_all = []

@@ -397,7 +397,7 @@ class KFTracklet():
         self.object_id = object_id
         self.step = global_step
         self.img_hw = img_hw
-        self.momentum = 0.9
+        self.momentum = 0.8
         self._pred_count = 0
 
     def predict(self):
@@ -434,7 +434,7 @@ class KFTracklet():
     def is_feasible(self):
         imh, imw = self.img_hw
         bbox = self.bbox
-        if self.score < 0.2:
+        if self.score < 0.1:
             return False
         if (bbox[:4] < 0).any():
             return False

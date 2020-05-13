@@ -137,10 +137,10 @@ class Detector():
         if len(dts) > 1000:
             _, idx = torch.topk(dts.scores, k=1000)
             dts = dts[idx]
-        dts = dts.nms(nms_thres=nms_thres)
         # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
         # np_im = np.array(pil_img)
         # dts.draw_on_np(np_im, imshow=True)
+        dts = dts.nms(nms_thres=nms_thres)
         if pad_info is not None:
             dts.bboxes_to_original_(pad_info)
         return dts
