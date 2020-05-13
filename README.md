@@ -11,6 +11,6 @@
 - [x] EfficientDet + FCOS + ATSS
 - [ ] RetinaNet prediction layer vs. YOLOv3 prediction layer vs. FCOS prediction layer
 - [ ] Mosaic training data augmentation
-- [ ] UCB
+- [ ] Hard example mining
 - [ ] EfficientDet + FCOS + angle
 - [ ] EfficientDet + FCOS + mask
