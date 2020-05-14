@@ -39,7 +39,7 @@
         "768": 6
     },
 
-    "test.preprocessing": "pad_divisible",
+    "test.preprocessing": "resize_pad_divisible",
     "test.default_input_size": 1024,
     "test.default_conf_thres": 0.3,
     "test.ap_conf_thres": 0.005,
