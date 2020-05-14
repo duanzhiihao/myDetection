@@ -6,10 +6,55 @@ import matplotlib.pyplot as plt
 from .constants import COCO_CATEGORY_LIST
 
 
-def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5):
-    '''
-    im: image numpy array, shape(h,w,3), RGB
-    angle: degree
+def drawline(img, pt1, pt2, color, thickness=1, style='dotted', gap=15):
+    dist =((pt1[0]-pt2[0])**2+(pt1[1]-pt2[1])**2)**.5
+    pts= []
+    for i in  np.arange(0,dist,gap):
+        r=i/dist
+        x=int((pt1[0]*(1-r)+pt2[0]*r)+.5)
+        y=int((pt1[1]*(1-r)+pt2[1]*r)+.5)
+        p = (x,y)
+        pts.append(p)
+
+    if style=='dotted':
+        for p in pts:
+            cv2.circle(img,p,thickness,color,-1)
+    else:
+        raise NotImplementedError()
+        s=pts[0]
+        e=pts[0]
+        i=0
+        for p in pts:
+            s=e
+            e=p
+            if i%2==1:
+                cv2.line(img,s,e,color,thickness)
+            i+=1
+
+def drawpoly(img,pts,color,thickness=1,style='dotted',):
+    s=pts[0]
+    e=pts[0]
+    pts.append(pts.pop(0))
+    for p in pts:
+        s=e
+        e=p
+        drawline(img,s,e,color,thickness,style)
+
+
+def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5,
+                linestyle='-'):
+    '''Draw a single rotated bbox on an image in-place.
+
+    Args:
+        im: image numpy array, shape(h,w,3), preferably RGB
+        x, y, w, h: center xy, width, and height of the bounding box
+        angle: degrees that the bounding box rotated clockwisely
+        color (optional): tuple in 0~255 range
+        linewidth (optional): with of the lines
+        linestyle (optional): '-' for solid lines, and ':' for dotted lines
+    
+    Returns:
+        None
     '''
     c, s = np.cos(angle/180*np.pi), np.sin(angle/180*np.pi)
     R = np.asarray([[c, s], [-s, c]])
@@ -17,9 +62,15 @@ def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5):
     rot_pts = []
     for pt in pts:
         rot_pts.append(([x, y] + pt @ R).astype(int))
-    contours = np.array([rot_pts[0], rot_pts[1], rot_pts[2], rot_pts[3]])
-    cv2.polylines(im, [contours], isClosed=True, color=color,
-                thickness=linewidth, lineType=cv2.LINE_4)
+    if linestyle == '-':
+        contours = np.array([rot_pts[0], rot_pts[1], rot_pts[2], rot_pts[3]])
+        cv2.polylines(im, [contours], isClosed=True, color=color,
+                    thickness=linewidth, lineType=cv2.LINE_4)
+    elif linestyle == ':':
+        contours = [rot_pts[0], rot_pts[1], rot_pts[2], rot_pts[3]]
+        drawpoly(im, contours, color, thickness=linewidth)
+    else:
+        raise Exception('Unknown linestyle in function _draw_xywha()')
 
 
 def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
@@ -109,6 +160,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         if kwargs.get('put_text', True):
             x1, y1 = cx - w/2, cy - h/2
             text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
+            text = cat_name if conf is None else f'{conf:.2f}'
             cv2.putText(im, text, (int(x1),int(y1)), font, font_scale,
                         (255,255,255), font_bold, cv2.LINE_AA)
     if kwargs.get('imshow', False):
