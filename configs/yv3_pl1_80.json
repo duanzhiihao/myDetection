@@ -3,7 +3,7 @@
     
     "general.input_format": "RGB_1",
     "general.input_divisibility": 32,
-    "general.num_class": 0,
+    "general.num_class": 80,
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
 
@@ -32,7 +32,7 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [512, 640, 768],
+    "train.img_sizes": [512, 544, 640, 768],
     "train.imgsize_to_batch_size": {
         "512": 14,
         "640": 9,
@@ -46,8 +46,8 @@
         "saturation": [0, 2]
     },
 
-    "test.preprocessing": "pad_divisible",
-    "test.default_input_size": 1024,
+    "test.preprocessing": "resize_pad_divisible",
+    "test.default_input_size": 608,
     "test.default_conf_thres": 0.3,
     "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.45
