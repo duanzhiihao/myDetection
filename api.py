@@ -17,14 +17,15 @@ import utils.visualization as visUtils
 
 class Detector():
     def __init__(self, model_name:str=None, model_and_cfg:tuple=None,
-                       weights_path:str=None):
-        assert torch.cuda.is_available()
+                       weights_path:str=None, cpu=False):
         if model_and_cfg:
             self.model, cfg = model_and_cfg
             # self.model.eval()
         else:
             self.model, cfg = name_to_model(model_name)
-            self.model = self.model.cuda().eval()
+            self.model.eval()
+            if not cpu:
+                self.model = self.model.cuda()
 
         self._init_preprocess(cfg)
         self._init_postprocess(cfg)
@@ -33,6 +34,8 @@ class Detector():
         print('Number of parameters:', n_params)
         if weights_path:
             self.model.load_state_dict(torch.load(weights_path)['model'])
+        
+        self.on_cpu = cpu
     
     def _init_preprocess(self, cfg):
         preprocess_name = cfg['test.preprocessing']
@@ -64,7 +67,6 @@ class Detector():
             img_dir: str
             See _predict_pil() for optinal arguments
         '''
-        raise DeprecationWarning()
         img_names = os.listdir(img_dir)
         detection_json = []
         for imname in tqdm(img_names):
@@ -127,8 +129,10 @@ class Detector():
 
         input_ = t_img.unsqueeze(0)
         assert input_.dim() == 4
+        if not self.on_cpu:
+            input_ = input_.cuda()
         with torch.no_grad():
-            dts = self.model(input_.cuda())
+            dts = self.model(input_)
         assert isinstance(dts, list)
         dts = dts[0]
         # post-processing

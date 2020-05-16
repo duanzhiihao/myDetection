@@ -137,6 +137,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.img_size = glocal_cfg['train.initial_imgsize']
         self.input_format = glocal_cfg['general.input_format']
         self.aug_setting = glocal_cfg['train.data_augmentation']
+        self.input_divisibility = glocal_cfg['general.input_divisibility']
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
@@ -237,7 +238,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # pad to square
         aug_flag = (self.aug_setting is not None)
         img, labels, pad_info = imgUtils.rect_to_square(img, labels, self.img_size,
-                                        pad_value=0, aug=aug_flag)
+                    pad_value=0, aug=aug_flag, resize_step=self.input_divisibility)
         # Remove annotations which are too small
         label_areas = labels.bboxes[:,2] * labels.bboxes[:,3]
         labels = labels[label_areas >= 50]

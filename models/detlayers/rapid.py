@@ -146,10 +146,11 @@ class RAPiDLayer(nn.Module):
             # gt_boxes[:, 1] = ty_all[b, :n] / nG # normalized 0-1
             # gt_boxes[:, 4] = ta_all[b, :n] # degree
 
-            # logits > -7 <=> sigmoid(logits) > 0.0009
-            selected_idx = conf_logits[b] > -7
+            # rot bbox IoU calculation is expensive so only calculate IoU
+            # using confident samples
+            selected_idx = conf_logits[b] > - np.log(1/(0.005) - 1) 
             selected = p_xywha[b][selected_idx]
-            if len(selected) < 2000 and len(selected) > 0:
+            if len(selected) < 1000 and len(selected) > 0:
                 # ignore the predicted bboxes who have high overlap with any GT
                 # pred_ious = iou_mask(selected.view(-1,5), gt_boxes, xywha=True,
                 #                     mask_size=32, is_degree=True)
