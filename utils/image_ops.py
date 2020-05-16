@@ -35,7 +35,8 @@ def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
 
 
 def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
-                   target_size:int, pad_value:int=0, aug:bool=False):
+                   target_size:int, pad_value:int=0, aug:bool=False,
+                   resize_step=128):
     '''
     Args:
         img: PIL.Image
@@ -50,7 +51,7 @@ def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
     # resize to target input size (usually smaller)
     resize_scale = target_size / max(ori_w,ori_h)
     if aug:
-        low_ = (target_size - 128) / target_size
+        low_ = (target_size - resize_step) / target_size
         resize_scale = resize_scale * (low_ + np.random.rand()*(1-low_))
     assert resize_scale > 0
     nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
