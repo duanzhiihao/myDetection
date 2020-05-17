@@ -103,7 +103,7 @@ class ImageObjects():
             single_cls_nms_func = torchvision.ops.nms
         elif dts._bb_format == 'cxcywhd':
             _bbs = dts.bboxes.clone()
-            def single_cls_nms_func(boxes, socres, nms_thres):
+            def single_cls_nms_func(boxes, scores, nms_thres):
                 img_hw = dts.img_hw or 1024
                 return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,
                                  img_size=img_hw, majority=None)

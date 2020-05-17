@@ -24,10 +24,10 @@ class period_L1():
         self.reduction = reduction
 
     def __call__(self, theta_pred, theta_gt):
-        # assert theta_pred.shape == theta_gt.shape
+        assert theta_pred.shape == theta_gt.shape
         dt = theta_pred - theta_gt
 
-        # periodic SE
+        # periodic absolute error
         dt = torch.abs(torch.remainder(dt-np.pi/2,np.pi) - np.pi/2)
         
         # assert (dt >= 0).all()
@@ -50,6 +50,7 @@ class period_smoothL1():
         self.beta = beta
 
     def __call__(self, theta_pred, theta_gt):
+        assert theta_pred.shape == theta_gt.shape
         dth = theta_pred - theta_gt
         dth = torch.remainder(dth-np.pi/2, np.pi) - np.pi/2
 
@@ -86,7 +87,7 @@ class period_L2():
             raise Exception('unknown reduction')
 
     def __call__(self, theta_pred, theta_gt):
-        # assert theta_pred.shape == theta_gt.shape
+        assert theta_pred.shape == theta_gt.shape
         dt = theta_pred - theta_gt
         # periodic SE
         loss = (torch.remainder(dt-np.pi/2,np.pi) - np.pi/2) ** 2
@@ -167,10 +168,11 @@ def smooth_L1_loss(pred, target, beta=1, weight=None, reduction='none'):
     '''
     Smooth L1 Loss. Original: https://github.com/facebookresearch/fvcore
     '''
-    assert beta > 1e-5, 'beta should not be smaller than 1e-5'
+    assert beta > 1e-5, 'beta should NOT be smaller than 1e-5'
     err = torch.abs(pred - target)
     loss = torch.where(err <= beta, 0.5*err.pow(2)/beta, err - 0.5*beta)
     if weight is not None:
+        assert weight.shape == loss.shape
         loss = weight * loss
 
     if reduction == 'sum':
@@ -248,13 +250,14 @@ if __name__ == "__main__":
     
     # lossfunc = FocalBCE(reduction='none')
     # lossfunc = bcel2bce(reduction='none')
-    lossfunc = smooth_L1_loss
+    # lossfunc = smooth_L1_loss
+    lossfunc = period_L1(reduction='none')
 
     x = torch.linspace(-10, 10, steps=10001, requires_grad=True)
     # out = torch.sigmoid(x)
     out = x
     
-    loss = lossfunc(out,torch.zeros_like(x))
+    loss = lossfunc(out, torch.zeros_like(x))
     loss.sum().backward()
     dx = x.grad.detach().numpy()
 

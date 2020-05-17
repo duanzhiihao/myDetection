@@ -159,8 +159,9 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         _draw_xywha(im, cx, cy, w, h, a, color=cat_color, linewidth=line_width)
         if kwargs.get('put_text', True):
             x1, y1 = cx - w/2, cy - h/2
-            text = cat_name if conf is None else f'{cat_name}, {conf:.2f}'
-            text = cat_name if conf is None else f'{conf:.2f}'
+            text = '' if conf is None else f'{conf:.2f}'
+            if kwargs.get('show_class', True):
+                text = f'{cat_name}, ' + text
             cv2.putText(im, text, (int(x1),int(y1)), font, font_scale,
                         (255,255,255), font_bold, cv2.LINE_AA)
     if kwargs.get('imshow', False):
