@@ -19,6 +19,14 @@ def get_trainingset(cfg: dict):
             'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
             'ann_bbox_format': 'x1y1wh'
         }
+    elif dataset_name == 'rotbbox_train2017':
+        training_set_cfg = {
+            'img_dir': '../Datasets/COCO/train2017',
+            'json_path': '../Datasets/COCO/annotations/rotbbox_train2017.json',
+            'ann_bbox_format': 'cxcywhd'
+        }
+        if cfg['train.data_augmentation'] is not None:
+            cfg['train.data_augmentation'].update(rotation_expand=True)
     elif dataset_name == 'personrbb_train2017':
         training_set_cfg = {
             'img_dir': '../Datasets/COCO/train2017',

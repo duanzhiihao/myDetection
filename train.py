@@ -16,7 +16,7 @@ import api
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='yv3_pl1_80')
-    parser.add_argument('--train_set', type=str, default='rotbb_debug3')
+    parser.add_argument('--train_set', type=str, default='rotbbox_train2017')
     parser.add_argument('--val_set', type=str, default='rotbb_debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
@@ -104,6 +104,7 @@ def main():
         except:
             print('Cannot load weights. Trying to set strict=False...')
             model.load_state_dict(previous_state['model'], strict=False)
+            print('Successfully loaded part of the weights.')
         start_iter = previous_state['iter']
         print(f'Start from iteration: {start_iter}')
 
