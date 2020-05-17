@@ -15,9 +15,9 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_fcs2')
-    parser.add_argument('--train_set', type=str, default='debug3')
-    parser.add_argument('--val_set', type=str, default='debug3')
+    parser.add_argument('--model', type=str, default='yv3_pl1_80')
+    parser.add_argument('--train_set', type=str, default='debug_lunch31')
+    parser.add_argument('--val_set', type=str, default='debug_lunch31')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--initial_imgsize', type=int, default=None)
@@ -32,10 +32,10 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    # parser.add_argument('--debug_mode', action='store_true')
+    parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')

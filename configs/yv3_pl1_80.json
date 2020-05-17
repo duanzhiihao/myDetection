@@ -32,11 +32,12 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [512, 544, 640, 768],
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 574, 608, 640, 672, 708],
     "train.imgsize_to_batch_size": {
-        "512": 14,
-        "640": 9,
-        "768": 6
+        "352": 24,
+        "384": 22, "416": 20, "448": 18, "480": 16,
+        "512": 14, "544": 12, "574": 10, "608": 8,
+        "640": 9, "672": 8, "708": 7
     },
     "train.data_augmentation": {
         "satpepper_noise_density": 0.02,
@@ -47,7 +48,7 @@
     },
 
     "test.preprocessing": "resize_pad_divisible",
-    "test.default_input_size": 608,
+    "test.default_input_size": 640,
     "test.default_conf_thres": 0.3,
     "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.45

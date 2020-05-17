@@ -5,6 +5,7 @@ import torch.nn.functional as tnf
 
 import models.losses as lossLib
 from utils.bbox_ops import iou_rle
+from utils.structures import ImageObjects
 
 
 class RAPiDLayer(nn.Module):
@@ -109,23 +110,26 @@ class RAPiDLayer(nn.Module):
         # traverse all images in a batch
         for b in range(nB):
             im_labels = labels[b]
+            assert isinstance(im_labels, ImageObjects)
+            assert im_labels._bb_format == 'cxcywhd'
+            assert im_labels.img_hw == img_size
             im_labels.sanity_check()
             nGT = len(im_labels)
+
+            # if there is no ground truth, continue
             if nGT == 0:
-                # no ground truth
                 continue
+
             gt_bboxes = im_labels.bboxes
             gt_cls_idx = im_labels.cats
-            assert gt_bboxes.shape[1] == 6 # (cls_idx, x, y, w, h, a)
+            assert gt_bboxes.shape[1] == 5 # (cx, cy, w, h, degree)
 
-            # calculate iou between truth and reference anchors
+            # iou between all GT and all level anchor boxes
             _gt_00wh0 = torch.zeros(nGT, 5)
             _gt_00wh0[:, 2:4] = gt_bboxes[:, 2:4]
             _gt_00wh0[:, 4] = 0
-            # anchor_ious = iou_mask(gt_boxes, norm_anch_00wha, xywha=True,
-            #                        mask_size=64, is_degree=True)
-            anchor_ious = iou_rle(_gt_00wh0, self.anch_00wha_all, xywha=True,
-                                is_degree=True, img_size=img_size, normalized=False)
+            anchor_ious = iou_rle(_gt_00wh0, self.anch_00wha_all,
+                                  bb_format='cxcywhd', img_size=img_size)
             best_n_all = torch.argmax(anchor_ious, dim=1)
             best_n = best_n_all % self.num_anchors
             
@@ -137,14 +141,6 @@ class RAPiDLayer(nn.Module):
                 continue
             else:
                 valid_gt_num += sum(valid_mask)
-            
-            # best_n = best_n[valid_mask]
-            # ti = ti_all[b, :n][valid_mask]
-            # tj = tj_all[b, :n][valid_mask]
-
-            # gt_boxes[:, 0] = tx_all[b, :n] / nG # normalized 0-1
-            # gt_boxes[:, 1] = ty_all[b, :n] / nG # normalized 0-1
-            # gt_boxes[:, 4] = ta_all[b, :n] # degree
 
             # rot bbox IoU calculation is expensive so only calculate IoU
             # using confident samples
@@ -152,8 +148,6 @@ class RAPiDLayer(nn.Module):
             selected = p_xywha[b][selected_idx]
             if len(selected) < 1000 and len(selected) > 0:
                 # ignore the predicted bboxes who have high overlap with any GT
-                # pred_ious = iou_mask(selected.view(-1,5), gt_boxes, xywha=True,
-                #                     mask_size=32, is_degree=True)
                 pred_ious = iou_rle(selected.view(-1,5), im_labels[:,1:6], xywha=True,
                                 is_degree=True, img_size=img_size, normalized=False)
                 iou_with_gt, _ = pred_ious.max(dim=1)

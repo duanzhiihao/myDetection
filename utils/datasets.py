@@ -6,10 +6,9 @@ from pycocotools import cocoeval
 import torch
 import torchvision.transforms.functional as tvf
 
-import utils.image_ops as imgUtils
-import utils.augmentation as augUtils
-from utils.structures import ImageObjects
-from evaluation.coco import coco_evaluate_json
+from . import image_ops as imgUtils, augmentation as augUtils
+from .structures import ImageObjects
+from .evaluation.coco import coco_evaluate_json
 
 
 def get_trainingset(cfg: dict):
@@ -225,7 +224,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         ori_w, ori_h = img.width, img.height
 
         _labels = self.imgId2labels[img_id]
-        assert _labels.img_size == (ori_h, ori_w)
+        assert _labels.img_hw == (ori_h, ori_w)
         labels = ImageObjects(
             bboxes=_labels.bboxes.clone(),
             cats=_labels.cats.clone(),
