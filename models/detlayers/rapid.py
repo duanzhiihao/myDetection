@@ -84,7 +84,7 @@ class RAPiDLayer(nn.Module):
             return preds, None
 
         assert isinstance(labels, list)
-        valid_gt_num = 0
+        self.valid_gts = []
         # Initialize prediction targets
         PositiveMask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
         IgnoredMask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
@@ -142,7 +142,7 @@ class RAPiDLayer(nn.Module):
                     # this layer is not responsible for this GT
                     continue
 
-                valid_gt_num += 1
+                self.valid_gts.append(gt_bb.clone())
                 ta = anch_idx_all % nA # target anchor index
                 ti = (gt_bb[0] / self.stride).long() # horizontal
                 tj = (gt_bb[1] / self.stride).long() # vertical
