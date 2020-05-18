@@ -35,11 +35,12 @@
     "model.fcos2.ignored_threshold": 0.75,
 
     "train.sgd.weight_decay": 0.00004,
-    "train.img_sizes": [512, 640, 768],
+    "train.img_sizes": [768, 896, 1024, 1152],
     "train.imgsize_to_batch_size": {
-        "512": 14,
-        "640": 9,
-        "768": 6
+        "768": 6,
+        "896": 5,
+        "1024": 4,
+        "1152": 3
     },
     "train.data_augmentation": {
         "satpepper_noise_density": 0.01,

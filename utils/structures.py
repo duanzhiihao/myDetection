@@ -62,12 +62,12 @@ class ImageObjects():
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
     
-    def clone(self) -> ImageObjects:
+    def clone(self):
         '''Return a clone of self'''
         new = ImageObjects(
             bboxes=self.bboxes.clone(),
             cats=self.cats.clone(),
-            scores=self.scores.clone(),
+            scores=self.scores.clone() if self.scores is not None else self.scores,
             bb_format=self._bb_format,
             img_hw=self.img_hw
         )

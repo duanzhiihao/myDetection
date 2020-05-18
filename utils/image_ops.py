@@ -35,14 +35,13 @@ def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
 
 
 def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
-                   target_size:int, pad_value:int=0, aug:bool=False,
+                   target_size:int, aug:bool=False,
                    resize_step=128):
     '''
     Args:
         img: PIL.Image
         labels: ImageObjects
         target_size: int, e.g. 608
-        pad_value: int
         aug: bool
     '''
     assert isinstance(img, PIL.Image.Image) and img.mode == 'RGB'
@@ -90,13 +89,14 @@ def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
     return img, labels, pad_info
 
 
-def format_tensor_img(t_img: torch.tensor, code: str):
+def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
     '''
     Args:
+        t_img: tensor image. must be torch.FloatTensor between 0-1
         code: str
     '''
-    assert torch.is_tensor(t_img) and t_img.dim() == 3 and t_img.shape[0] == 3
-    assert 0 < t_img.mean() < 1
+    assert isinstance(t_img, torch.FloatTensor) and 0 <= t_img.mean() <= 1
+    assert t_img.dim() == 3 and t_img.shape[0] == 3
     if code == 'RGB_1':
         pass
     elif code == 'RGB_1_norm':

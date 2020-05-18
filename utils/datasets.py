@@ -3,6 +3,7 @@ import json
 import random
 from collections import defaultdict
 from pycocotools import cocoeval
+import PIL.Image
 import torch
 import torchvision.transforms.functional as tvf
 
@@ -149,8 +150,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     Args:
         img_dir: str, imgs folder, e.g. 'someDir/COCO/train2017/'
-        json_path: str, e.g. 'someDir/COCO/instances_train2017.json'
-        bb_format: str, default: 'x1y1wh'
+        json_path: str, e.g. 'someDir/COCO/annotations/instances_train2017.json'
         img_size: int, target image size input to the YOLO, default: 608
         augmentation: bool, default: True
         debug: bool, if True, only one data id is selected from the dataset
@@ -236,33 +236,27 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         """
-        One image-label pair for the given index is picked up and pre-processed.
 
         Args:
             index (int): data index
         """
-        # laod the image
-        img_id = self.img_ids[index]
-        img_name = self.imgid2info[img_id]['file_name']
-        img_path = os.path.join(self.img_dir, img_name)
-        img = imgUtils.imread_pil(img_path)
-
-        labels = self.imgId2labels[img_id]
+        if self.enable_mosaic:
+            index = random.randint(0, len(self.img_ids)-1)
+            pairs = []
+            for _ in range(4):
+                img_label_pair = self._load_pil_img(index, to_square=False)
+                pairs.append(img_label_pair)
+            img_label_pair = augUtils.mosaic(pairs, self.img_size)
+        else:
+            img_label_pair = self._load_pil_img(index, to_square=True)
+        
+        img, labels, img_id, pad_info = img_label_pair
+        # Convert PIL.image to torch.Tensor with shape (3,h,w) if it's not
+        if isinstance(img, PIL.Image.Image):
+            img = tvf.to_tensor(img)
+        else:
+            assert isinstance(img, torch.FloatTensor)
         assert isinstance(labels, ImageObjects)
-        assert labels.img_hw == (img.height, img.width)
-        labels = labels.clone()
-        # augmentation
-        if self.aug_setting is not None:
-            img, labels = self.augment_PIL(img, labels)
-        # pad to square
-        aug_flag = (self.aug_setting is not None)
-        img, labels, pad_info = imgUtils.rect_to_square(img, labels, self.img_size,
-                    pad_value=0, aug=aug_flag, resize_step=self.input_divisibility)
-        # Remove annotations which are too small
-        label_areas = labels.bboxes[:,2] * labels.bboxes[:,3]
-        labels = labels[label_areas >= 32]
-        # Convert PIL.image into torch.tensor with shape (3,h,w)
-        img = tvf.to_tensor(img)
         # Noise augmentation
         if self.aug_setting is not None:
             # blur = [augUtils.random_avg_filter, augUtils.max_filter,
@@ -275,19 +269,55 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 img = augUtils.add_saltpepper(img, max_p=p)
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
-        # Debugging
+        # Remove annotations which are too small
+        label_areas = labels.bboxes[:,2] * labels.bboxes[:,3]
+        labels = labels[label_areas >= 32]
+
+        # sanity check before return
         if (labels.bboxes[:,0:2] > self.img_size).any():
             print('Warning: some x,y in ground truth are greater than image size')
-            print('image path:', img_path)
+            print('image id:', img_id)
         # if (labels.bboxes[:,2:4] > self.img_size).any():
         #     print('Warning: some w,h in ground truth are greater than image size')
         #     print('image path:', img_path)
         if (labels.bboxes[:,0:4] < 0).any():
             print('Warning: some bbox in ground truth are smaller than 0')
-            print('image path:', img_path)
+            print('image id:', img_id)
         labels.bboxes[:,0:4].clamp_(min=0)
         assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
+
+    def _load_pil_img(self, index, to_square=True) -> tuple:
+        '''
+        One image-label pair for the given index is picked up and pre-processed.
+        
+        Return:
+            img:
+            labels:
+            img_id:
+            pad_info:
+        '''
+        # laod the image
+        img_id = self.img_ids[index]
+        img_name = self.imgid2info[img_id]['file_name']
+        img_path = os.path.join(self.img_dir, img_name)
+        img = imgUtils.imread_pil(img_path)
+        # get labels
+        labels = self.imgId2labels[img_id]
+        assert isinstance(labels, ImageObjects)
+        assert labels.img_hw == (img.height, img.width)
+        labels = labels.clone()
+        # augmentation
+        if self.aug_setting is not None:
+            img, labels = self.augment_PIL(img, labels)
+        # pad to square
+        aug_flag = (self.aug_setting is not None)
+        if to_square:
+            img, labels, pad_info = imgUtils.rect_to_square(img, labels,
+                self.img_size, aug=aug_flag, resize_step=self.input_divisibility)
+        else:
+            pad_info = None
+        return (img, labels, img_id, pad_info)
 
     def augment_PIL(self, img, labels):
         if torch.rand(1).item() > 0.5:
