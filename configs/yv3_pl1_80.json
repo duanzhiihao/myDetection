@@ -48,7 +48,7 @@
     },
 
     "test.preprocessing": "resize_pad_divisible",
-    "test.default_input_size": 640,
+    "test.default_input_size": 608,
     "test.default_conf_thres": 0.3,
     "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.45
