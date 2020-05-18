@@ -27,7 +27,7 @@
         [91.7364, 144.9949], [137.5189, 178.4791], [194.4429, 250.7985]
     ],
     "model.rapid.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
-    "model.angle.loss_angle": "period_L1",
+    "model.angle.loss_angle": "Periodic_L1",
     "model.angle.pred_range": 360,
 
     "train.sgd.weight_decay": 0.0005,

@@ -16,6 +16,12 @@ import utils.visualization as visUtils
 
 
 class Detector():
+    '''Wrapper for image object detectors
+
+    Args:
+        model_name: str, see /configs/
+        cpu (optional): run on CPU or not. default=False
+    '''
     def __init__(self, model_name:str=None, model_and_cfg:tuple=None,
                        weights_path:str=None, cpu=False):
         if model_and_cfg:
@@ -141,6 +147,8 @@ class Detector():
         if len(dts) > 1000:
             _, idx = torch.topk(dts.scores, k=1000)
             dts = dts[idx]
+        if kwargs.get('category_set', None) is not None:
+            dts.category_filter_(kwargs['category_set'])
         # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
         # np_im = np.array(pil_img)
         # dts.draw_on_np(np_im, imshow=True)

@@ -77,7 +77,7 @@ class RAPiDLayer(nn.Module):
                 }
             else:
                 preds = {
-                    'bbox': p_xywha,
+                    'bbox': p_xywha.view(nB, nA*nH*nW, 5),
                     'class_idx': torch.zeros(nB, nA*nH*nW, dtype=torch.int64),
                     'score': p_conf.view(nB, nA*nH*nW).cpu(),
                 }

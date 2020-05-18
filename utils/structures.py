@@ -34,8 +34,6 @@ class ImageObjects():
             assert bboxes.shape[1] == 5
         else:
             raise NotImplementedError()
-        # if cats is None:
-        #     cats = torch.zeros(bboxes.shape[:-1], dtype=torch.int64)
 
         self.bboxes = bboxes
         self.cats = cats
@@ -59,19 +57,31 @@ class ImageObjects():
         return obj_num
     
     def cpu_(self):
+        '''Move all attributes to CPU in-place'''
         self.bboxes = self.bboxes.cpu()
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
 
     def sort_by_score_(self, descending=True):
-        '''
-        Sort the bounding boxes by scores in-place
-        '''
+        '''Sort the bounding boxes by scores in-place'''
         assert self.scores is not None
         idxs = torch.argsort(self.scores, descending=descending)
         self.bboxes = self.bboxes[idxs, :]
         self.cats = self.cats[idxs]
         self.scores = self.scores[idxs]
+    
+    def category_filter_(self, categories) -> None:
+        '''
+        Keep the objects in the given category set and discard others in-place.
+        '''
+        keep_cats = torch.LongTensor(categories)
+        assert self.cats.dim() == 1 and keep_cats.dim() == 1
+        keep_mask = (self.cats.unsqueeze(1) == keep_cats.unsqueeze(0))
+        keep_mask = keep_mask.any(dim=1)
+        self.bboxes = self.bboxes[keep_mask]
+        self.cats = self.cats[keep_mask]
+        if self.scores is not None:
+            self.scores = self.scores[keep_mask]
 
     def nms(self, nms_thres=0.45):
         return ImageObjects.non_max_suppression(self, nms_thres)
@@ -132,7 +142,80 @@ class ImageObjects():
         out_cats = torch.cat(out_cats, dim=0)
         return ImageObjects(out_bbs, out_cats, out_scores, dts._bb_format,
                             img_hw=dts.img_hw)
+
+    def bboxes_to_original_(self, pad_info):
+        '''
+        Recover the bbox from the padded square image to in the original image.
+
+        Args:
+            pad_info: (ori w, ori h, tl x, tl y, imw, imh)
+        '''
+        assert len(pad_info) == 6
+        ori_w, ori_h, tl_x, tl_y, imw, imh = pad_info
+        self.bboxes[:,0] = (self.bboxes[:,0] - tl_x) / imw * ori_w
+        self.bboxes[:,1] = (self.bboxes[:,1] - tl_y) / imh * ori_h
+        self.bboxes[:,2] = self.bboxes[:,2] / imw * ori_w
+        self.bboxes[:,3] = self.bboxes[:,3] / imh * ori_h
+        self.img_hw = (ori_h, ori_w)
     
+    def sanity_check(self):
+        '''Integrity check. 
+        '''
+        # Check dimension and length
+        assert self.bboxes.dim() == 2 and self.cats.dim() == 1
+        assert self.cats.shape[0] == self.bboxes.shape[0]
+        if self.scores is not None:
+            assert self.scores.shape[0] == self.bboxes.shape[0]
+        # Check bbox format
+        if self._bb_format == 'cxcywh':
+            assert self.bboxes.shape[1] == 4
+        elif self._bb_format == 'cxcywhd':
+            assert self.bboxes.shape[1] == 5
+        else:
+            raise NotImplementedError()
+        # Check dtype
+        assert self.cats.dtype == torch.int64, 'Incorrect data type of categories'
+        # Check image size
+        assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
+    
+    def draw_on_np(self, im, class_map='COCO', **kwargs):
+        '''Draw the bounding box on the np image in-place
+        '''
+        assert self.bboxes.dim() == 2
+        draw_bboxes_on_np(im, self, class_map=class_map, **kwargs)
+
+    def to_json(self, img_id) -> list:
+        '''Generate COCO-like json format
+
+        Args:
+            img_id: image id to put in the json format, usually int or str
+
+        Return:
+            list_json: list of dict. Each dict contains
+                {
+                    'image_id': int or str,
+                    'category_id': int,
+                    'bbox': list[float],
+                    'score': float
+                }
+        '''
+        assert self.bboxes.dim() == 2
+        assert self.bboxes.shape[0] == self.cats.shape[0] == self.scores.shape[0]
+        list_json = []
+        for bb, c, s in zip(self.bboxes, self.cats, self.scores):
+            if self._bb_format == 'cxcywh':
+                cx,cy,w,h = [float(t) for t in bb]
+                bbox = [cx-w/2, cy-h/2, w, h]
+            elif self._bb_format == 'cxcywhd':
+                bbox = [float(t) for t in bb]
+            else:
+                raise NotImplementedError()
+            cat_id = COCO_CATEGORY_LIST[int(c)]['id']
+            dt_dict = {'image_id': img_id, 'category_id': cat_id,
+                       'bbox': bbox, 'score': float(s)}
+            list_json.append(dt_dict)
+        return list_json
+
     # def _bbox_cvt_format(self, target_format: str):
     #     '''
     #     Args:
@@ -165,61 +248,6 @@ class ImageObjects():
     #     else:
     #         raise NotImplementedError()
     #     self._bb_format = target_format
-
-    def bboxes_to_original_(self, pad_info):
-        '''
-        Recover the bbox from the padded square image to in the original image.
-
-        Args:
-            pad_info: (ori w, ori h, tl x, tl y, imw, imh)
-        '''
-        assert len(pad_info) == 6
-        ori_w, ori_h, tl_x, tl_y, imw, imh = pad_info
-        self.bboxes[:,0] = (self.bboxes[:,0] - tl_x) / imw * ori_w
-        self.bboxes[:,1] = (self.bboxes[:,1] - tl_y) / imh * ori_h
-        self.bboxes[:,2] = self.bboxes[:,2] / imw * ori_w
-        self.bboxes[:,3] = self.bboxes[:,3] / imh * ori_h
-        self.img_hw = (ori_h, ori_w)
-    
-    def sanity_check(self):
-        # Check dimension and length
-        assert self.bboxes.dim() == 2 and self.cats.dim() == 1
-        assert self.cats.shape[0] == self.bboxes.shape[0]
-        if self.scores is not None:
-            assert self.scores.shape[0] == self.bboxes.shape[0]
-        # Check bbox format
-        if self._bb_format == 'cxcywh':
-            assert self.bboxes.shape[1] == 4
-        elif self._bb_format == 'cxcywhd':
-            assert self.bboxes.shape[1] == 5
-        else:
-            raise NotImplementedError()
-        # Check dtype
-        assert self.cats.dtype == torch.int64, 'Incorrect data type of categories'
-        # Check image size
-        assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
-    
-    def draw_on_np(self, im, class_map='COCO', **kwargs):
-        assert self.bboxes.dim() == 2
-        draw_bboxes_on_np(im, self, class_map=class_map, **kwargs)
-
-    def to_json(self, img_id):
-        assert self.bboxes.dim() == 2
-        assert self.bboxes.shape[0] == self.cats.shape[0] == self.scores.shape[0]
-        list_json = []
-        for bb, c, s in zip(self.bboxes, self.cats, self.scores):
-            if self._bb_format == 'cxcywh':
-                cx,cy,w,h = [float(t) for t in bb]
-                bbox = [cx-w/2, cy-h/2, w, h]
-            elif self._bb_format == 'cxcywhd':
-                bbox = [float(t) for t in bb]
-            else:
-                raise NotImplementedError()
-            cat_id = COCO_CATEGORY_LIST[int(c)]['id']
-            dt_dict = {'image_id': img_id, 'category_id': cat_id,
-                       'bbox': bbox, 'score': float(s)}
-            list_json.append(dt_dict)
-        return list_json
 
 
 class OnlineTracklet():
