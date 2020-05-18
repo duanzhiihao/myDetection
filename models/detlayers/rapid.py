@@ -69,7 +69,7 @@ class RAPiDLayer(nn.Module):
             if self.n_cls > 0:
                 p_cls = torch.sigmoid(cls_logits)
                 cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
-                confs = p_conf * cls_score
+                confs = torch.sqrt(p_conf * cls_score)
                 preds = {
                     'bbox': p_xywha.view(nB, nA*nH*nW, 5),
                     'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
