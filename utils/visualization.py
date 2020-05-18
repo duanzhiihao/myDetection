@@ -136,7 +136,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         cat_idx2color = lambda x: COCO_CATEGORY_LIST[x]['color']
     else: raise NotImplementedError()
     # Initialize some drawing parameters
-    line_width = round(im.shape[0] / 300)
+    line_width = round(im.shape[0] / 400)
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = np.sqrt(im.shape[0] * im.shape[1]) / 2048
     font_bold = im.shape[0] // 600

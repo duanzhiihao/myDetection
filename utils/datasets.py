@@ -264,7 +264,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                     pad_value=0, aug=aug_flag, resize_step=self.input_divisibility)
         # Remove annotations which are too small
         label_areas = labels.bboxes[:,2] * labels.bboxes[:,3]
-        labels = labels[label_areas >= 50]
+        labels = labels[label_areas >= 32]
         # Convert PIL.image into torch.tensor with shape (3,h,w)
         img = tvf.to_tensor(img)
         # Noise augmentation
