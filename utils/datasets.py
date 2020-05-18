@@ -164,6 +164,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
+        self.enable_mosaic = self.aug_setting.get('mosaic', False)
 
         self.img_ids = []
         self.imgid2info = dict()
@@ -235,7 +236,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         """
-        One image / label pair for the given index is picked up and pre-processed.
+        One image-label pair for the given index is picked up and pre-processed.
 
         Args:
             index (int): data index
@@ -245,16 +246,11 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img_name = self.imgid2info[img_id]['file_name']
         img_path = os.path.join(self.img_dir, img_name)
         img = imgUtils.imread_pil(img_path)
-        ori_w, ori_h = img.width, img.height
 
-        _labels = self.imgId2labels[img_id]
-        assert _labels.img_hw == (ori_h, ori_w)
-        labels = ImageObjects(
-            bboxes=_labels.bboxes.clone(),
-            cats=_labels.cats.clone(),
-            bb_format=_labels._bb_format,
-            img_hw=(ori_h, ori_w)
-        )
+        labels = self.imgId2labels[img_id]
+        assert isinstance(labels, ImageObjects)
+        assert labels.img_hw == (img.height, img.width)
+        labels = labels.clone()
         # augmentation
         if self.aug_setting is not None:
             img, labels = self.augment_PIL(img, labels)
@@ -280,9 +276,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
-        # if (labels.bboxes[:,0:2] > self.img_size).any():
-        #     print('Warning: some x,y in ground truth are greater than image size')
-        #     print('image path:', img_path)
+        if (labels.bboxes[:,0:2] > self.img_size).any():
+            print('Warning: some x,y in ground truth are greater than image size')
+            print('image path:', img_path)
         # if (labels.bboxes[:,2:4] > self.img_size).any():
         #     print('Warning: some w,h in ground truth are greater than image size')
         #     print('image path:', img_path)
