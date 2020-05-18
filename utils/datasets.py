@@ -93,8 +93,8 @@ def get_valset(valset_name):
         validation_func = lambda x: evaluate_json(x, val_json_path)
     elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
                         'High_activity', 'All_off', 'IRfilter', 'IRill',
-                        'MW',
-                        'Meeting1', 'Meeting2', 'Lunch1', 'Lunch2'}:
+                        'MW-R',
+                        'Meeting1', 'Meeting2', 'Lab1', 'Lab2'}:
         img_dir = f'../Datasets/COSSY/frames/{valset_name}'
         val_json_path = f'../Datasets/COSSY/annotations/{valset_name}.json'
         gt_json = json.load(open(val_json_path, 'r'))
@@ -164,7 +164,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
-        self.enable_mosaic = self.aug_setting.get('mosaic', False)
 
         self.img_ids = []
         self.imgid2info = dict()
@@ -240,7 +239,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         Args:
             index (int): data index
         """
-        if self.enable_mosaic:
+        if (self.aug_setting is not None) and self.aug_setting.get('mosaic', False):
             index = random.randint(0, len(self.img_ids)-1)
             pairs = []
             for _ in range(4):

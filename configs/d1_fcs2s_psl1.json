@@ -1,0 +1,57 @@
+{
+    "base": "OneStageBBox",
+    
+    "general.input_format": "RGB_1_norm",
+    "general.input_divisibility": 128,
+    "general.num_class": 80,
+    "general.pred_bbox_format": "cxcywh",
+    "general.bbox_param": 4,
+
+    "model.backbone.name": "efficientnet-b1",
+    "model.backbone.num_levels": 5,
+    "model.backbone.C6C7_out_channels": 88,
+    "model.backbone.out_channels": "PLACEHOLDER",
+    "model.backbone.out_strides": "PLACEHOLDER",
+    "model.efficientnet.enable_dropout": true,
+    "model.efficientnet.C6C7_downsample": "conv",
+
+    "model.fpn.name": "bifpn",
+    "model.fpn.out_channels": "PLACEHOLDER",
+    "model.fpn.out_strides": "PLACEHOLDER",
+    "model.bifpn.out_ch": 88,
+    "model.bifpn.repeat_num": 4,
+    "model.bifpn.fusion_method": "linear",
+
+    "model.rpn.name": "effrpn",
+    "model.effrpn.repeat_num": 3,
+    "model.effrpn.num_anchor_per_level": 1,
+    "model.effrpn.enable_conf": true,
+    "model.effrpn.bbox_last": "lr_tb",
+    "model.effrpn.cls_last": "spconv",
+
+    "model.pred_layer": "FCOS2",
+
+    "model.fcos.anchors": [0, 64, 128, 256, 512, 100000000],
+    "model.fcos2.ignored_threshold": 0.75,
+
+    "train.sgd.weight_decay": 0.00004,
+    "train.img_sizes": [512, 640, 768],
+    "train.imgsize_to_batch_size": {
+        "512": 14,
+        "640": 9,
+        "768": 6
+    },
+    "train.data_augmentation": {
+        "satpepper_noise_density": 0.01,
+        "brightness": [0.6, 1.4],
+        "contrast": [0.6, 1.4],
+        "hue": [-0.1, 0.1],
+        "saturation": [0, 2]
+    },
+
+    "test.preprocessing": "resize_pad_divisible",
+    "test.default_input_size": 640,
+    "test.default_conf_thres": 0.5,
+    "test.ap_conf_thres": 0.005,
+    "test.nms_thres": 0.45
+}

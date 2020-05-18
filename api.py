@@ -182,7 +182,7 @@ class Detector():
             # resize the image such that the LONGER side of the image
             # equals to desired input size; then pad it to be square
             pil_img, _, pad_info = imgUtils.rect_to_square(pil_img, None,
-                                    input_size, pad_value=0, aug=False)
+                                    input_size, aug=False)
             pad_info = pad_info
         else:
             raise Exception('Unknown preprocessing name')
