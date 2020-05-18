@@ -61,6 +61,17 @@ class ImageObjects():
         self.bboxes = self.bboxes.cpu()
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
+    
+    def clone(self):
+        '''Return a clone of self'''
+        new = ImageObjects(
+            bboxes=self.bboxes.clone(),
+            cats=self.cats.clone(),
+            scores=self.scores.clone() if self.scores is not None else self.scores,
+            bb_format=self._bb_format,
+            img_hw=self.img_hw
+        )
+        return new
 
     def sort_by_score_(self, descending=True):
         '''Sort the bounding boxes by scores in-place'''

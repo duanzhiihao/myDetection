@@ -1,11 +1,82 @@
 import random
 import numpy as np
 import scipy.ndimage
+import PIL.Image
+import cv2
 import torch
 import torchvision.transforms.functional as tvf
 import torch.nn.functional as tnf
 
 from .structures import ImageObjects
+from .bbox_ops import cxcywh_to_x1y1x2y2
+
+
+def mosaic(img_label_pairs, target_size:int, hori_ratio=0.4, verti_ratio=0.4):
+    '''
+    Mosaic augmentation as described in YOLOv4: https://arxiv.org/abs/2004.10934
+    '''
+    assert len(img_label_pairs) == 4
+    pil_imgs = [p[0] for p in img_label_pairs]
+    labels = [p[1] for p in img_label_pairs]
+    imgIds = [p[2] for p in img_label_pairs]
+    
+    new_im = np.zeros((target_size,target_size,3), dtype='float32')
+
+    w1 = round(target_size*hori_ratio)
+    h1 = round(target_size*verti_ratio)
+    
+    # top-left image
+    im, labels = _crop_img_labels(pil_imgs[0], labels[0], (h1,w1))
+    new_im[0:h1, 0:w1, :] = im
+    raise NotImplementedError()
+
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8,8)); plt.imshow(new_im); plt.show()
+    debug = 1
+    new_im = torch.from_numpy(new_im).permute(2, 0, 1)
+    return (new_im, labels, imgIds, None)
+
+
+def _crop_img_labels(im, labels, target_hw):
+    '''
+    Crop image and labels for mosaic augmentation
+    '''
+    if isinstance(im, PIL.Image.Image):
+        im = np.array(im, dtype='float32') / 255
+    assert im.ndim == 3 and im.shape[2] == 3
+
+    tgt_h, tgt_w = target_hw
+    # resize the image such that it can fill the target_hw window
+    ratio = max(tgt_h/im.shape[0], tgt_w/im.shape[1])
+    rh, rw = int(im.shape[0] * ratio), int(im.shape[1] * ratio)
+    im = cv2.resize(im, (rw,rh))
+    # sanity check
+    if rh == tgt_h:
+        assert rw >= tgt_w
+    else:
+        assert (rw == tgt_w) and (rh > tgt_h)
+    # random extract window
+    hstart = random.randint(0, rh - tgt_h)
+    wstart = random.randint(0, rw - tgt_w)
+    im = im[hstart:hstart+tgt_h, wstart:wstart+tgt_w, :]
+
+    # modify labels
+    assert isinstance(labels, ImageObjects)
+    assert labels._bb_format in {'cxcywh', 'cxcywhd'}
+    # rescaling
+    bboxes = labels.bboxes
+    bboxes[:, 0:4] *= ratio
+    bboxes[:, 0] -= wstart
+    bboxes[:, 1] -= hstart
+    # convert to x1y1x2y2
+    bboxes = cxcywh_to_x1y1x2y2(bboxes)
+    bboxes.clamp_(min=0)
+    bboxes[:, 0].clamp_(max=tgt_w)
+    # need mask
+    raise NotImplementedError()
+
+    labels.img_hw = (rh, rw)
+    return im, labels
 
 
 def hflip(image, labels):

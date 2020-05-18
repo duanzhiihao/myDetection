@@ -15,12 +15,12 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yv3_pl1_80')
-    parser.add_argument('--train_set', type=str, default='rotbbox_train2017')
+    parser.add_argument('--model', type=str, default='d1_fcs2s_mos')
+    parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='rotbb_debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
-    parser.add_argument('--initial_imgsize', type=int, default=352)
+    parser.add_argument('--initial_imgsize', type=int, default=768)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--warmup', type=int, default=1000)
@@ -71,7 +71,7 @@ def main():
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
         # optimizer setting
-        num_cpu = 4
+        num_cpu = 0
         warmup_iter = args.warmup
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)

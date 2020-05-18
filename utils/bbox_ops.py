@@ -229,7 +229,7 @@ def nms_rotbb(boxes, scores, nms_thres=0.45, bb_format='cxcywhd', img_size=2048,
     return keep[votes_valid]
 
 
-def cxcywh_to_x1y1x2y2(cxcywh):
+def cxcywh_to_x1y1x2y2(cxcywh: torch.tensor) -> torch.tensor:
     assert cxcywh.shape[-1] >= 4
     x1y1x2y2 = cxcywh.clone()
     x1y1x2y2[...,0] = (cxcywh[..., 0] - cxcywh[..., 2] / 2)
