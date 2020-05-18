@@ -48,7 +48,6 @@ def rotate(image, degrees, labels, expand=False):
     img_w, img_h = image.width, image.height
     image = tvf.rotate(image, angle=-degrees, expand=expand)
     new_w, new_h = image.width, image.height
-    labels.img_size = (new_h, new_w)
     # image coordinate to cartesian coordinate
     x = labels.bboxes[:,0] - 0.5*img_w
     y = -(labels.bboxes[:,1] - 0.5*img_h)
@@ -69,6 +68,7 @@ def rotate(image, degrees, labels, expand=False):
     labels.bboxes[:,4] += degrees
     labels.bboxes[:,4] = torch.remainder(labels.bboxes[:,4], 180)
     labels.bboxes[:,4][labels.bboxes[:,4]>=90] -= 180
+    labels.img_hw = (new_h, new_w)
 
     return image, labels
 

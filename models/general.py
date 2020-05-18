@@ -80,7 +80,7 @@ class OneStageBBox(torch.nn.Module):
             if self.check_gt_assignment:
                 total_gt_num = sum([len(t) for t in labels])
                 assigned = sum(branch._assigned_num for branch in self.det_layers)
-                assert assigned == total_gt_num
+                assert assigned == total_gt_num, f'{assigned} != {total_gt_num}'
             self.loss_str = ''
             for m in self.det_layers:
                 self.loss_str += m.loss_str + '\n'

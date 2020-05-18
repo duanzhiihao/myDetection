@@ -6,10 +6,9 @@ from pycocotools import cocoeval
 import torch
 import torchvision.transforms.functional as tvf
 
-import utils.image_ops as imgUtils
-import utils.augmentation as augUtils
-from utils.structures import ImageObjects
-from evaluation.coco import coco_evaluate_json
+from . import image_ops as imgUtils, augmentation as augUtils
+from .structures import ImageObjects
+from .evaluation.coco import coco_evaluate_json
 
 
 def get_trainingset(cfg: dict):
@@ -20,6 +19,14 @@ def get_trainingset(cfg: dict):
             'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
             'ann_bbox_format': 'x1y1wh'
         }
+    elif dataset_name == 'rotbbox_train2017':
+        training_set_cfg = {
+            'img_dir': '../Datasets/COCO/train2017',
+            'json_path': '../Datasets/COCO/annotations/rotbbox_train2017.json',
+            'ann_bbox_format': 'cxcywhd'
+        }
+        if cfg['train.data_augmentation'] is not None:
+            cfg['train.data_augmentation'].update(rotation_expand=True)
     elif dataset_name == 'personrbb_train2017':
         training_set_cfg = {
             'img_dir': '../Datasets/COCO/train2017',
@@ -54,6 +61,14 @@ def get_trainingset(cfg: dict):
         }
         if cfg['train.data_augmentation'] is not None:
             cfg['train.data_augmentation'].update(rotation_expand=False)
+    elif dataset_name == 'rotbb_debug3':
+        training_set_cfg = {
+            'img_dir': './images/rotbb_debug3/',
+            'json_path': './utils/debug/rotbb_debug3.json',
+            'ann_bbox_format': 'cxcywhd'
+        }
+        if cfg['train.data_augmentation'] is not None:
+            cfg['train.data_augmentation'].update(rotation_expand=True)
     else:
         raise NotImplementedError()
     return Dataset4ObjDet(training_set_cfg, cfg)
@@ -110,6 +125,14 @@ def get_valset(valset_name):
     elif valset_name == 'debug_lunch31':
         img_dir = './images/debug_lunch31/'
         val_json_path = './utils/debug/debug_lunch31.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
+                     for imi in gt_json['images']]
+        from .evaluation.cepdof import evaluate_json
+        validation_func = lambda x: evaluate_json(x, val_json_path)
+    elif valset_name == 'rotbb_debug3':
+        img_dir = './images/rotbb_debug3/'
+        val_json_path = './utils/debug/rotbb_debug3.json'
         gt_json = json.load(open(val_json_path, 'r'))
         eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
                      for imi in gt_json['images']]
@@ -225,7 +248,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         ori_w, ori_h = img.width, img.height
 
         _labels = self.imgId2labels[img_id]
-        assert _labels.img_size == (ori_h, ori_w)
+        assert _labels.img_hw == (ori_h, ori_w)
         labels = ImageObjects(
             bboxes=_labels.bboxes.clone(),
             cats=_labels.cats.clone(),
@@ -257,12 +280,12 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # Convert into desired input format, e.g., normalized
         img = imgUtils.format_tensor_img(img, code=self.input_format)
         # Debugging
-        if (labels.bboxes[:,0:2] > self.img_size).any():
-            print('Warning: some x,y in ground truth are greater than image size')
-            print('image path:', img_path)
-        if (labels.bboxes[:,2:4] > self.img_size).any():
-            print('Warning: some w,h in ground truth are greater than image size')
-            print('image path:', img_path)
+        # if (labels.bboxes[:,0:2] > self.img_size).any():
+        #     print('Warning: some x,y in ground truth are greater than image size')
+        #     print('image path:', img_path)
+        # if (labels.bboxes[:,2:4] > self.img_size).any():
+        #     print('Warning: some w,h in ground truth are greater than image size')
+        #     print('image path:', img_path)
         if (labels.bboxes[:,0:4] < 0).any():
             print('Warning: some bbox in ground truth are smaller than 0')
             print('image path:', img_path)

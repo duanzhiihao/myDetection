@@ -27,16 +27,17 @@
         [91.7364, 144.9949], [137.5189, 178.4791], [194.4429, 250.7985]
     ],
     "model.rapid.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
-    "model.angle.loss_angle": "period_L1",
-    "model.angle.pred_range": 360,
+    "model.rapid.wh_smooth_l1_beta": 1,
+    "model.angle.loss_angle": "Periodic_L1",
 
     "train.sgd.weight_decay": 0.0005,
-    "train.check_gt_assignment": true,
-    "train.img_sizes": [512, 544, 640, 768],
+    "train.check_gt_assignment": false,
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 708],
     "train.imgsize_to_batch_size": {
-        "512": 14,
-        "640": 9,
-        "768": 6
+        "352": 30,
+        "384": 26, "416": 22, "448": 19, "480": 16,
+        "512": 14, "544": 12, "576": 11, "608": 10,
+        "640": 9, "672": 8, "708": 7
     },
     "train.data_augmentation": {
         "satpepper_noise_density": 0.02,

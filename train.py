@@ -15,12 +15,12 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_fcs2')
-    parser.add_argument('--train_set', type=str, default='debug3')
-    parser.add_argument('--val_set', type=str, default='debug3')
+    parser.add_argument('--model', type=str, default='yv3_pl1_80')
+    parser.add_argument('--train_set', type=str, default='rotbbox_train2017')
+    parser.add_argument('--val_set', type=str, default='rotbb_debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
-    parser.add_argument('--initial_imgsize', type=int, default=None)
+    parser.add_argument('--initial_imgsize', type=int, default=352)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--warmup', type=int, default=1000)
@@ -32,7 +32,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug3/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/rotbb_debug3/')
     
     parser.add_argument('--debug_mode', action='store_true')
     # parser.add_argument('--debug_mode', type=bool, default=True)
@@ -99,7 +99,12 @@ def main():
         print("Loading checkpoint...", args.checkpoint)
         weights_path = os.path.join('./weights/', args.checkpoint)
         previous_state = torch.load(weights_path)
-        model.load_state_dict(previous_state['model'])
+        try:
+            model.load_state_dict(previous_state['model'])
+        except:
+            print('Cannot load weights. Trying to set strict=False...')
+            model.load_state_dict(previous_state['model'], strict=False)
+            print('Successfully loaded part of the weights.')
         start_iter = previous_state['iter']
         print(f'Start from iteration: {start_iter}')
 

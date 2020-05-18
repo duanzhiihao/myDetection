@@ -48,18 +48,22 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=False):
 
 
 def iou_rle(boxes1, boxes2, bb_format='cxcywhd', **kwargs):
-    '''
-    use mask method to calculate IOU between boxes1 and boxes2
+    '''IoU between rotated bounding boxes
+
+    Calculate IOU between boxes1 and boxes2 using binary masks and \
+        Run Length Encoding (RLE)
 
     Args:
-        boxes1: tensor or numpy, shape(N,5), 5=(x, y, w, h, degree)
-        boxes2: tensor or numpy, shape(M,5), 5=(x, y, w, h, degree)
-        bb_format: str,
+        boxes1, boxes2: torch.tensor or numpy, must have the same type
+        bb_format: str, must be one of the following:
+                   'cxcywhd': [center x, center y, width, height, degree(clockwise)]
+        img_hw (optional but recommended): image height and width
 
     Return:
         iou_matrix: tensor, shape(N,M), float32, 
                     ious of all possible pairs between boxes1 and boxes2
     '''
+    assert type(boxes1) == type(boxes2)
     assert bb_format == 'cxcywhd'
 
     if not (torch.is_tensor(boxes1) and torch.is_tensor(boxes2)):

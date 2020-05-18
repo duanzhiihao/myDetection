@@ -81,6 +81,9 @@ def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
         labels.bboxes[:,:4] *= resize_scale
         labels.bboxes[:,0] += left
         labels.bboxes[:,1] += top
+        if labels.img_hw is not None:
+            assert labels.img_hw == (ori_h, ori_w)
+        labels.img_hw = (target_size, target_size)
     
     pad_info = (ori_w, ori_h) + img_tl + img_wh
     assert isinstance(pad_info, tuple)
