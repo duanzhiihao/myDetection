@@ -9,7 +9,7 @@
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
 
-    "model.input.frame_concatenation": 2,
+    "general.input.frame_concatenation": 2,
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,
@@ -49,7 +49,10 @@
         "brightness": [0.3, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
-        "saturation": [0, 2]
+        "saturation": [0, 2],
+        "horizontal_flip": true,
+        "vertical_flip": true,
+        "rotation": true
     },
 
     "test.preprocessing": "resize_pad_divisible",

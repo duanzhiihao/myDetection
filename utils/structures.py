@@ -23,9 +23,10 @@ class ImageObjects():
                 'cxcywhr': (cx,cy,w,h,radian)
         img_hw: int or (height, width)
     '''
-    def __init__(self, bboxes, cats, scores=None,
+    def __init__(self, bboxes, cats, masks=None, scores=None,
                        bb_format='cxcywh', img_hw=None):
         # format check
+        raise NotImplementedError()
         assert bboxes.dim() == 2 and bboxes.shape[0] == cats.shape[0]
         assert cats.dtype == torch.int64, 'Incorrect data type of categories'
         if bb_format == 'cxcywh':

@@ -6,7 +6,7 @@ def get_backbone(cfg: dict):
     if backbone_name == 'dark53':
         from .backbones import Darknet53
         assert cfg['model.backbone.num_levels'] == 3
-        backbone = Darknet53()
+        backbone = Darknet53(cfg)
         print("Using backbone Darknet-53. Loading ImageNet weights....")
         pretrained = torch.load('./weights/dark53_imgnet.pth')
         backbone.load_state_dict(pretrained)

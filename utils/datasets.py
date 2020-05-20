@@ -13,69 +13,50 @@ from .evaluation.coco import coco_evaluate_json
 
 
 def get_trainingset(cfg: dict):
-    dataset_name = cfg['train.dataset_name']
-    if dataset_name == 'COCOtrain2017':
+    dataset_name: str = cfg['train.dataset_name']
+    if dataset_name in {'COCOtrain2017', 'COCOval2017'}:
+        # Official COCO dataset
+        _dname = dataset_name.replace('COCO', '')
         training_set_cfg = {
-            'img_dir': '../Datasets/COCO/train2017',
-            'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
-            'ann_bbox_format': 'x1y1wh'
+            'img_dir': f'../Datasets/COCO/{_dname}',
+            'json_path': f'../Datasets/COCO/annotations/instances_{_dname}.json',
+            'ann_bbox_format': 'x1y1wh',
+            'is_video': False,
+            'noperson_img_dir': f'../Datasets/COCO/{_dname}_np'
         }
-    elif dataset_name == 'COCOval2017':
+        # These datasets are not designed for rotation augmentation
+        if cfg['train.data_augmentation'] is not None:
+            assert cfg['train.data_augmentation']['rotation'] == False
+    elif dataset_name in {'rotbbox_train2017', 'rotbbox_val2017',
+                          'personrbb_train2017', 'personrbb_val2017'}:
+        # Customized COCO dataset
+        _dname = dataset_name.split('_')[1]
         training_set_cfg = {
-            'img_dir': '../Datasets/COCO/train2017',
-            'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
-            'ann_bbox_format': 'x1y1wh'
-        }
-    elif dataset_name == 'rotbbox_train2017':
-        training_set_cfg = {
-            'img_dir': '../Datasets/COCO/train2017',
-            'json_path': '../Datasets/COCO/annotations/rotbbox_train2017.json',
-            'ann_bbox_format': 'cxcywhd'
+            'img_dir': f'../Datasets/COCO/{_dname}',
+            'json_path': f'../Datasets/COCO/annotations/{dataset_name}.json',
+            'ann_bbox_format': 'cxcywhd',
+            'is_video': False,
+            'noperson_img_dir': f'../Datasets/COCO/{_dname}_np'
         }
         if cfg['train.data_augmentation'] is not None:
+            assert cfg['train.data_augmentation']['rotation'] == True
             cfg['train.data_augmentation'].update(rotation_expand=True)
-    elif dataset_name == 'personrbb_train2017':
+    elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
         training_set_cfg = {
-            'img_dir': '../Datasets/COCO/train2017',
-            'json_path': '../Datasets/COCO/annotations/personrbb_train2017.json',
+            'img_dir': f'./images/{dataset_name}/',
+            'json_path': f'./utils/debug/{dataset_name}.json',
+            'ann_bbox_format': 'x1y1wh',
+            'is_video': False,
+        }
+        # These datasets are not designed for rotation augmentation
+        assert cfg['train.data_augmentation'] is None
+    elif dataset_name == {'rotbb_debug3', 'debug_lunch31'}:
+        training_set_cfg = {
+            'img_dir': f'./images/{dataset_name}/',
+            'json_path': f'./utils/debug/{dataset_name}.json',
             'ann_bbox_format': 'cxcywhd'
         }
-        if cfg['train.data_augmentation'] is not None:
-            cfg['train.data_augmentation'].update(rotation_expand=True)
-    elif dataset_name == 'debug_zebra':
-        training_set_cfg = {
-            'img_dir': './images/debug_zebra/',
-            'json_path': './utils/debug/debug_zebra.json',
-            'ann_bbox_format': 'x1y1wh'
-        }
-    elif dataset_name == 'debug_kitchen':
-        training_set_cfg = {
-            'img_dir': './images/debug_kitchen/',
-            'json_path': './utils/debug/debug_kitchen.json',
-            'ann_bbox_format': 'x1y1wh'
-        }
-    elif dataset_name == 'debug3':
-        training_set_cfg = {
-            'img_dir': './images/debug3/',
-            'json_path': './utils/debug/debug3.json',
-            'ann_bbox_format': 'x1y1wh'
-        }
-    elif dataset_name == 'debug_lunch31':
-        training_set_cfg = {
-            'img_dir': './images/debug_lunch31/',
-            'json_path': './utils/debug/debug_lunch31.json',
-            'ann_bbox_format': 'cxcywhd'
-        }
-        if cfg['train.data_augmentation'] is not None:
-            cfg['train.data_augmentation'].update(rotation_expand=False)
-    elif dataset_name == 'rotbb_debug3':
-        training_set_cfg = {
-            'img_dir': './images/rotbb_debug3/',
-            'json_path': './utils/debug/rotbb_debug3.json',
-            'ann_bbox_format': 'cxcywhd'
-        }
-        if cfg['train.data_augmentation'] is not None:
-            cfg['train.data_augmentation'].update(rotation_expand=True)
+        assert cfg['train.data_augmentation'] is None
     else:
         raise NotImplementedError()
     return Dataset4ObjDet(training_set_cfg, cfg)
@@ -167,6 +148,12 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.input_format = global_cfg['general.input_format']
         self.aug_setting = global_cfg['train.data_augmentation']
         self.input_divisibility = global_cfg['general.input_divisibility']
+
+        # Special settings
+        self.frame_concat = global_cfg.get('general.input.frame_concatenation', None)
+        self.mosaic = self.aug_setting.get('mosaic', False) if (self.aug_setting is not None) else None
+        self.is_video = dataset_cfg['is_video'] # TODO:
+
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
@@ -181,6 +168,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         '''
         laod json file to self.img_ids, self.imgid2anns
         '''
+        assert not self.is_video # TODO:
         print(f'loading annotations {json_path} into memory...')
         with open(json_path, 'r') as f:
             json_data = json.load(f)
@@ -244,15 +232,17 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         Args:
             index (int): data index
         """
-        if (self.aug_setting is not None) and self.aug_setting.get('mosaic', False):
+        if self.frame_concat is not None:
+            img_label_pair = self._load_concat_frames(index, to_square=True)
+        elif self.mosaic == True:
             index = random.randint(0, len(self.img_ids)-1)
             pairs = []
             for _ in range(4):
-                img_label_pair = self._load_pil_img(index, to_square=False)
+                img_label_pair = self._load_single_pil(index, to_square=False)
                 pairs.append(img_label_pair)
             img_label_pair = augUtils.mosaic(pairs, self.img_size)
         else:
-            img_label_pair = self._load_pil_img(index, to_square=True)
+            img_label_pair = self._load_single_pil(index, to_square=True)
         
         img, labels, img_id, pad_info = img_label_pair
         # Convert PIL.image to torch.Tensor with shape (3,h,w) if it's not
@@ -288,20 +278,36 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             print('Warning: some bbox in ground truth are smaller than 0')
             print('image id:', img_id)
         labels.bboxes[:,0:4].clamp_(min=0)
-        assert img.dim() == 3 and img.shape[0] == 3 and img.shape[1] == img.shape[2]
+        assert img.dim() == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
-    def _load_pil_img(self, index, to_square=True) -> tuple:
+    def _load_concat_frames(self, index, to_square=True) -> tuple:
+        assert not self.is_video # TODO:
+        assert self.frame_concat >= 2
+        # load the image
+        img_id = self.img_ids[index]
+        img_name = self.imgid2info[img_id]['file_name']
+        img_path = os.path.join(self.img_dir, img_name)
+        img = imgUtils.imread_pil(img_path)
+        # get labels
+        labels = self.imgId2labels[img_id]
+        assert isinstance(labels, ImageObjects)
+        assert labels.img_hw == (img.height, img.width)
+        labels = labels.clone()
+
+        return (img, labels, img_id, pad_info)
+
+    def _load_single_pil(self, index, to_square=True) -> tuple:
         '''
         One image-label pair for the given index is picked up and pre-processed.
         
-        Return:
-            img:
+        Returns:
+            img: PIL.Image
             labels:
             img_id:
             pad_info:
         '''
-        # laod the image
+        # load the image
         img_id = self.img_ids[index]
         img_name = self.imgid2info[img_id]['file_name']
         img_path = os.path.join(self.img_dir, img_name)
@@ -322,8 +328,9 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         else:
             pad_info = None
         return (img, labels, img_id, pad_info)
-
+    
     def augment_PIL(self, img, labels):
+        # TODO: move this function to augmentation.py
         if torch.rand(1).item() > 0.5:
             low, high = self.aug_setting.get('brightness', [0.6, 1.4])
             img = tvf.adjust_brightness(img, uniform(low, high))

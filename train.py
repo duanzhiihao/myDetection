@@ -76,7 +76,7 @@ def main():
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)
 
-    job_name = f'{args.model}_{args.train_set}{target_size}_{args.lr}'
+    job_name = f'{args.model}_{args.train_set}_{args.lr}'
     
     # Prepare model
     pnum = sum(p.numel() for p in model.parameters() if p.requires_grad)

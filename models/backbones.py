@@ -41,12 +41,13 @@ class DarkBlock(nn.Module):
 
 
 class Darknet53(nn.Module):
-    def __init__(self):
+    def __init__(self, global_cfg):
         super(Darknet53, self).__init__()
         self.netlist = nn.ModuleList()
         
+        in_imgs = global_cfg.get('general.input.frame_concatenation', 1)
         # first conv layer
-        self.netlist.append(ConvBnLeaky(3, 32, k=3, s=1))
+        self.netlist.append(ConvBnLeaky(3*in_imgs, 32, k=3, s=1))
 
         # Downsampled by 2 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(32, 64, k=3, s=2))
