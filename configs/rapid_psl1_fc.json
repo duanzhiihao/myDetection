@@ -1,13 +1,15 @@
 {
-    "__doc": "80-cls yolov3 + periodic l1 (equivalent to = 80-cls rapid)",
+    "__doc": "rapid, periodic smooth L1, frame concatnation",
 
     "base": "OneStageBBox",
     
     "general.input_format": "RGB_1",
     "general.input_divisibility": 32,
-    "general.num_class": 80,
+    "general.num_class": 0,
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
+
+    "model.input.frame_concatenation": 2,
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,
@@ -30,7 +32,8 @@
     ],
     "model.rapid.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
     "model.rapid.wh_smooth_l1_beta": 1,
-    "model.angle.loss_angle": "Periodic_L1",
+    "model.angle.loss_angle": "Periodic_smoothL1",
+    "model.angle.pred_range": 360,
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": false,
@@ -50,7 +53,7 @@
     },
 
     "test.preprocessing": "resize_pad_divisible",
-    "test.default_input_size": 608,
+    "test.default_input_size": 1024,
     "test.default_conf_thres": 0.3,
     "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.45

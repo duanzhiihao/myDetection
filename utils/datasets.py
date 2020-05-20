@@ -20,6 +20,12 @@ def get_trainingset(cfg: dict):
             'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
             'ann_bbox_format': 'x1y1wh'
         }
+    elif dataset_name == 'COCOval2017':
+        training_set_cfg = {
+            'img_dir': '../Datasets/COCO/train2017',
+            'json_path': '../Datasets/COCO/annotations/instances_train2017.json',
+            'ann_bbox_format': 'x1y1wh'
+        }
     elif dataset_name == 'rotbbox_train2017':
         training_set_cfg = {
             'img_dir': '../Datasets/COCO/train2017',
@@ -155,12 +161,12 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         augmentation: bool, default: True
         debug: bool, if True, only one data id is selected from the dataset
     """
-    def __init__(self, dataset_cfg: dict, glocal_cfg: dict):
+    def __init__(self, dataset_cfg: dict, global_cfg: dict):
         self.img_dir = dataset_cfg['img_dir']
-        self.img_size = glocal_cfg['train.initial_imgsize']
-        self.input_format = glocal_cfg['general.input_format']
-        self.aug_setting = glocal_cfg['train.data_augmentation']
-        self.input_divisibility = glocal_cfg['general.input_divisibility']
+        self.img_size = global_cfg['train.initial_imgsize']
+        self.input_format = global_cfg['general.input_format']
+        self.aug_setting = global_cfg['train.data_augmentation']
+        self.input_divisibility = global_cfg['general.input_divisibility']
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
@@ -235,7 +241,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         """
-
         Args:
             index (int): data index
         """

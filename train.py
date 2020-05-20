@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--val_set', type=str, default='debug_lunch31')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
-    parser.add_argument('--initial_imgsize', type=int, default=768)
+    parser.add_argument('--initial_imgsize', type=int, default=None)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--warmup', type=int, default=1000)
