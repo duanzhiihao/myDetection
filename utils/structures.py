@@ -21,62 +21,61 @@ class ImageObjects():
                 'x1y1x2y2': (x1,y1,x2,y2)
                 'cxcywhd': (cx,cy,w,h,degree)
                 'cxcywhr': (cx,cy,w,h,radian)
-        img_hw: int or (height, width)
+        img_hw: tuple-like, image (height, width)
     '''
     def __init__(self, bboxes, cats, masks=None, scores=None,
                        bb_format='cxcywh', img_hw=None):
-        # format check
-        raise NotImplementedError()
-        assert bboxes.dim() == 2 and bboxes.shape[0] == cats.shape[0]
-        assert cats.dtype == torch.int64, 'Incorrect data type of categories'
-        if bb_format == 'cxcywh':
-            assert bboxes.shape[1] == 4
-        elif bb_format == 'cxcywhd':
-            assert bboxes.shape[1] == 5
-        else:
-            raise NotImplementedError()
-
-        self.bboxes = bboxes
-        self.cats = cats
-        self.scores = scores
-        self._bb_format = bb_format
-        self.img_hw = img_hw
+        self.bboxes:     torch.FloatTensor = bboxes
+        self.cats:       torch.LongTensor  = cats
+        self.masks:      torch.BoolTensor  = masks
+        self.scores:     torch.FloatTensor = scores
+        self._bb_format: str               = bb_format
+        self.img_hw:     tuple             = img_hw
+        self.sanity_check()
     
     def __getitem__(self, idx):
         if isinstance(idx, int):
             b = self.bboxes[idx:idx+1,:]
             c = self.cats[idx:idx+1]
+            m = self.masks[idx:idx+1,:,:] if self.masks is not None else None
             s = self.scores[idx:idx+1] if self.scores is not None else None
-            return ImageObjects(b, c, s, self._bb_format, self.img_hw)
+            return ImageObjects(b, c, m, s, self._bb_format, self.img_hw)
         b = self.bboxes[idx,:]
         c = self.cats[idx]
+        m = self.masks[idx,:,:] if self.masks is not None else None
         s = self.scores[idx] if self.scores is not None else None
-        return ImageObjects(b, c, s, self._bb_format, self.img_hw)
+        return ImageObjects(b, c, m, s, self._bb_format, self.img_hw)
     
     def __len__(self):
-        obj_num = self.bboxes.shape[0]
-        return obj_num
+        return self.bboxes.shape[0]
     
     def cpu_(self):
         '''Move all attributes to CPU in-place'''
         self.bboxes = self.bboxes.cpu()
         self.cats = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
+        self.masks = self.masks.cpu() if self.masks is not None else None
     
     def clone(self):
-        '''Return a clone of self'''
-        new = ImageObjects(
-            bboxes=self.bboxes.clone(),
-            cats=self.cats.clone(),
-            scores=self.scores.clone() if self.scores is not None else self.scores,
-            bb_format=self._bb_format,
-            img_hw=self.img_hw
-        )
-        return new
+        '''
+        Return a clone of self \\
+        Note: rles will not be cloned, and masks will not be created
+        '''
+        raise DeprecationWarning()
+        # new = ImageObjects(
+        #     bboxes=self.bboxes.clone(),
+        #     cats=self.cats.clone(),
+        #     segms=self._rles,
+        #     scores=self.scores.clone() if self.scores is not None else self.scores,
+        #     bb_format=self._bb_format,
+        #     img_hw=self.img_hw
+        # )
+        # return new
 
     def sort_by_score_(self, descending=True):
         '''Sort the bounding boxes by scores in-place'''
         assert self.scores is not None
+        assert self.masks is None, 'sorting with masks is not currently supported'
         idxs = torch.argsort(self.scores, descending=descending)
         self.bboxes = self.bboxes[idxs, :]
         self.cats = self.cats[idxs]
@@ -86,6 +85,7 @@ class ImageObjects():
         '''
         Keep the objects in the given category set and discard others in-place.
         '''
+        assert self.masks is None, 'filtering with masks is not currently supported'
         keep_cats = torch.LongTensor(categories)
         assert self.cats.dim() == 1 and keep_cats.dim() == 1
         keep_mask = (self.cats.unsqueeze(1) == keep_cats.unsqueeze(0))
@@ -108,6 +108,7 @@ class ImageObjects():
             nms_thres: float
         '''
         assert isinstance(dts, ImageObjects)
+        assert dts.masks is None, 'nms with masks is not currently supported'
         assert dts.scores is not None
         if dts.bboxes.shape[0] == 0:
             return dts
@@ -152,7 +153,7 @@ class ImageObjects():
         out_bbs = torch.cat(out_bbs, dim=0)
         out_scores = torch.cat(out_scores, dim=0)
         out_cats = torch.cat(out_cats, dim=0)
-        return ImageObjects(out_bbs, out_cats, out_scores, dts._bb_format,
+        return ImageObjects(out_bbs, out_cats, None, out_scores, dts._bb_format,
                             img_hw=dts.img_hw)
 
     def bboxes_to_original_(self, pad_info):
@@ -162,6 +163,7 @@ class ImageObjects():
         Args:
             pad_info: (ori w, ori h, tl x, tl y, imw, imh)
         '''
+        assert self.masks is None, 'this func with masks is not currently supported'
         assert len(pad_info) == 6
         ori_w, ori_h, tl_x, tl_y, imw, imh = pad_info
         self.bboxes[:,0] = (self.bboxes[:,0] - tl_x) / imw * ori_w
@@ -173,22 +175,26 @@ class ImageObjects():
     def sanity_check(self):
         '''Integrity check. 
         '''
-        # Check dimension and length
-        assert self.bboxes.dim() == 2 and self.cats.dim() == 1
-        assert self.cats.shape[0] == self.bboxes.shape[0]
-        if self.scores is not None:
-            assert self.scores.shape[0] == self.bboxes.shape[0]
         # Check bbox format
+        assert self.bboxes.dtype == torch.float and self.bboxes.dim() == 2
         if self._bb_format == 'cxcywh':
             assert self.bboxes.shape[1] == 4
         elif self._bb_format == 'cxcywhd':
             assert self.bboxes.shape[1] == 5
         else:
             raise NotImplementedError()
-        # Check dtype
+        # Check category format
         assert self.cats.dtype == torch.int64, 'Incorrect data type of categories'
+        assert self.cats.dim() == 1 and self.cats.shape[0] == self.bboxes.shape[0]
+        # Check mask format
+        if self.masks is not None:
+            assert self.masks.dtype == torch.long and self.masks.dim() == 3
+            assert self.masks.shape == (self.cats.shape[0],) + self.img_hw
+        # Check socres format
+        if self.scores is not None:
+            assert self.scores.shape[0] == self.bboxes.shape[0]
         # Check image size
-        assert self.img_hw is None or isinstance(self.img_hw, (int,list,tuple,torch.Size))
+        assert self.img_hw is None or len(self.img_hw) == 2
     
     def draw_on_np(self, im, class_map='COCO', **kwargs):
         '''Draw the bounding box on the np image in-place

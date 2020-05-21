@@ -7,7 +7,9 @@ import PIL.Image
 import torch
 import torchvision.transforms.functional as tvf
 
-from . import image_ops as imgUtils, augmentation as augUtils
+from . import image_ops as imgUtils
+from . import augmentation as augUtils
+from . import mask_ops as maskUtils
 from .structures import ImageObjects
 from .evaluation.coco import coco_evaluate_json
 
@@ -50,7 +52,7 @@ def get_trainingset(cfg: dict):
         }
         # These datasets are not designed for rotation augmentation
         assert cfg['train.data_augmentation'] is None
-    elif dataset_name == {'rotbb_debug3', 'debug_lunch31'}:
+    elif dataset_name in {'rotbb_debug3', 'debug_lunch31'}:
         training_set_cfg = {
             'img_dir': f'./images/{dataset_name}/',
             'json_path': f'./utils/debug/{dataset_name}.json',
@@ -143,38 +145,34 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         debug: bool, if True, only one data id is selected from the dataset
     """
     def __init__(self, dataset_cfg: dict, global_cfg: dict):
-        self.img_dir = dataset_cfg['img_dir']
-        self.img_size = global_cfg['train.initial_imgsize']
-        self.input_format = global_cfg['general.input_format']
-        self.aug_setting = global_cfg['train.data_augmentation']
+        self.img_dir            = dataset_cfg['img_dir']
+        self.img_size           = global_cfg['train.initial_imgsize']
+        self.input_format       = global_cfg['general.input_format']
+        self.aug_setting        = global_cfg['train.data_augmentation']
         self.input_divisibility = global_cfg['general.input_divisibility']
 
         # Special settings
         self.frame_concat = global_cfg.get('general.input.frame_concatenation', None)
-        self.mosaic = self.aug_setting.get('mosaic', False) if (self.aug_setting is not None) else None
-        self.is_video = dataset_cfg['is_video'] # TODO:
+        self.mosaic       = self.aug_setting.get('mosaic', False) if (self.aug_setting is not None) else None
+        self.is_video     = dataset_cfg.get('is_video', False) # TODO:
 
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
 
-        self.img_ids = []
-        self.imgid2info = dict()
-        self.imgid2anns = defaultdict(list)
-        self.catid2idx = []
-        self.load_json(dataset_cfg['json_path'], dataset_cfg['ann_bbox_format'])
+        self.img_ids    = []
+        self.imgId2info = dict()
+        self.imgId2anns = defaultdict(list)
+        self.catId2idx  = dict()
+        self._load_json(dataset_cfg['json_path'], dataset_cfg['ann_bbox_format'])
 
-    def load_json(self, json_path, ann_bbox_format):
-        '''
-        laod json file to self.img_ids, self.imgid2anns
-        '''
-        assert not self.is_video # TODO:
-        print(f'loading annotations {json_path} into memory...')
+    def _load_json(self, json_path, ann_bbox_format):
+        '''laod json file'''
+        if self.is_video: # TODO:
+            raise NotImplementedError()
+        print(f'Loading annotations {json_path} into memory...')
         with open(json_path, 'r') as f:
             json_data = json.load(f)
-
-        catgys = json_data['categories']
-        self.catid2idx = dict([(cat['id'],idx) for idx,cat in enumerate(catgys)])
 
         if ann_bbox_format in {'x1y1wh', 'cxcywh'}:
             self.bb_format = 'cxcywh'
@@ -184,22 +182,35 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             self.bb_param = 5
         else:
             raise Exception('Bounding box format is not supported')
+
+        for img in json_data['images']:
+            self.imgId2info[img['id']] = img
+
+        for idx, cat in enumerate(json_data['categories']):
+            self.catId2idx[cat['id']] = idx
+            
         for ann in json_data['annotations']:
             # Parse bounding box annotation
             assert len(ann['bbox']) == self.bb_param
             if self.skip_crowd_ann and ann['iscrowd']:
                 continue
+            # If the dataset is using (x1,y1,w,h), convert to (cx,cy,w,h)
             if ann_bbox_format == 'x1y1wh':
-                # The dataset is using (x1,y1,w,h). Converting to (cx,cy,w,h)
                 ann['bbox'][0] = ann['bbox'][0] + ann['bbox'][2] / 2
                 ann['bbox'][1] = ann['bbox'][1] + ann['bbox'][3] / 2
-            ann['cat_idx'] = self.catid2idx[ann['category_id']]
-            self.imgid2anns[ann['image_id']].append(ann)
+            # category inddex
+            ann['cat_idx'] = self.catId2idx[ann['category_id']]
+            # segmentation mask
+            imgInfo = self.imgId2info[ann['image_id']]
+            imh, imw = imgInfo['height'], imgInfo['width']
+            if ann['segmentation'] != []:
+                ann['rle'] = maskUtils.segm2rle(ann.pop('segmentation'), imh, imw)
+            self.imgId2anns[ann['image_id']].append(ann)
 
-        self.imgId2labels = dict()
+        # self.imgId2labels = dict()
         for img in json_data['images']:
             img_id = img['id']
-            anns = self.imgid2anns[img_id]
+            anns = self.imgId2anns[img_id]
             if self.skip_crowd_img and any(ann['iscrowd'] for ann in anns):
                 # if there is crowd gt, skip this image
                 continue
@@ -207,22 +218,26 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # if there is no object in this image, skip this image
                 continue
             self.img_ids.append(img_id)
-            self.imgid2info[img['id']] = img
             # convert annotations from json format to ImageObjects format
-            bboxes = []
-            cat_idxs = []
-            for ann in anns:
-                bboxes.append(ann['bbox'])
-                cat_idxs.append(ann['cat_idx'])
-            labels = ImageObjects(
-                bboxes=torch.FloatTensor(bboxes),
-                cats=torch.LongTensor(cat_idxs),
-                bb_format=self.bb_format,
-                img_hw=(img['height'], img['width'])
-            )
-            assert img_id not in self.imgId2labels
-            self.imgId2labels[img_id] = labels
-        debug = 1
+            # bboxes = []
+            # cat_idxs = []
+            # for ann in anns:
+            #     bboxes.append(ann['bbox'])
+            #     cat_idxs.append(ann['cat_idx'])
+            # if anns[0].get('segmentation', []) == []:
+            #     segms = None
+            # else:
+            #     segms = [ann['segmentation'] for ann in anns]
+            # labels = ImageObjects(
+            #     bboxes=torch.FloatTensor(bboxes),
+            #     cats=torch.LongTensor(cat_idxs),
+            #     segms=segms,
+            #     bb_format=self.bb_format,
+            #     img_hw=(img['height'], img['width'])
+            # )
+            # assert img_id not in self.imgId2labels
+            # self.imgId2labels[img_id] = labels
+        # breakpoint()
 
     def __len__(self):
         return len(self.img_ids)
@@ -282,11 +297,12 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return img, labels, img_id, pad_info
 
     def _load_concat_frames(self, index, to_square=True) -> tuple:
-        assert not self.is_video # TODO:
+        if self.is_video: # TODO:
+            raise NotImplementedError()
         assert self.frame_concat >= 2
         # load the image
         img_id = self.img_ids[index]
-        img_name = self.imgid2info[img_id]['file_name']
+        img_name = self.imgId2info[img_id]['file_name']
         img_path = os.path.join(self.img_dir, img_name)
         img = imgUtils.imread_pil(img_path)
         # get labels
@@ -309,14 +325,17 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         '''
         # load the image
         img_id = self.img_ids[index]
-        img_name = self.imgid2info[img_id]['file_name']
+        imgInfo = self.imgId2info[img_id]
+        img_name = imgInfo['file_name']
         img_path = os.path.join(self.img_dir, img_name)
         img = imgUtils.imread_pil(img_path)
-        # get labels
-        labels = self.imgId2labels[img_id]
-        assert isinstance(labels, ImageObjects)
-        assert labels.img_hw == (img.height, img.width)
-        labels = labels.clone()
+        assert imgInfo['height'] == img.height and imgInfo['width'] == img.width
+        # get annotations
+        anns = self.imgId2anns[img_id]
+        labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
+        # assert isinstance(labels, ImageObjects)
+        # assert labels.img_hw == ()
+        # labels = labels.clone()
         # augmentation
         if self.aug_setting is not None:
             img, labels = self.augment_PIL(img, labels)
@@ -328,6 +347,23 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         else:
             pad_info = None
         return (img, labels, img_id, pad_info)
+
+    @staticmethod
+    def _ann2labels(anns, img_h, img_w, bb_format):
+        bboxes = [a['bbox'] for a in anns]
+        cat_idxs = [a['cat_idx'] for a in anns]
+        if 'rle' not in anns[0]:
+            rles = None
+        else:
+            rles = [a['rle'] for a in anns]
+        labels = ImageObjects(
+            bboxes=torch.FloatTensor(bboxes),
+            cats=torch.LongTensor(cat_idxs),
+            masks=None if rles is None else maskUtils.rle2mask(rles),
+            bb_format=bb_format,
+            img_hw=(img_h, img_w)
+        )
+        return labels
     
     def augment_PIL(self, img, labels):
         # TODO: move this function to augmentation.py
