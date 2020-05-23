@@ -45,7 +45,10 @@
         "brightness": [0.3, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
-        "saturation": [0, 2]
+        "saturation": [0, 2],
+        "horizontal_flip": true,
+        "vertical_flip": true,
+        "rotation": true
     },
 
     "test.preprocessing": "resize_pad_divisible",

@@ -1,3 +1,4 @@
+from typing import List
 import random
 import numpy as np
 import scipy.ndimage
@@ -79,14 +80,71 @@ def _crop_img_labels(im, labels, target_hw):
     return im, labels
 
 
-def hflip(image, labels):
+def augment_PIL(self, imgs: List[PIL.Image], labels: List[ImageObjects],
+                aug_setting: dict):
+    '''
+    Perform random augmentation for a list of PIL images.
+
+    Args:
+        imgs:
+        labels:
+        aug_Setting:
+
+    Return:
+        imgs:
+        labels:
+    '''
+    assert len(imgs) == len(labels)
+    num = len(imgs)
+    if torch.rand(1).item() > 0.5:
+        low, high = aug_setting.get('brightness', [0.6, 1.4])
+        for i in range(num):
+            imgs[i] = tvf.adjust_brightness(imgs[i], uniform(low, high))
+    if torch.rand(1).item() > 0.5:
+        low, high = aug_setting.get('contrast', [0.5, 1.5])
+        for i in range(num):
+            imgs[i] = tvf.adjust_contrast(imgs[i], uniform(low, high))
+    if torch.rand(1).item() > 0.5:
+        low, high = aug_setting.get('hue', [-0.1, 0.1])
+        for i in range(num):
+            imgs[i] = tvf.adjust_hue(imgs[i], uniform(low, high))
+    if torch.rand(1).item() > 0.5:
+        low, high = aug_setting.get('saturation', [0, 2])
+        for i in range(num):
+            imgs[i] = tvf.adjust_saturation(imgs[i], uniform(low, high)) # 0 ~ 3
+    # if torch.rand(1).item() > 0.5:
+    #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
+    # horizontal flip
+    if aug_setting['horizontal_flip'] and torch.rand(1).item() > 0.5:
+        for i in range(num):
+            imgs[i], labels[i] = hflip(imgs[i], labels[i])
+    # vertical flip
+    if aug_setting['vertical_flip'] and torch.rand(1).item() > 0.5:
+        for i in range(num):
+            imgs[i], labels[i] = vflip(imgs[i], labels[i])
+    if aug_setting['rotation']:
+        # random rotation
+        rand_deg = torch.rand(1).item() * 360
+        expand = aug_setting['rotation_expand']
+        for i in range(num):
+            imgs[i], labels[i] = rotate(imgs[i], rand_deg, labels[i], expand=expand)
+        return img, labels
+
+    return img, labels
+
+
+def uniform(a, b):
+    return a + torch.rand(1).item() * (b-a)
+
+
+def hflip(image, labels: ImageObjects):
     '''
     left-right flip
 
     Args:
         image: PIL.Image
     '''
-    assert isinstance(labels, ImageObjects)
+    assert not labels.masks
     image = tvf.hflip(image)
     assert labels._bb_format in {'cxcywh', 'cxcywhd'}
     labels.bboxes[:,0] = image.width - labels.bboxes[:,0]

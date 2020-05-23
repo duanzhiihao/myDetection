@@ -52,7 +52,7 @@ def get_trainingset(cfg: dict):
         }
         # These datasets are not designed for rotation augmentation
         assert cfg['train.data_augmentation'] is None
-    elif dataset_name in {'rotbb_debug3', 'debug_lunch31'}:
+    elif dataset_name in {'rotbb_debug3', 'debug_lunch31', 'rot80_debug1'}:
         training_set_cfg = {
             'img_dir': f'./images/{dataset_name}/',
             'json_path': f'./utils/debug/{dataset_name}.json',
@@ -306,10 +306,15 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         img_path = os.path.join(self.img_dir, img_name)
         img = imgUtils.imread_pil(img_path)
         # get labels
-        labels = self.imgId2labels[img_id]
-        assert isinstance(labels, ImageObjects)
-        assert labels.img_hw == (img.height, img.width)
-        labels = labels.clone()
+        anns = self.imgId2anns[img_id]
+        labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
+        assert labels.masks is not None
+        # if dataset is not videos, try to generate previous frames
+        bg_img_dir = self.img_dir + '_np' # background image path
+        assert os.path.exists(bg_img_dir)
+        bg_path = os.path.join(bg_img_dir, img_name)
+        bg = imgUtils.imread_pil(bg_img_dir)
+        
 
         return (img, labels, img_id, pad_info)
 
