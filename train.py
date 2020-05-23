@@ -15,8 +15,8 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='rapid')
-    parser.add_argument('--train_set', type=str, default='debug_lunch31')
+    parser.add_argument('--model', type=str, default='rapid_psl1_fc')
+    parser.add_argument('--train_set', type=str, default='personrbb_val2017')
     parser.add_argument('--val_set', type=str, default='debug_lunch31')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
@@ -34,8 +34,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
     
-    # parser.add_argument('--debug_mode', action='store_true')
-    parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -71,7 +71,7 @@ def main():
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
         # optimizer setting
-        num_cpu = 4
+        num_cpu = 0
         warmup_iter = args.warmup
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)

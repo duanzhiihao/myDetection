@@ -128,3 +128,25 @@ def tensor_img_to_pil(t_img: torch.tensor, code: str):
     else:
         raise NotImplementedError()
     return tvf.to_pil_image(t_img)
+
+
+def extract_mask(im: np.ndarray, mask: np.ndarray, cxcywhd):
+    '''
+    extract a bounding box from an image according to a binary mask and rotbbox
+    '''
+    raise NotImplementedError()
+    assert mask.dtype == np.bool and mask.ndim == 2 and mask.shape == im.shape[:2]
+    assert len(cxcywhd) == 5
+
+    if isinstance(im, PIL.Image.Image):
+        raise NotImplementedError()
+    assert isinstance(im, np.ndarray)
+
+    # idx0, idx1 = np.nonzero(mask)
+    # ymin, xmin = np.min(idx0), np.min(idx1)
+    # ymax, xmax = np.max(idx0), np.max(idx1)
+    # center = [(xmin + xmax) / 2, (ymin + ymax) / 2]
+    # w = masked[ymin:ymax+1, xmin:xmax+1]
+
+    # roate the whole image
+

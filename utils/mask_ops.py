@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import pycocotools.mask as _maskUtils
 
@@ -35,6 +36,7 @@ def rle2mask(rles) -> torch.BoolTensor:
         masks: torch.BoolTensor, shape[len(rles), image h, image w]
     '''
     masks = _maskUtils.decode(rles)
-    masks = torch.from_numpy(masks)
+    assert masks.dtype == np.uint8 and masks.ndim == 3
+    masks = torch.from_numpy(masks).bool().permute(2, 0, 1)
     return masks
 

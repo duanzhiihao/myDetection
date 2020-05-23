@@ -297,6 +297,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return img, labels, img_id, pad_info
 
     def _load_concat_frames(self, index, to_square=True) -> tuple:
+        raise NotImplementedError()
         if self.is_video: # TODO:
             raise NotImplementedError()
         assert self.frame_concat >= 2
@@ -313,10 +314,16 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         bg_img_dir = self.img_dir + '_np' # background image path
         assert os.path.exists(bg_img_dir)
         bg_path = os.path.join(bg_img_dir, img_name)
-        bg = imgUtils.imread_pil(bg_img_dir)
-        
-
-        return (img, labels, img_id, pad_info)
+        background = imgUtils.imread_pil(bg_path)
+        # import numpy as np; import matplotlib.pyplot as plt;
+        # plt.imshow(np.array(img)); plt.show()
+        # plt.imshow(np.array(background)); plt.show()
+        t_interval = 1 / self.aug_setting['simulation_fps']
+        augUtils.random_place(img, labels, background, dt=t_interval)
+        labels.masks
+        debug = 1
+        # augUtils.augment_PIL()
+        # return (img, labels, img_id, pad_info)
 
     def _load_single_pil(self, index, to_square=True) -> tuple:
         '''
@@ -338,12 +345,10 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         # get annotations
         anns = self.imgId2anns[img_id]
         labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
-        # assert isinstance(labels, ImageObjects)
-        # assert labels.img_hw == ()
-        # labels = labels.clone()
         # augmentation
         if self.aug_setting is not None:
-            img, labels = self.augment_PIL(img, labels)
+            img, labels = augUtils.augment_PIL([img], [labels], self.aug_setting)
+            img, labels = img[0], labels[0]
         # pad to square
         aug_flag = (self.aug_setting is not None)
         if to_square:
@@ -371,35 +376,35 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return labels
     
     def augment_PIL(self, img, labels):
-        # TODO: move this function to augmentation.py
-        if torch.rand(1).item() > 0.5:
-            low, high = self.aug_setting.get('brightness', [0.6, 1.4])
-            img = tvf.adjust_brightness(img, uniform(low, high))
-        if torch.rand(1).item() > 0.5:
-            low, high = self.aug_setting.get('contrast', [0.5, 1.5])
-            img = tvf.adjust_contrast(img, uniform(low, high))
-        if torch.rand(1).item() > 0.5:
-            low, high = self.aug_setting.get('hue', [-0.1, 0.1])
-            img = tvf.adjust_hue(img, uniform(low, high))
-        if torch.rand(1).item() > 0.5:
-            low, high = self.aug_setting.get('saturation', [0, 2])
-            img = tvf.adjust_saturation(img, uniform(low, high)) # 0 ~ 3
+        raise DeprecationWarning()
         # if torch.rand(1).item() > 0.5:
-        #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
-        # horizontal flip
-        if torch.rand(1).item() > 0.5:
-            img, labels = augUtils.hflip(img, labels)
-        if self.bb_format in {'cxcywhd'}:
-            # vertical flip
-            if torch.rand(1).item() > 0.5:
-                img, labels = augUtils.vflip(img, labels)
-            # random rotation
-            rand_deg = torch.rand(1).item() * 360
-            expand = self.aug_setting['rotation_expand']
-            img, labels = augUtils.rotate(img, rand_deg, labels, expand=expand)
-            return img, labels
+        #     low, high = self.aug_setting.get('brightness', [0.6, 1.4])
+        #     img = tvf.adjust_brightness(img, uniform(low, high))
+        # if torch.rand(1).item() > 0.5:
+        #     low, high = self.aug_setting.get('contrast', [0.5, 1.5])
+        #     img = tvf.adjust_contrast(img, uniform(low, high))
+        # if torch.rand(1).item() > 0.5:
+        #     low, high = self.aug_setting.get('hue', [-0.1, 0.1])
+        #     img = tvf.adjust_hue(img, uniform(low, high))
+        # if torch.rand(1).item() > 0.5:
+        #     low, high = self.aug_setting.get('saturation', [0, 2])
+        #     img = tvf.adjust_saturation(img, uniform(low, high)) # 0 ~ 3
+        # # if torch.rand(1).item() > 0.5:
+        # #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
+        # # horizontal flip
+        # if torch.rand(1).item() > 0.5:
+        #     img, labels = augUtils.hflip(img, labels)
+        # if self.bb_format in {'cxcywhd'}:
+        #     # vertical flip
+        #     if torch.rand(1).item() > 0.5:
+        #         img, labels = augUtils.vflip(img, labels)
+        #     # random rotation
+        #     rand_deg = torch.rand(1).item() * 360
+        #     expand = self.aug_setting['rotation_expand']
+        #     img, labels = augUtils.rotate(img, rand_deg, labels, expand=expand)
+        #     return img, labels
 
-        return img, labels
+        # return img, labels
 
     @staticmethod
     def collate_func(batch):

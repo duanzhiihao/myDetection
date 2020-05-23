@@ -188,7 +188,7 @@ class ImageObjects():
         assert self.cats.dim() == 1 and self.cats.shape[0] == self.bboxes.shape[0]
         # Check mask format
         if self.masks is not None:
-            assert self.masks.dtype == torch.long and self.masks.dim() == 3
+            assert self.masks.dtype == torch.bool and self.masks.dim() == 3
             assert self.masks.shape == (self.cats.shape[0],) + self.img_hw
         # Check socres format
         if self.scores is not None:

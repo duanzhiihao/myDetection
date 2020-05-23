@@ -9,7 +9,13 @@ def get_backbone(cfg: dict):
         backbone = Darknet53(cfg)
         print("Using backbone Darknet-53. Loading ImageNet weights....")
         pretrained = torch.load('./weights/dark53_imgnet.pth')
-        backbone.load_state_dict(pretrained)
+        if cfg.get('general.input.frame_concatenation', None):
+            print('Using frame concatenation. Skipping the first conv...')
+            to_pop = [k for k in pretrained.keys() if k.startswith('netlist.0')]
+            [pretrained.pop(k) for k in to_pop]
+            backbone.load_state_dict(pretrained, strict=False)
+        else:
+            backbone.load_state_dict(pretrained, strict=True)
         out_feature_channels = (256, 512, 1024)
         out_strides = (8, 16, 32)
     elif backbone_name.startswith('efficientnet'):

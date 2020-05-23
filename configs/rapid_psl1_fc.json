@@ -52,7 +52,8 @@
         "saturation": [0, 2],
         "horizontal_flip": true,
         "vertical_flip": true,
-        "rotation": true
+        "rotation": true,
+        "simulation_fps": 10
     },
 
     "test.preprocessing": "resize_pad_divisible",
