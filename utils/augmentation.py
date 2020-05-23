@@ -150,8 +150,9 @@ def random_place(img: PIL.Image.Image, labels: ImageObjects,
     assert labels._bb_format == 'cxcywhd'
     im = np.array(img).astype('float32') / 255
     bg = np.array(background).astype('float32') / 255
+    plt.figure(figsize=(8,8)); plt.imshow(bg)
     
-    npmasks = labels.masks
+    npmasks = labels.masks.numpy()
     for mask in npmasks:
         # randomly disappear
         if torch.rand(1).item() < 0.01:
@@ -167,6 +168,7 @@ def random_place(img: PIL.Image.Image, labels: ImageObjects,
         xmin, xmax = np.min(idx1), np.max(idx1)
         window = masked[ymin:ymax+1, xmin:xmax+1, :]
         mask_win = mask[ymin:ymax+1, xmin:xmax+1]
+        # plt.figure(figsize=(8,8)); plt.imshow(mask_win, cmap='gray'); plt.show()
         # location and width
         wincx, wincy = (xmin + xmax) / 2, (ymin + ymax) / 2
         winh, winw = window.shape[:2]
@@ -178,11 +180,12 @@ def random_place(img: PIL.Image.Image, labels: ImageObjects,
         # randomly resize
         new_h, new_w = int(winh*normal(1,1*dt)), int(winw*normal(1,1*dt))
         window = cv2.resize(window, (new_w, new_h))
-        mask_win = cv2.resize(mask_win, (new_w, new_h))
+        mask_win = cv2.resize(mask_win.astype('float32'), (new_w, new_h))
         # rotate by a random angle
         da = normal(0, 80) * dt
         win_rot = scipy.ndimage.rotate(window, angle=da, reshape=True, prefilter=False)
-        win_rot = scipy.ndimage.rotate(window, angle=da, reshape=True, prefilter=False)
+        mask_win = scipy.ndimage.rotate(mask_win, angle=da, reshape=True, prefilter=False)
+        mask_win = (mask_win > 0.5)
         new_h, new_w = win_rot.shape[:2]
         # plt.figure(); plt.imshow(window)
         # plt.figure(); plt.imshow(win_rot); plt.show()
@@ -197,22 +200,24 @@ def random_place(img: PIL.Image.Image, labels: ImageObjects,
         if _h == 0 or _w == 0:
             continue
         # edge cases
-        win_rot = _random_crop(win_rot, _h, _w)
+        win_rot, mask_win = _random_crop(win_rot, mask_win, _h, _w)
         # plt.figure(); plt.imshow(bg_window)
         # plt.figure(); plt.imshow(win_rot); plt.show()
-        mask_rot = win_rot.sum(axis=2) > 0.5
-        bg_window[mask_rot] = win_rot[mask_rot]
+        # mask_rot = win_rot.sum(axis=2) > 0.5
+        bg_window[mask_win] = win_rot[mask_win]
         bg[_y1:_y2, _x1:_x2, :] = bg_window
-    plt.figure(); plt.imshow(bg)
-    plt.figure(); plt.imshow(im); plt.show()
+    plt.figure(figsize=(8,8)); plt.imshow(bg)
+    plt.figure(figsize=(8,8)); plt.imshow(im); plt.show()
     raise NotImplementedError()
 
 
-def _random_crop(im, win_h, win_w):
+def _random_crop(im, mask, win_h, win_w):
     assert 0 < win_h <= im.shape[0] and 0 < win_w <= im.shape[1]
     _y1 = random.randint(0, im.shape[0] - win_h)
     _x1 = random.randint(0, im.shape[1] - win_w)
-    return im[_y1:_y1+win_h, _x1:_x1+win_w, :]
+    im = im[_y1:_y1+win_h, _x1:_x1+win_w, :]
+    mask = mask[_y1:_y1+win_h, _x1:_x1+win_w] if mask is not None else None
+    return im, mask
 
 
 def hflip(image: PIL.Image.Image, labels: ImageObjects):

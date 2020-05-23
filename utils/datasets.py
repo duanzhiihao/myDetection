@@ -298,6 +298,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def _load_concat_frames(self, index, to_square=True) -> tuple:
         raise NotImplementedError()
+
         if self.is_video: # TODO:
             raise NotImplementedError()
         assert self.frame_concat >= 2
