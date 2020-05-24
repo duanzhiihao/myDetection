@@ -43,7 +43,8 @@ def drawpoly(img,pts,color,thickness=1,style='dotted',):
 
 def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5,
                 linestyle='-'):
-    '''Draw a single rotated bbox on an image in-place.
+    '''
+    Draw a single rotated bbox on an image in-place.
 
     Args:
         im: image numpy array, shape(h,w,3), preferably RGB
@@ -170,24 +171,32 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         plt.show()
 
 
-def random_colors(num, order='rgb', dtype='uint8') -> np.ndarray:
+def random_colors(num: int, order: str='RGB', dtype: str='uint8') -> np.ndarray:
     '''
     Generate random distinct colors
+
+    Args:
+        num: number of distinct colors
+        order: 'RGB', 'BGR'
+        dtype: 'uint8', 'float', 'float32'
+    
+    Return:
+        colors: np.ndarray, shape[num, 3]
     '''
     assert isinstance(num, int) and num >= 1
     hues = np.linspace(0, 360, num+1, dtype=np.float32)
     np.random.shuffle(hues)
     hsvs = np.ones((1,num,3), dtype=np.float32)
     hsvs[0,:,0] = 2 if num==1 else hues[:-1]
-    if order == 'rgb':
+    if order == 'RGB':
         colors = cv2.cvtColor(hsvs, cv2.COLOR_HSV2RGB)
-    elif order == 'bgr':
+    elif order == 'BGR':
         colors = cv2.cvtColor(hsvs, cv2.COLOR_HSV2BGR)
     if dtype == 'uint8':
         colors = (colors * 255).astype(np.uint8)
     else:
         assert dtype == 'float' or dtype == 'float32'
-    colors = colors.reshape(num,3)
+    colors: np.ndarray = colors.reshape(num,3)
     return colors
 
 
