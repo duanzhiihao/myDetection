@@ -2,6 +2,9 @@ import torch
 
 
 def get_backbone(cfg: dict):
+    '''
+    Get backbone network
+    '''
     backbone_name = cfg['model.backbone.name']
     if backbone_name == 'dark53':
         from .backbones import Darknet53
@@ -32,6 +35,9 @@ def get_backbone(cfg: dict):
 
 
 def get_fpn(cfg: dict):
+    '''
+    Get feature fusion network. Also called Feature Pyramid Network (FPN)
+    '''
     fpn_name = cfg['model.fpn.name']
     if fpn_name == 'yolov3':
         from .fpns import YOLOv3FPN
@@ -58,7 +64,23 @@ def get_fpn(cfg: dict):
     return fpn
 
 
+def get_agg(cfg: dict):
+    '''
+    Get feature aggregation module
+    '''
+    agg_name = cfg['model.agg.name']
+    if agg_name == 'sum':
+        from .aggregation import WeightedSum
+        agg = WeightedSum(cfg)
+    else:
+        raise NotImplementedError()
+    return agg
+
+
 def get_rpn(cfg: dict):
+    '''
+    Get region proposal network
+    '''
     rpn_name = cfg['model.rpn.name']
     if rpn_name == 'yolov3':
         from .rpns import YOLOHead
@@ -75,6 +97,9 @@ def get_rpn(cfg: dict):
 
 
 def get_det_layer(cfg: dict):
+    '''
+    Get final detection layer.
+    '''
     det_layer_name = cfg['model.pred_layer']
     if det_layer_name == 'YOLO':
         from .detlayers.yolov3 import YOLOLayer

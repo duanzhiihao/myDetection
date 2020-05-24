@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models
 
-from external_packages.efficientnet.model import EfficientNet, MemoryEfficientSwish
+from external.efficientnet.model import EfficientNet, MemoryEfficientSwish
 from .modules import SeparableConv2d
 
 
