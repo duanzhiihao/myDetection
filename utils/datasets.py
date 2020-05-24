@@ -375,37 +375,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
             img_hw=(img_h, img_w)
         )
         return labels
-    
-    def augment_PIL(self, img, labels):
-        raise DeprecationWarning()
-        # if torch.rand(1).item() > 0.5:
-        #     low, high = self.aug_setting.get('brightness', [0.6, 1.4])
-        #     img = tvf.adjust_brightness(img, uniform(low, high))
-        # if torch.rand(1).item() > 0.5:
-        #     low, high = self.aug_setting.get('contrast', [0.5, 1.5])
-        #     img = tvf.adjust_contrast(img, uniform(low, high))
-        # if torch.rand(1).item() > 0.5:
-        #     low, high = self.aug_setting.get('hue', [-0.1, 0.1])
-        #     img = tvf.adjust_hue(img, uniform(low, high))
-        # if torch.rand(1).item() > 0.5:
-        #     low, high = self.aug_setting.get('saturation', [0, 2])
-        #     img = tvf.adjust_saturation(img, uniform(low, high)) # 0 ~ 3
-        # # if torch.rand(1).item() > 0.5:
-        # #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
-        # # horizontal flip
-        # if torch.rand(1).item() > 0.5:
-        #     img, labels = augUtils.hflip(img, labels)
-        # if self.bb_format in {'cxcywhd'}:
-        #     # vertical flip
-        #     if torch.rand(1).item() > 0.5:
-        #         img, labels = augUtils.vflip(img, labels)
-        #     # random rotation
-        #     rand_deg = torch.rand(1).item() * 360
-        #     expand = self.aug_setting['rotation_expand']
-        #     img, labels = augUtils.rotate(img, rand_deg, labels, expand=expand)
-        #     return img, labels
-
-        # return img, labels
 
     @staticmethod
     def collate_func(batch):
@@ -419,6 +388,3 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         return torch.utils.data.DataLoader(self,
                     collate_fn=Dataset4ObjDet.collate_func, **kwargs)
 
-
-def uniform(a, b):
-    return a + torch.rand(1).item() * (b-a)

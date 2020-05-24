@@ -1,9 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision.models
-
-from external.efficientnet.model import EfficientNet, MemoryEfficientSwish
-from .modules import SeparableConv2d
 
 
 def ConvBnLeaky(in_, out_, k, s):
@@ -125,6 +121,7 @@ class ResNetBackbone(nn.Module):
 
 def get_resnet50():
     print('Using backbone ResNet-50. Loading ImageNet weights...')
+    import torchvision.models
     model = torchvision.models.resnet50(pretrained=True)
     return ResNetBackbone(model)
 
@@ -144,6 +141,7 @@ class EfNetBackbone(nn.Module):
         super().__init__()
         model_name = cfg['model.backbone.name']
         assert model_name in self.valid_names, 'Unknown efficientnet model name'
+        from external.efficientnet.model import EfficientNet
         efn = EfficientNet.from_pretrained(model_name, advprop=True)
         del efn._conv_head, efn._bn1, efn._avg_pooling, efn._dropout, efn._fc
         self.model = efn

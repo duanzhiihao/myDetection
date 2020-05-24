@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 from models.general import name_to_model
-from utils import timer, image_ops, datasets, trainUtils
+from utils import timer, image_ops, datasets, optim
 import api
 
 
@@ -121,7 +121,7 @@ def main():
         decay = global_cfg['train.sgd.weight_decay'] if 'conv' in key else 0.0
         params += [{'params': value, 'weight_decay': decay}]
     # Initialize optimizer
-    optimizer = trainUtils.get_optimizer(name=args.optimizer, params=params,
+    optimizer = optim.get_optimizer(name=args.optimizer, params=params,
                                          lr=args.lr, cfg=global_cfg)
     if args.checkpoint and args.optimizer in previous_state:
         optimizer.load_state_dict(previous_state[args.optimizer])
