@@ -14,3 +14,10 @@
 - [ ] Hard example mining
 - [ ] EfficientDet + FCOS + angle
 - [ ] EfficientDet + FCOS + mask
+
+## Installation
+0. Clone repository
+1. `conda develop --name pytorch_env /home/duanzh/Projects/myDetection`
+
+## Uninstall
+`conda develop --uninstall /home/duanzh/Projects/myDetection`
