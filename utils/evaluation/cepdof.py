@@ -39,6 +39,7 @@ class CEPDOFeval(cocoeval.COCOeval):
         # So, add id to each dt and gt in the dt_json and gt_json.
         for i, gt in enumerate(self.gt_json['annotations']):
             gt['id'] = gt.get('id', i+1)
+            gt['area'] = gt.get('area', gt['bbox'][2]*gt['bbox'][3])
         for i, dt in enumerate(self.dt_json):
             dt['id'] = dt.get('id', i+1)
             # Calculate the areas of detections if there is not. category_id
