@@ -55,7 +55,7 @@ def get_valset(valset_name):
             'out_format': 'cepdof'
         }
         from .cepdof import evaluate_json
-        validation_func = lambda x: evaluate_json(x, val_json_path)
+        validation_func = lambda x: evaluate_json(x, val_json_path.replace('_mot',''))
 
     # ------------------------ datasets for debugging ------------------------
     elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
