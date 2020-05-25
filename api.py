@@ -44,10 +44,9 @@ class Detector():
         self.on_cpu = cpu
     
     def _init_preprocess(self, cfg):
-        preprocess_name = cfg['test.preprocessing']
         self.divisibe = cfg['general.input_divisibility']
         self.input_size = cfg.get('test.default_input_size', None)
-        self.preprocess = preprocess_name
+        self.preprocess = cfg['test.preprocessing']
     
     def _init_postprocess(self, cfg):
         self.conf_thres = cfg['test.default_conf_thres']
@@ -59,12 +58,28 @@ class Detector():
             eval_info: list of (img_path, img_id)
             See _predict_pil() for optinal arguments
         '''
+        print('Warning: will be deprecated')
         detection_json = []
         for (impath, imgId) in tqdm(eval_info):
             detections = self.detect_one(img_path=impath, **kwargs)
             detection_json += detections.to_json(img_id=imgId)
         return detection_json
-        
+
+    def eval_predict_vod(self, eval_info, **kwargs):
+        assert isinstance(eval_info, dict)
+        img_dir = eval_info['image_dir']
+        out_format = eval_info['out_format']
+        detection_json = []
+        for vid_info in eval_info['eval_json']['videos']:
+            file_names = vid_info['file_names']
+            self.model.clear_hidden_state()
+            for fname in tqdm(file_names):
+                impath = os.path.join(img_dir, fname)
+                dts = self.detect_one(img_path=impath, **kwargs)
+                imgId = fname.split('/')[-1][:-4]
+                detection_json += dts.to_json(img_id=imgId, out_format=out_format)
+        return detection_json
+
     def predict_imgDir(self, img_dir, **kwargs):
         '''
         Run the object detector on a sequence of images
@@ -144,8 +159,8 @@ class Detector():
         # post-processing
         dts.cpu_()
         dts = dts[dts.scores >= conf_thres]
-        if len(dts) > 1000:
-            _, idx = torch.topk(dts.scores, k=1000)
+        if len(dts) > 512:
+            _, idx = torch.topk(dts.scores, k=512)
             dts = dts[idx]
         if kwargs.get('category_set', None) is not None:
             dts.category_filter_(kwargs['category_set'])

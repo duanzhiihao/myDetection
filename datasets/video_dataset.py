@@ -104,8 +104,9 @@ class Dataset4VODT(Dataset):
         else:
             img_label_pairs = self._load_random_seq(to_square=True)
         
-        seq_imgs, seq_labels, img_paths, pad_info = img_label_pairs
-        assert len(seq_imgs) == len(seq_labels) == len(img_paths) == len(pad_info)
+        seq_imgs, seq_labels, start_flags, img_paths, pad_info = img_label_pairs
+        assert len(seq_imgs) == len(seq_labels) == len(start_flags) \
+               == len(img_paths) == len(pad_info)
         # visualize the clip for debugging
         if False:
             import numpy as np; import cv2
@@ -142,7 +143,7 @@ class Dataset4VODT(Dataset):
         # sanity check before return
         for _lab in seq_labels:
             _lab.bboxes[:, 0:4].clamp_(min=0)
-        return seq_imgs, seq_labels, tuple(img_paths)
+        return seq_imgs, seq_labels, start_flags, tuple(img_paths)
 
     def _load_random_seq(self, to_square=True):
         '''Load a sequence of images and labels'''
@@ -150,6 +151,7 @@ class Dataset4VODT(Dataset):
         index = random.randint(0, len(self.video_start)-self.seq_len)
         seq_imgs = []
         seq_labels = []
+        start_flags = []
         img_paths = []
         while len(seq_imgs) < self.seq_len and index < len(self.video_start):
             vinfo = self.videoId2info[self.video_ids[index]]
@@ -160,6 +162,7 @@ class Dataset4VODT(Dataset):
             labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
             seq_imgs.append(img)
             seq_labels.append(labels)
+            start_flags.append(self.video_start[index])
             img_paths.append(impath)
             # temporal down sampling
             if 'min_fps' in self.clip_aug:
@@ -167,6 +170,7 @@ class Dataset4VODT(Dataset):
             else:
                 max_step = 1
             index += random.randint(1, max(max_step,1))
+        start_flags[0] = torch.BoolTensor([True])[0] # the first image is always start
         # augmentation
         if self.clip_aug is not None:
             seq_imgs, seq_labels = augUtils.augment_PIL(seq_imgs, seq_labels,
@@ -178,7 +182,7 @@ class Dataset4VODT(Dataset):
                     self.img_size, aug=aug_flag, resize_step=self.input_divisibility)
         else:
             pad_info = None
-        return (seq_imgs, labels, img_paths, pad_info)
+        return (seq_imgs, labels, start_flags, img_paths, pad_info)
 
     @staticmethod
     def _ann2labels(anns, img_h, img_w, bb_format):
@@ -199,11 +203,12 @@ class Dataset4VODT(Dataset):
 
     @staticmethod
     def collate_func(batch):
-        _seqs, _labels, _ids = [list(b) for b in zip(*batch)]
-        seq_batch:   List[torch.tensor] = [torch.stack(b) for b in zip(*_seqs)]
-        label_batch: List[list]         = [list(b) for b in zip(*_labels)]
-        id_batch:    List[tuple]        = [list(b) for b in zip(*_ids)]
-        return seq_batch, label_batch, id_batch
+        _seqs, _labels, _flags, _ids = [list(b) for b in zip(*batch)]
+        seq_imgs:   List[torch.tensor] = [torch.stack(b) for b in zip(*_seqs)]
+        seq_labels: List[list]         = [list(b) for b in zip(*_labels)]
+        seq_flags:  List[torch.tensor] = [torch.stack(b) for b in zip(*_flags)]
+        img_ids:    List[tuple]        = [list(b) for b in zip(*_ids)]
+        return seq_imgs, seq_labels, seq_flags, img_ids
     
     def to_iter(self, **kwargs):
         self.iter = iter(DataLoader(self, collate_fn=self.collate_func, **kwargs))

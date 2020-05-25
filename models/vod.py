@@ -28,25 +28,33 @@ class SimpleVOD(torch.nn.Module):
 
         self.hidden = None
     
-    def reset_hidden_state(self):
+    def clear_hidden_state(self):
         self.hidden = None
 
-    def forward(self, x, labels: List[ImageObjects]=None):
+    def forward(self, x, is_start: torch.BoolTensor=None,
+                labels: List[ImageObjects]=None):
         '''
         Forwar pass
 
         Args:
             x: a batch of images, e.g. shape(8,3,608,608)
+            is_start: a batch of bool tensors indicating if the input x is the \
+                start of a video.
             labels: a batch of ground truth
         '''
         assert x.dim() == 4
+        if is_start is None:
+            is_start = torch.zeros(x.shape[0], dtype=torch.bool, device=x.device)
+        assert is_start.dim() == 1 and is_start.shape[0] == x.shape[0]
         self.img_size = x.shape[2:4]
 
         # go through the backbone and the feature payamid network
         features = self.backbone(x)
         features = self.fpn(features)
-        features = self.agg(features, self.hidden)
+        # feature aggregation
+        features = self.agg(features, self.hidden, is_start)
         self.hidden = [f.detach() for f in features]
+        # prediction
         all_branch_preds = self.rpn(features)
         
         dts_all = []

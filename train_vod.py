@@ -21,13 +21,13 @@ def main():
     parser.add_argument('--train_set', type=str, default='HBMWR_mot_train')
     parser.add_argument('--val_set', type=str, default='Lab1_mot')
 
-    parser.add_argument('--super_batchsize', type=int, default=32)
+    parser.add_argument('--super_batchsize', type=int, default=16)
     parser.add_argument('--initial_imgsize', type=int, default=None)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--warmup', type=int, default=1000)
     parser.add_argument('--checkpoint', type=str,
-                        default='')
+                        default='rapid_H1MW1024_Mar11_4000_.pth')
 
     parser.add_argument('--print_interval', type=int, default=20)
     parser.add_argument('--eval_interval', type=int, default=200)
@@ -124,7 +124,7 @@ def main():
             print('Cannot load weights. Trying to set strict=False...')
             model.load_state_dict(previous_state['model'], strict=False)
             print('Successfully loaded part of the weights.')
-        start_iter = previous_state['iter']
+        start_iter = previous_state.get('iter', start_iter)
         print(f'Start from iteration: {start_iter}')
 
     print('Initializing tensorboard SummaryWriter...')
@@ -154,12 +154,13 @@ def main():
     start_time = timer.tic()
     for iter_i in range(start_iter, 1000000):
         # evaluation
-        if iter_i > 0 and iter_i % args.eval_interval == 0:
-            if not args.debug_mode:
+        # if iter_i > 0 and iter_i % args.eval_interval == 0:
+        if iter_i % args.eval_interval == 0:
+            if args.debug_mode != 'overfit':
                 model.eval()
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
-                dts = model_eval.evaluation_predict(eval_info,
+                dts = model_eval.eval_predict_vod(eval_info,
                     input_size=target_size,
                     conf_thres=global_cfg.get('test.ap_conf_thres', 0.005))
                 eval_str, ap, ap50, ap75 = validation_func(dts)
@@ -179,8 +180,8 @@ def main():
         # subdivision loop
         optimizer.zero_grad()
         for _ in range(subdivision):
-            seq_imgs, seq_labels, img_ids = dataset.get_next()
-            assert len(seq_imgs) == len(seq_labels) == len(img_ids)
+            seq_imgs, seq_labels, seq_flags, img_ids = dataset.get_next()
+            assert len(seq_imgs) == len(seq_labels) == len(seq_flags)
             # visualize the clip for debugging
             if False:
                 for b in range(batch_size):
@@ -190,9 +191,10 @@ def main():
                         _lab[b].draw_on_np(_im)
                         cv2.imshow('', _im)
                         cv2.waitKey(500)
-            for imgs, labels in zip(seq_imgs, seq_labels):
+            # model.reset_hidden_state()
+            for imgs, labels, is_start in zip(seq_imgs, seq_labels, seq_flags):
                 imgs = imgs.cuda()
-                loss = model(imgs, labels)
+                loss = model(imgs, is_start, labels)
                 assert not torch.isnan(loss)
                 loss.backward()
         for p in model.parameters():

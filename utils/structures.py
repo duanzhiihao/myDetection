@@ -201,7 +201,7 @@ class ImageObjects():
         assert self.bboxes.dim() == 2
         draw_bboxes_on_np(im, self, class_map=class_map, **kwargs)
 
-    def to_json(self, img_id) -> list:
+    def to_json(self, img_id, out_format='coco') -> list:
         '''Generate COCO-like json format
 
         Args:
@@ -220,10 +220,12 @@ class ImageObjects():
         assert self.bboxes.shape[0] == self.cats.shape[0] == self.scores.shape[0]
         list_json = []
         for bb, c, s in zip(self.bboxes, self.cats, self.scores):
-            if self._bb_format == 'cxcywh':
+            if out_format == 'coco':
+                assert self._bb_format == 'cxcywh'
                 cx,cy,w,h = [float(t) for t in bb]
                 bbox = [cx-w/2, cy-h/2, w, h]
-            elif self._bb_format == 'cxcywhd':
+            elif out_format == 'cepdof':
+                assert self._bb_format == 'cxcywhd'
                 bbox = [float(t) for t in bb]
             else:
                 raise NotImplementedError()
