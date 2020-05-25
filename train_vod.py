@@ -191,7 +191,7 @@ def main():
                         _lab[b].draw_on_np(_im)
                         cv2.imshow('', _im)
                         cv2.waitKey(500)
-            # model.reset_hidden_state()
+            model.reset_hidden_state()
             for imgs, labels, is_start in zip(seq_imgs, seq_labels, seq_flags):
                 imgs = imgs.cuda()
                 loss = model(imgs, is_start, labels)
