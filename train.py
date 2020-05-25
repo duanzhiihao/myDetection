@@ -71,7 +71,7 @@ def main():
         assert 'train.imgsize_to_batch_size' in global_cfg
         print('Auto-batchsize enabled. Automatically selecting the batch size.')
         # optimizer setting
-        num_cpu = 0
+        num_cpu = 4
         warmup_iter = args.warmup
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)

@@ -99,20 +99,24 @@ def augment_PIL(imgs: List[PIL.Image.Image], labels: List[ImageObjects],
     num = len(imgs)
     if torch.rand(1).item() > 0.5:
         low, high = aug_setting.get('brightness', [0.6, 1.4])
+        _val = uniform(low, high)
         for i in range(num):
-            imgs[i] = tvf.adjust_brightness(imgs[i], uniform(low, high))
+            imgs[i] = tvf.adjust_brightness(imgs[i], _val)
     if torch.rand(1).item() > 0.5:
         low, high = aug_setting.get('contrast', [0.5, 1.5])
+        _val = uniform(low, high)
         for i in range(num):
-            imgs[i] = tvf.adjust_contrast(imgs[i], uniform(low, high))
+            imgs[i] = tvf.adjust_contrast(imgs[i], _val)
     if torch.rand(1).item() > 0.5:
         low, high = aug_setting.get('hue', [-0.1, 0.1])
+        _val = uniform(low, high)
         for i in range(num):
-            imgs[i] = tvf.adjust_hue(imgs[i], uniform(low, high))
+            imgs[i] = tvf.adjust_hue(imgs[i], _val)
     if torch.rand(1).item() > 0.5:
         low, high = aug_setting.get('saturation', [0, 2])
+        _val = uniform(low, high)
         for i in range(num):
-            imgs[i] = tvf.adjust_saturation(imgs[i], uniform(low, high)) # 0 ~ 3
+            imgs[i] = tvf.adjust_saturation(imgs[i], _val)
     # if torch.rand(1).item() > 0.5:
     #     img = tvf.adjust_gamma(img, uniform(0.5, 3))
     # horizontal flip
@@ -129,9 +133,7 @@ def augment_PIL(imgs: List[PIL.Image.Image], labels: List[ImageObjects],
         expand = aug_setting['rotation_expand']
         for i in range(num):
             imgs[i], labels[i] = rotate(imgs[i], rand_deg, labels[i], expand=expand)
-        return img, labels
-
-    return img, labels
+    return imgs, labels
 
 
 def random_place(img: PIL.Image.Image, labels: ImageObjects,
@@ -293,10 +295,13 @@ def add_gaussian(imgs, max_var=0.1):
     return imgs
 
 
-def add_saltpepper(imgs, max_p=0.06):
+def add_saltpepper(imgs: torch.FloatTensor, max_p=0.06):
     '''
-    imgs: tensor, (batch),C,H,W
-    p: probibility to add salt and pepper
+    Add salt & pepper noise to the image in-place
+
+    Args:
+        imgs: tensor, (batch),C,H,W
+        p: probibility to add salt and pepper
     '''
     c,h,w = imgs.shape[-3:]
 
@@ -309,7 +314,6 @@ def add_saltpepper(imgs, max_p=0.06):
     value = torch.randint(0,2,size=(total,),dtype=torch.float)
 
     imgs[...,idxC,idxH,idxW] = value
-
     return imgs
 
 

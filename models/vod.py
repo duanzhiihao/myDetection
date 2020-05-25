@@ -6,6 +6,9 @@ from utils.structures import ImageObjects
 
 
 class SimpleVOD(torch.nn.Module):
+    '''
+    A simple video object detection class
+    '''
     def __init__(self, cfg: dict):
         super().__init__()
 
@@ -21,7 +24,7 @@ class SimpleVOD(torch.nn.Module):
 
         self.check_gt_assignment = cfg.get('train.check_gt_assignment', False)
         self.bb_format = cfg.get('general.pred_bbox_format')
-        # self.input_format = cfg['general.input_format']
+        self.input_format = cfg['general.input_format']
 
         self.hidden = None
     

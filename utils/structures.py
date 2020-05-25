@@ -58,8 +58,7 @@ class ImageObjects():
     
     def clone(self):
         '''
-        Return a clone of self \\
-        Note: rles will not be cloned, and masks will not be created
+        Return a clone of self
         '''
         raise DeprecationWarning()
         # new = ImageObjects(

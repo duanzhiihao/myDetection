@@ -1,6 +1,7 @@
+import random
 import numpy as np
 import PIL.Image
-import random
+import cv2
 import torch
 import torchvision.transforms.functional as tvf
 
@@ -34,63 +35,87 @@ def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
     return pil_img
 
 
-def rect_to_square(img: PIL.Image.Image, labels: ImageObjects,
-                   target_size:int, aug:bool=False,
-                   resize_step=128):
+def rect_to_square(image, labels, target_size:int, aug:bool=False,
+                   resize_step:int=128):
     '''
+    Resize and pad the input image to square. \\
+    If aug, the input image will be randomly resized such that the longer side is \
+        between [target_size-resize_step, target_size].\\
+    Otherwise, the input is resied such that longer side = target_size.
+
     Args:
-        img: PIL.Image
-        labels: ImageObjects
-        target_size: int, e.g. 608
-        aug: bool
+        image: PIL.Image or list of PIL.Image
+        labels: ImageObjects or list of ImageObjects
+        target_size: int, the width/height of the output square
+        aug: bool, if Ture, perform random resizing and placing augmentation
+        resize_step: int, the input image is re
     '''
-    assert isinstance(img, PIL.Image.Image) and img.mode == 'RGB'
-    ori_h, ori_w = img.height, img.width
-
-    # resize to target input size (usually smaller)
-    resize_scale = target_size / max(ori_w,ori_h)
-    if aug:
-        low_ = (target_size - resize_step) / target_size
-        resize_scale = resize_scale * (low_ + np.random.rand()*(1-low_))
-    assert resize_scale > 0
-    nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
-    img = tvf.resize(img, (nopad_h,nopad_w))
-
-    # pad to square
-    if aug:
-        # random placing
-        left = random.randint(0, target_size - nopad_w)
-        top = random.randint(0, target_size - nopad_h)
+    if isinstance(image, PIL.Image.Image):
+        imgs, labels = [image], [labels]
     else:
-        left = (target_size - nopad_w) // 2
-        top = (target_size - nopad_h) // 2
-    right = target_size - nopad_w - left
-    bottom = target_size - nopad_h - top
-
-    fill_value = tuple([random.randint(0,255) for _ in range(3)]) if aug else 0
-    img = tvf.pad(img, padding=(left,top,right,bottom), fill=fill_value)
-    # record the padding info
-    img_tl = (left, top) # start of the true image
-    img_wh = (nopad_w, nopad_h)
-
-    # modify labels
+        imgs = image
     if labels is not None:
-        assert isinstance(labels, ImageObjects)
-        assert labels._bb_format in {'cxcywh', 'cxcywhd'}
-        labels.bboxes[:,:4] *= resize_scale
-        labels.bboxes[:,0] += left
-        labels.bboxes[:,1] += top
-        if labels.img_hw is not None:
-            assert labels.img_hw == (ori_h, ori_w)
-        labels.img_hw = (target_size, target_size)
+        assert len(imgs) == len(labels)
+    pad_info = []
+    aug_resize = torch.rand(1).item()
+    fill_value = tuple([random.randint(0,255) for _ in range(3)]) if aug else 0
+    for i in range(len(imgs)):
+        _img = imgs[i]
+        assert isinstance(_img, PIL.Image.Image) and _img.mode == 'RGB'
     
-    pad_info = (ori_w, ori_h) + img_tl + img_wh
-    assert isinstance(pad_info, tuple)
-    return img, labels, pad_info
+        ori_h, ori_w = _img.height, _img.width
+        # resize to target input size (usually smaller)
+        resize_scale = target_size / max(ori_w,ori_h)
+        if aug:
+            low_ = (target_size - resize_step) / target_size
+            resize_scale = resize_scale * (low_ + aug_resize*(1-low_))
+        assert resize_scale > 0
+        nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
+        _img = tvf.resize(_img, (nopad_h,nopad_w))
+
+        # pad to square
+        if aug and isinstance(image, PIL.Image.Image):
+            # random placing if enable aug. and input is a single image
+            left = random.randint(0, target_size - nopad_w)
+            top = random.randint(0, target_size - nopad_h)
+        else:
+            left = (target_size - nopad_w) // 2
+            top = (target_size - nopad_h) // 2
+        right = target_size - nopad_w - left
+        bottom = target_size - nopad_h - top
+
+        _img = tvf.pad(_img, padding=(left,top,right,bottom), fill=fill_value)
+        imgs[i] = _img
+
+        # record the padding info
+        img_tl = (left, top) # start of the true image
+        img_wh = (nopad_w, nopad_h)
+        _info = (ori_w, ori_h) + img_tl + img_wh
+        pad_info.append(_info)
+
+        # modify labels
+        _lab = labels[i]
+        if _lab is not None:
+            assert isinstance(_lab, ImageObjects)
+            assert _lab._bb_format in {'cxcywh', 'cxcywhd'}
+            _lab.bboxes[:,:4] *= resize_scale
+            _lab.bboxes[:,0] += left
+            _lab.bboxes[:,1] += top
+            if _lab.img_hw is not None:
+                assert _lab.img_hw == (ori_h, ori_w)
+            _lab.img_hw = (target_size, target_size)
+        
+    if isinstance(image, PIL.Image.Image):
+        image, labels, pad_info = imgs[0], labels[0], pad_info[0]
+    else:
+        image = imgs
+    return image, labels, pad_info
 
 
 def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
     '''
+    Transform the tensor image to a specified format.
+
     Args:
         t_img: tensor image. must be torch.FloatTensor between 0-1
         code: str
@@ -113,21 +138,45 @@ def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
     return t_img
 
 
-def tensor_img_to_pil(t_img: torch.tensor, code: str):
+def img_tensor_to_np(t_img: torch.FloatTensor, encoding: str, out_format: str):
+    '''
+    Convert a tensor image to numpy image. 
+    This is sort of the inverse operation of format_tensor_img(). \\
+    NOTE: this function is not optimized for speed
+
+    Args:
+        t_img: tensor image
+        encoding: how tensor image is transformed.
+                  Available: 'RGB_1', 'RGB_1_norm', 'BGR_255_norm'
+        out_format: 'RGB_1', 'BGR_1'
+    '''
     assert torch.is_tensor(t_img) and t_img.dim() == 3 and t_img.shape[0] == 3
-    # assert 0 < t_img.mean() < 1
-    if code == 'RGB_1':
+    assert encoding in {'RGB_1', 'RGB_1_norm', 'BGR_255_norm'}
+    assert out_format in {'RGB_1', 'BGR_1', 'BGR_uint8'}
+
+    t_img = t_img.clone()
+    # 0. convert everthing to RGB_1
+    if encoding == 'RGB_1':
         pass
-    elif code == 'RGB_1_norm':
+    elif encoding == 'RGB_1_norm':
         means = [0.485,0.456,0.406]
         stds = [0.229,0.224,0.225]
         for channel, m, sd in zip(t_img, means, stds):
             channel.mul_(sd).add_(m)
-    elif code == 'BGR_255_norm':
+    elif encoding == 'BGR_255_norm':
         raise NotImplementedError()
     else:
         raise NotImplementedError()
-    return tvf.to_pil_image(t_img)
+    im = t_img.permute(1, 2, 0).numpy()
+    # 1. convert RGB_1 to output format
+    if out_format == 'RGB_1':
+        pass
+    elif out_format == 'BGR_1':
+        im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+    elif out_format == 'BGR_uint8':
+        im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+        im = (im * 255).astype('uint8')
+    return im
 
 
 def extract_mask(im: np.ndarray, mask: np.ndarray, cxcywhd):

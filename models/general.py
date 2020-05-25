@@ -7,10 +7,14 @@ from utils.structures import ImageObjects
 
 
 def name_to_model(model_name):
-    cfg = json.load(open(f'./configs/{model_name}.json', 'r'))
+    from settings import PROJECT_ROOT
+    cfg = json.load(open(f'{PROJECT_ROOT}/configs/{model_name}.json', 'r'))
 
     if cfg['base'] == 'OneStageBBox':
         model = OneStageBBox(cfg)
+    elif cfg['base'] == 'SimpleVOD':
+        from .vod import SimpleVOD
+        model = SimpleVOD(cfg)
     else:
         raise Exception('Unknown model name')
     

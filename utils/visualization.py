@@ -74,53 +74,15 @@ def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5,
         raise Exception('Unknown linestyle in function _draw_xywha()')
 
 
-def draw_cocobb_on_np(im, bboxes, bb_type='pbb', print_dt=False):
-    '''
-    im: numpy array, uint8, shape(h,w,3), RGB
-    bboxes: rows of [class,x,y,w,h,conf]
-    '''
-    raise DeprecationWarning()
-
-    assert bboxes.dim() == 2 and bboxes.shape[1] >= 5
-    line_width = round(im.shape[0] / 300)
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = im.shape[0] * im.shape[1] / (700*700)
-    font_bold = im.shape[0] // 400
-    for bb in bboxes:
-        if bb_type == 'gtbb':
-            # ground truth BB
-            cat_idx,x,y,w,h = bb
-            a = 0
-            conf = -1
-        elif bb_type == 'pbb':
-            # predicted BB
-            cat_idx,x,y,w,h,conf = bb
-            a = 0
-        elif bb_type == 'gtrbb':
-            # ground truth rotated BB
-            cat_idx,x,y,w,h,a, = bb
-            conf = -1
-        elif bb_type == 'prbb':
-            # predicted rotated BB
-            cat_idx,x,y,w,h,a,conf = bb
-        else:
-            raise NotImplementedError()
-        cat_idx = int(cat_idx)
-        cat_name = COCO_CATEGORY_LIST[cat_idx]['name']
-        cat_color = COCO_CATEGORY_LIST[cat_idx]['color']
-        if print_dt:
-            print(f'category:{cat_name}, score: {conf},',
-                  f'[{x:.1f} {y:.1f} {w:.1f} {h:.1f} {a:.1f}].')
-        _draw_xywha(im, x, y, w, h, a, color=cat_color, linewidth=line_width)
-        x1, y1 = x - w/2, y - h/2
-        text = cat_name if 'gt' in bb_type else f'{cat_name}, {conf:.2f}'
-        cv2.putText(im, text, (int(x1),int(y1)), font, 0.5,
-                    (255,255,255), font_bold, cv2.LINE_AA)
-    # plt.imshow(im)
-    # plt.show()
-
-
 def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
+    '''
+    Draw bounding boxes on a numpy image in-place
+
+    Args:
+        im: numpy.ndarray, uint8, shape(h,w,3), RGB
+        img_objs: utils.structures.ImageObjects
+        class_map: 'COCO'
+    '''
     print_dt = kwargs.get('print_dt', False)
     color = kwargs.get('color', None)
     # Extract bboxes, scores, and category indices
@@ -137,7 +99,7 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         cat_idx2color = lambda x: COCO_CATEGORY_LIST[x]['color']
     else: raise NotImplementedError()
     # Initialize some drawing parameters
-    line_width = round(im.shape[0] / 400)
+    line_width = kwargs.get('line_width', round(im.shape[0] / 300))
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = np.sqrt(im.shape[0] * im.shape[1]) / 2048
     font_bold = im.shape[0] // 600

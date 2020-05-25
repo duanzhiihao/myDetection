@@ -1,6 +1,12 @@
 '''
-This is the global settings for dataset paths. Please use absolute path.
+This is the global settings for dataset paths.
+
+Please use absolute path. Better not to add '/' at the end.
 '''
+import os
+
+# Project root dir
+PROJECT_ROOT = os.path.dirname(__file__)
 
 # COCO dataset: http://cocodataset.org/#home
 COCO_DIR = '/home/duanzh/Projects/Datasets/COCO'

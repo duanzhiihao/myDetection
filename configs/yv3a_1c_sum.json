@@ -1,5 +1,5 @@
 {
-    "__doc": "rapid, periodic smooth L1, feature aggreagation",
+    "__doc": "1-class yolov3, periodic smooth L1, sum aggreagation",
 
     "base": "SimpleVOD",
     
@@ -8,8 +8,6 @@
     "general.num_class": 0,
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
-
-    "general.input.frame_concatenation": 2,
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,
@@ -38,25 +36,31 @@
     "model.angle.pred_range": 360,
 
     "train.sgd.weight_decay": 0.0005,
-    "train.check_gt_assignment": false,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
+    "train.check_gt_assignment": true,
+    "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
     "train.imgsize_to_batch_size": {
         "352": 30,
         "384": 26, "416": 22, "448": 19, "480": 16,
         "512": 14, "544": 12, "576": 11, "608": 10,
         "640": 9, "672": 8, "704": 7
     },
-    "train.data_augmentation": {
-        "satpepper_noise_density": 0.02,
+    "train.data_augmentation.clip": {
+        "min_fps": 8,
+        "mosaic": false,
+        "satpepper_noise_density": 0,
         "brightness": [0.3, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
         "saturation": [0, 2],
+        "resize": true,
         "horizontal_flip": true,
         "vertical_flip": true,
-        "rotation": true,
-        "simulation_fps": 10
+        "rotation": true
     },
+    "train.data_augmentation.frame": {
+        "satpepper_noise_density": 0.02
+    },
+    "train.sequence_length": 10,
 
     "test.preprocessing": "resize_pad_divisible",
     "test.default_input_size": 1024,

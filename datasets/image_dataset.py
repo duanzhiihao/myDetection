@@ -2,135 +2,14 @@ import os
 import json
 import random
 from collections import defaultdict
-from pycocotools import cocoeval
 import PIL.Image
 import torch
 import torchvision.transforms.functional as tvf
 
-from . import image_ops as imgUtils
-from . import augmentation as augUtils
-from . import mask_ops as maskUtils
-from .structures import ImageObjects
-from .evaluation.coco import coco_evaluate_json
-
-
-def get_trainingset(cfg: dict):
-    dataset_name: str = cfg['train.dataset_name']
-    if dataset_name in {'COCOtrain2017', 'COCOval2017'}:
-        # Official COCO dataset
-        _dname = dataset_name.replace('COCO', '')
-        training_set_cfg = {
-            'img_dir': f'../Datasets/COCO/{_dname}',
-            'json_path': f'../Datasets/COCO/annotations/instances_{_dname}.json',
-            'ann_bbox_format': 'x1y1wh',
-            'is_video': False,
-            'noperson_img_dir': f'../Datasets/COCO/{_dname}_np'
-        }
-        # These datasets are not designed for rotation augmentation
-        if cfg['train.data_augmentation'] is not None:
-            assert cfg['train.data_augmentation']['rotation'] == False
-    elif dataset_name in {'rotbbox_train2017', 'rotbbox_val2017',
-                          'personrbb_train2017', 'personrbb_val2017'}:
-        # Customized COCO dataset
-        _dname = dataset_name.split('_')[1]
-        training_set_cfg = {
-            'img_dir': f'../Datasets/COCO/{_dname}',
-            'json_path': f'../Datasets/COCO/annotations/{dataset_name}.json',
-            'ann_bbox_format': 'cxcywhd',
-            'is_video': False,
-            'noperson_img_dir': f'../Datasets/COCO/{_dname}_np'
-        }
-        if cfg['train.data_augmentation'] is not None:
-            assert cfg['train.data_augmentation']['rotation'] == True
-            cfg['train.data_augmentation'].update(rotation_expand=True)
-    elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
-        training_set_cfg = {
-            'img_dir': f'./images/{dataset_name}/',
-            'json_path': f'./utils/debug/{dataset_name}.json',
-            'ann_bbox_format': 'x1y1wh',
-            'is_video': False,
-        }
-        # These datasets are not designed for rotation augmentation
-        assert cfg['train.data_augmentation'] is None
-    elif dataset_name in {'rotbb_debug3', 'debug_lunch31', 'rot80_debug1'}:
-        training_set_cfg = {
-            'img_dir': f'./images/{dataset_name}/',
-            'json_path': f'./utils/debug/{dataset_name}.json',
-            'ann_bbox_format': 'cxcywhd'
-        }
-        assert cfg['train.data_augmentation'] is None
-    else:
-        raise NotImplementedError()
-    return Dataset4ObjDet(training_set_cfg, cfg)
-
-
-def get_valset(valset_name):
-    if valset_name == 'COCOval2017':
-        img_dir = '../Datasets/COCO/val2017'
-        val_json_path = '../Datasets/COCO/annotations/instances_val2017.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
-    elif valset_name == 'personrbb_val2017':
-        img_dir = '../Datasets/COCO/val2017'
-        val_json_path = '../Datasets/COCO/annotations/personrbb_val2017.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        from .evaluation.cepdof import evaluate_json
-        validation_func = lambda x: evaluate_json(x, val_json_path)
-    elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
-                        'High_activity', 'All_off', 'IRfilter', 'IRill',
-                        'MW-R',
-                        'Meeting1', 'Meeting2', 'Lab1', 'Lab2'}:
-        img_dir = f'../Datasets/COSSY/frames/{valset_name}'
-        val_json_path = f'../Datasets/COSSY/annotations/{valset_name}.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        from .evaluation.cepdof import evaluate_json
-        validation_func = lambda x: evaluate_json(x, val_json_path)
-    elif valset_name == 'debug3':
-        img_dir = './images/debug3/'
-        val_json_path = './utils/debug/debug3.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
-    elif valset_name == 'debug_zebra':
-        img_dir = './images/debug_zebra/'
-        val_json_path = './utils/debug/debug_zebra.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
-    elif valset_name == 'debug_kitchen':
-        img_dir = './images/debug_kitchen/'
-        val_json_path = './utils/debug/debug_kitchen.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        validation_func = lambda x: coco_evaluate_json(x, val_json_path)
-    elif valset_name == 'debug_lunch31':
-        img_dir = './images/debug_lunch31/'
-        val_json_path = './utils/debug/debug_lunch31.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        from .evaluation.cepdof import evaluate_json
-        validation_func = lambda x: evaluate_json(x, val_json_path)
-    elif valset_name == 'rotbb_debug3':
-        img_dir = './images/rotbb_debug3/'
-        val_json_path = './utils/debug/rotbb_debug3.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
-        from .evaluation.cepdof import evaluate_json
-        validation_func = lambda x: evaluate_json(x, val_json_path)
-    else:
-        raise NotImplementedError()
-    return eval_info, validation_func
+import utils.image_ops as imgUtils
+import utils.augmentation as augUtils
+import utils.mask_ops as maskUtils
+from utils.structures import ImageObjects
 
 
 class Dataset4ObjDet(torch.utils.data.Dataset):
@@ -139,7 +18,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     Args:
         img_dir: str, imgs folder, e.g. 'someDir/COCO/train2017/'
-        json_path: str, e.g. 'someDir/COCO/annotations/instances_train2017.json'
+        ann_path: str, e.g. 'someDir/COCO/annotations/instances_train2017.json'
         img_size: int, target image size input to the YOLO, default: 608
         augmentation: bool, default: True
         debug: bool, if True, only one data id is selected from the dataset
@@ -164,10 +43,10 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.imgId2info = dict()
         self.imgId2anns = defaultdict(list)
         self.catId2idx  = dict()
-        self._load_json(dataset_cfg['json_path'], dataset_cfg['ann_bbox_format'])
+        self._load_json(dataset_cfg['ann_path'], dataset_cfg['ann_bbox_format'])
 
     def _load_json(self, json_path, ann_bbox_format):
-        '''laod json file'''
+        '''load json file'''
         if self.is_video: # TODO:
             raise NotImplementedError()
         print(f'Loading annotations {json_path} into memory...')
@@ -387,4 +266,3 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
     def to_dataloader(self, **kwargs):
         return torch.utils.data.DataLoader(self,
                     collate_fn=Dataset4ObjDet.collate_func, **kwargs)
-
