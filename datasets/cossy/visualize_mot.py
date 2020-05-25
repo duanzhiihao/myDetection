@@ -8,7 +8,7 @@ from utils.visualization import random_colors, _draw_xywha
 
 
 if __name__ == "__main__":
-    ann_data = json.load(open(COSSY_DIR + '/annotations/HBMWR_mot.json'))
+    ann_data = json.load(open(COSSY_DIR + '/annotations/MW-R_mot.json'))
 
     nColors = 12
     COLORS = random_colors(num=nColors, dtype='uint8').tolist()
@@ -18,10 +18,10 @@ if __name__ == "__main__":
     # out_path = f'./videos_with_ann/Edge_test_mot.avi'
     # vout = cv2.VideoWriter(out_path, fourcc, 10, (fw,fh))
 
-    random.shuffle(ann_data)
-    for i, vidinfo in enumerate(tqdm(ann_data)):
+    random.shuffle(ann_data['videos'])
+    for i, vidinfo in enumerate(tqdm(ann_data['videos'])):
         id2color = dict()
-        vname = vidinfo['video_name']
+        vname = vidinfo['id']
         for imname, img_anns in zip(vidinfo['file_names'], vidinfo['annotations']):
             # impath = os.path.join(f'./frames/{vname}/{imname}')
             impath = f'{COSSY_DIR}/frames/{imname}'

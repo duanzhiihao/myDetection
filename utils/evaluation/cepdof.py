@@ -14,6 +14,7 @@ def evaluate_json(dts_json, gt_json_path):
     cocoEval.accumulate()
     cocoEval.summarize()
     ap, ap50, ap75 = cocoEval.stats[0], cocoEval.stats[1], cocoEval.stats[2]
+    # TODO: return a dict
     return cocoEval.summary, ap, ap50, ap75
 
 

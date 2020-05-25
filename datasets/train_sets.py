@@ -40,7 +40,7 @@ def get_trainingset(cfg: dict):
         return Dataset4ObjDet(training_set_cfg, cfg)
 
     # ------------------------ video datasets ------------------------
-    elif dataset_name in {'HBMWR_mot'}:
+    elif dataset_name in {'HBMWR_mot_train'}:
         # COSSY multi object tracking dataset
         from settings import COSSY_DIR
         training_set_cfg = {

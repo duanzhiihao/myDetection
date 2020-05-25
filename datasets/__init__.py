@@ -1,1 +1,1 @@
-from .registry import get_trainingset
+from .train_sets import get_trainingset

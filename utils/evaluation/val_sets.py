@@ -3,6 +3,7 @@ import json
 
 
 def get_valset(valset_name):
+    # ------------------------ image datasets ------------------------
     if valset_name == 'COCOval2017':
         from settings import COCO_DIR
         img_dir = f'{COCO_DIR}/val2017'
@@ -38,6 +39,21 @@ def get_valset(valset_name):
         eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
                      for imi in gt_json['images']]
 
+        from .cepdof import evaluate_json
+        validation_func = lambda x: evaluate_json(x, val_json_path)
+
+    # ------------------------ video datasets ------------------------
+    elif valset_name in {'Lab1_mot'}:
+        from settings import COSSY_DIR
+        val_json_path = f'{COSSY_DIR}/annotations/{valset_name}.json'
+        gt_json = json.load(open(val_json_path, 'r'))
+        for vid in gt_json['videos']:
+            vid['annotations'] = []
+        eval_info = {
+            'image_dir': f'{COSSY_DIR}/frames',
+            'eval_json': gt_json,
+            'out_format': 'cepdof'
+        }
         from .cepdof import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
 
