@@ -17,7 +17,9 @@
 
 ## Installation
 0. Clone repository
-1. `conda develop --name pytorch_env /home/duanzh/Projects/myDetection`
+
+**Optional**:
+`conda develop --name pytorch_env /home/duanzh/Projects/myDetection`
 
 ## Uninstall
 `conda develop --uninstall /home/duanzh/Projects/myDetection`
