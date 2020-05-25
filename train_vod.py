@@ -158,6 +158,7 @@ def main():
         # if iter_i % args.eval_interval == 0:
             if args.debug_mode != 'overfit':
                 model.eval()
+            model.clear_hidden_state()
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.eval_predict_vod(eval_info,
