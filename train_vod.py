@@ -154,8 +154,8 @@ def main():
     start_time = timer.tic()
     for iter_i in range(start_iter, 1000000):
         # evaluation
-        # if iter_i > 0 and iter_i % args.eval_interval == 0:
-        if iter_i % args.eval_interval == 0:
+        if iter_i > 0 and iter_i % args.eval_interval == 0:
+        # if iter_i % args.eval_interval == 0:
             if args.debug_mode != 'overfit':
                 model.eval()
             with timer.contexttimer() as t0:
