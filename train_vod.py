@@ -32,8 +32,8 @@ def main():
     parser.add_argument('--print_interval', type=int, default=20)
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
-    parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/Lab1_mot/')
+    parser.add_argument('--demo_interval', type=int, default=100)
+    parser.add_argument('--demo_images_dir', type=str, default='./images/fisheye/')
     
     parser.add_argument('--debug_mode', type=str, default='local')
     args = parser.parse_args()
@@ -191,7 +191,7 @@ def main():
                         _lab[b].draw_on_np(_im)
                         cv2.imshow('', _im)
                         cv2.waitKey(500)
-            model.reset_hidden_state()
+            model.clear_hidden_state()
             for imgs, labels, is_start in zip(seq_imgs, seq_labels, seq_flags):
                 imgs = imgs.cuda()
                 loss = model(imgs, is_start, labels)
@@ -228,9 +228,8 @@ def main():
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = int(np.ceil(super_batchsize / batch_size / seq_len))
             dataset.img_size = imgsize
-            dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
-                                            num_workers=num_cpu, pin_memory=True)
-            dataiterator = iter(dataloader)
+            dataset.to_iter(batch_size=batch_size, num_workers=num_cpu,
+                            pin_memory=True)
 
         # save checkpoint
         if iter_i > 0 and (iter_i % args.checkpoint_interval == 0):
@@ -244,7 +243,7 @@ def main():
 
         # save detection
         if iter_i > 0 and iter_i % args.demo_interval == 0:
-            if not args.debug_mode:
+            if args.debug_mode != 'overfit':
                 model.eval()
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
             for imname in os.listdir(args.demo_images_dir):
@@ -252,7 +251,7 @@ def main():
                 impath = os.path.join(args.demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                         conf_thres=0.3, input_size=target_size)
-                if args.debug_mode:
+                if args.debug_mode is not None:
                     cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
                     log_dir = f'./logs/{args.model}_debug/'
                     if not os.path.exists(log_dir): os.mkdir(log_dir)
