@@ -7,8 +7,8 @@
 - [x] EfficientNet + BiFPN + YOLO
 - [x] EfficientDet
 - [x] EfficientDet + FCOS
-- [x] EfficientDet + FCOS + spatial convolution
-- [x] EfficientDet + FCOS + ATSS
+- [x] EfficientDet + custom FCOS
+- [x] EfficientDet + custom FCOS + ATSS
 - [ ] Feature aggregation
 - [ ] Mosaic training data augmentation
 - [ ] Hard example mining
