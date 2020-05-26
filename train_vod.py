@@ -246,11 +246,11 @@ def main():
         if iter_i > 0 and iter_i % args.demo_interval == 0:
             if args.debug_mode != 'overfit':
                 model.eval()
-            model.clear_hidden_state()
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
             for imname in os.listdir(args.demo_images_dir):
                 if not imname.endswith('.jpg'): continue
                 impath = os.path.join(args.demo_images_dir, imname)
+                model_eval.model.clear_hidden_state()
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                         conf_thres=0.3, input_size=target_size)
                 if args.debug_mode is not None:
