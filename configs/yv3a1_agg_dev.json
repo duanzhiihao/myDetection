@@ -4,7 +4,7 @@
     "base": "SimpleVOD",
     
     "general.input_format": "RGB_1",
-    "general.input_divisibility": 32,
+    "general.input_divisibility": 64,
     "general.num_class": 0,
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
@@ -37,12 +37,10 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": false,
-    "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
+    "train.img_sizes": [512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088, 1152, 1280],
     "train.imgsize_to_batch_size": {
-        "352": 30,
-        "384": 26, "416": 22, "448": 19, "480": 16,
-        "512": 14, "544": 12, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 7
+        "512": 12, "576": 10, "640": 8, "704": 7, "768":6, "832": 5,
+        "896": 4, "960": 3, "1024": 3, "1088": 3, "1152": 2, "1280": 2
     },
     "train.data_augmentation.clip": {
         "min_fps": 8,
@@ -60,7 +58,7 @@
     "train.data_augmentation.frame": {
         "satpepper_noise_density": 0.02
     },
-    "train.sequence_length": 10,
+    "train.sequence_length": 6,
 
     "test.preprocessing": "resize_pad_divisible",
     "test.default_input_size": 1024,

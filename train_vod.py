@@ -17,11 +17,11 @@ import api
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yv3a_1c_sum')
+    parser.add_argument('--model', type=str, default='yv3a1_agg_dev')
     parser.add_argument('--train_set', type=str, default='HBMWR_mot_train')
     parser.add_argument('--val_set', type=str, default='Lab1_mot')
 
-    parser.add_argument('--super_batchsize', type=int, default=16)
+    parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--initial_imgsize', type=int, default=None)
     parser.add_argument('--optimizer', type=str, default='SGDMR')
     parser.add_argument('--lr', type=float, default=0.0001)
@@ -35,7 +35,7 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=100)
     parser.add_argument('--demo_images_dir', type=str, default='./images/fisheye/')
     
-    parser.add_argument('--debug_mode', type=str, default='local')
+    parser.add_argument('--debug_mode', type=str, default=None)
     args = parser.parse_args()
 
     assert torch.cuda.is_available()
@@ -45,6 +45,7 @@ def main():
     # -------------------------- settings ---------------------------
     if args.debug_mode == 'overfit':
         raise NotImplementedError()
+        print(f'Running debug mode: {args.debug_mode}...')
         # overfitting on one or a few images
         global_cfg['train.img_sizes'] = [640]
         global_cfg['train.initial_imgsize'] = 640
@@ -57,6 +58,7 @@ def main():
         num_cpu = 0
         warmup_iter = 40
     elif args.debug_mode == 'local':
+        print(f'Running debug mode: {args.debug_mode}...')
         # train on local laptop with a small resolution and batch size
         TRAIN_RESOLUTIONS = [384, 512]
         AUTO_BATCHSIZE = {'384': 4, '512': 2}
@@ -73,6 +75,7 @@ def main():
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)
     elif args.debug_mode == None:
+        print(f'Debug mode disabled.')
         # normal training
         AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']
@@ -260,6 +263,10 @@ def main():
                     s = os.path.join(log_dir, f'{imname[:-4]}_iter{iter_i}.jpg')
                     cv2.imwrite(s, cv2_im)
                 else:
+                    if min(np_img.shape[:2]) > 512:
+                        _h, _w = np_img.shape[:2]
+                        _r = 512 / min(_h, _w)
+                        np_img = cv2.resize(np_img, (int(_w*_r), int(_h*_r)))
                     logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 

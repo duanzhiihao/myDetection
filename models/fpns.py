@@ -2,9 +2,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as tnf
 
-from .backbones import ConvBnLeaky
-from .modules import SeparableConv2d, Swish
 
+class YOLOv3FPN(nn.Module):
+    '''
+    Feature pyramid network used in the YOLOv3
+    '''
+    def __init__(self, cfg: dict):
+        super().__init__()
+        assert cfg['model.backbone.num_levels'] == 3
+        ch3, ch4, ch5 = cfg['model.backbone.out_channels']
+        self.branch_P3 = YOLOBranch(ch3, prev_ch=(ch4//2,ch3//2))
+        self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
+        self.branch_P5 = YOLOBranch(ch5)
+    
+    def forward(self, features):
+        c3, c4, c5 = features
+        # go through FPN blocks in three scales
+        p5, c5_to_c4 = self.branch_P5(c5, previous=None)
+        p4, c4_to_c3 = self.branch_P4(c4, previous=c5_to_c4)
+        p3, _ = self.branch_P3(c3, previous=c4_to_c3)
+
+        return [p3, p4, p5]
 
 class YOLOBranch(nn.Module):
     '''
@@ -16,7 +34,8 @@ class YOLOBranch(nn.Module):
                  default: None
     '''
     def __init__(self, in_, prev_ch=None):
-        super(YOLOBranch, self).__init__()
+        super().__init__()
+        from .modules import ConvBnLeaky
         assert in_ % 2 == 0, 'input channel must be divisible by 2'
 
         # tmp_ch = prev_ch if prev_ch is not None else (in_, in_//2)
@@ -55,25 +74,6 @@ class YOLOBranch(nn.Module):
         return x, feature
 
 
-class YOLOv3FPN(nn.Module):
-    def __init__(self, cfg: dict):
-        super().__init__()
-        assert cfg['model.backbone.num_levels'] == 3
-        ch3, ch4, ch5 = cfg['model.backbone.out_channels']
-        self.branch_P3 = YOLOBranch(ch3, prev_ch=(ch4//2,ch3//2))
-        self.branch_P4 = YOLOBranch(ch4, prev_ch=(ch5//2,ch4//2))
-        self.branch_P5 = YOLOBranch(ch5)
-    
-    def forward(self, features):
-        c3, c4, c5 = features
-        # go through FPN blocks in three scales
-        p5, c5_to_c4 = self.branch_P5(c5, previous=None)
-        p4, c4_to_c3 = self.branch_P4(c4, previous=c5_to_c4)
-        p3, _ = self.branch_P3(c3, previous=c4_to_c3)
-
-        return [p3, p4, p5]
-
-
 # class LastLevelP6P7(nn.Module):
 #     """
 #     This module is used in RetinaNet to generate extra layers, P6 and P7.
@@ -92,6 +92,7 @@ class YOLOv3FPN(nn.Module):
 #         p6 = self.p6(x)
 #         p7 = self.p7(tnf.relu(p6))
 #         return [p6, p7]
+
 
 class C3toP5FPN(nn.Module):
     '''
@@ -386,6 +387,7 @@ class BiFPN5(nn.Module):
 class LinearFusion(nn.Module):
     def __init__(self, num, channels):
         super().__init__()
+        from .modules import SeparableConv2d, Swish
         self.num = num
         self.weights = nn.Parameter(torch.ones(num), requires_grad=True)
         self.spconv_bn = nn.Sequential(

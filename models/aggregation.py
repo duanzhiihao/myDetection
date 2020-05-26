@@ -75,8 +75,9 @@ class Concat(SimpleBase):
         self.rnns = nn.ModuleList()
         for ch in fpn_out_chs:
             fusion = nn.Sequential(
-                ConvBnLeaky(ch*2, ch, k=3, s=1),
-                ConvBnLeaky(ch, ch, k=3, s=1)
+                nn.Conv2d(ch*2, ch, 1, stride=1, padding=0, groups=2),
+                ConvBnLeaky(ch, ch//2, k=1, s=1),
+                ConvBnLeaky(ch//2, ch, k=3, s=1)
             )
             self.rnns.append(fusion)
 
