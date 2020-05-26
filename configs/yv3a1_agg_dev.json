@@ -1,5 +1,5 @@
 {
-    "__doc": "1-class yolov3, periodic smooth L1, sum aggreagation",
+    "__doc": "yolov3, angle, 1-class, aggreagation",
 
     "base": "SimpleVOD",
     
@@ -18,7 +18,7 @@
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
-    "model.agg.name": "sum",
+    "model.agg.name": "concatenate",
 
     "model.rpn.name": "yolov3",
     

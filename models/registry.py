@@ -69,9 +69,12 @@ def get_agg(cfg: dict):
     Get feature aggregation module
     '''
     agg_name = cfg['model.agg.name']
-    if agg_name == 'sum':
-        from .aggregation import WeightedSum
-        agg = WeightedSum(cfg)
+    if agg_name == 'average':
+        from .aggregation import WeightedAvg
+        agg = WeightedAvg(cfg)
+    elif agg_name == 'concatenate':
+        from .aggregation import Concat
+        agg = Concat(cfg)
     else:
         raise NotImplementedError()
     return agg

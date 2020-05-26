@@ -2,43 +2,10 @@ import torch
 import torch.nn as nn
 
 
-def ConvBnLeaky(in_, out_, k, s):
-    '''
-    in_: input channel, e.g. 32
-    out_: output channel, e.g. 64
-    k: kernel size, e.g. 3 or (3,3)
-    s: stride, e.g. 1 or (1,1)
-    '''
-    pad = (k - 1) // 2
-    return nn.Sequential(
-        nn.Conv2d(in_, out_, k, s, padding=pad, bias=False),
-        nn.BatchNorm2d(out_, eps=1e-5, momentum=0.01),
-        nn.LeakyReLU(0.1)
-    )
-
-
-class DarkBlock(nn.Module):
-    '''
-    basic residual block in Darknet53
-    in_out: input and output channels
-    hidden: channels in the block
-    '''
-    def __init__(self, in_out, hidden):
-        super().__init__()
-        self.cbl_0 = ConvBnLeaky(in_out, hidden, k=1, s=1)
-        self.cbl_1 = ConvBnLeaky(hidden, in_out, k=3, s=1)
-
-    def forward(self, x):
-        residual = x
-        x = self.cbl_0(x)
-        x = self.cbl_1(x)
-
-        return x + residual
-
-
 class Darknet53(nn.Module):
     def __init__(self, global_cfg):
         super(Darknet53, self).__init__()
+        from .modules import ConvBnLeaky, DarkBlock
         self.netlist = nn.ModuleList()
         
         in_imgs = global_cfg.get('general.input.frame_concatenation', 1)

@@ -1,7 +1,7 @@
 from typing import List
 import torch
 
-import models.registry as registry
+import models
 from utils.structures import ImageObjects
 
 
@@ -12,12 +12,12 @@ class SimpleVOD(torch.nn.Module):
     def __init__(self, cfg: dict):
         super().__init__()
 
-        self.backbone = registry.get_backbone(cfg)
-        self.fpn      = registry.get_fpn(cfg)
-        self.agg      = registry.get_agg(cfg)
-        self.rpn      = registry.get_rpn(cfg)
+        self.backbone = models.get_backbone(cfg)
+        self.fpn      = models.get_fpn(cfg)
+        self.agg      = models.get_agg(cfg)
+        self.rpn      = models.get_rpn(cfg)
         
-        det_layer = registry.get_det_layer(cfg)
+        det_layer = models.get_det_layer(cfg)
         self.det_layers = torch.nn.ModuleList()
         for level_i in range(len(cfg['model.fpn.out_channels'])):
             self.det_layers.append(det_layer(level_i=level_i, cfg=cfg))
