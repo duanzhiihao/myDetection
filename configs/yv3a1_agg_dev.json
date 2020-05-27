@@ -18,7 +18,7 @@
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
-    "model.agg.name": "concatenate",
+    "model.agg.name": "cross-correlation",
 
     "model.rpn.name": "yolov3",
     

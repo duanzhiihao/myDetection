@@ -12,27 +12,24 @@ class SimpleVOD(torch.nn.Module):
     def __init__(self, cfg: dict):
         super().__init__()
 
-        self.backbone = models.get_backbone(cfg)
-        self.fpn      = models.get_fpn(cfg)
-        self.agg      = models.get_agg(cfg)
-        self.rpn      = models.get_rpn(cfg)
-        
-        det_layer = models.get_det_layer(cfg)
+        self.backbone   = models.get_backbone(cfg)
+        self.fpn        = models.get_fpn(cfg)
+        self.agg        = models.get_agg(cfg)
+        self.rpn        = models.get_rpn(cfg)
         self.det_layers = torch.nn.ModuleList()
+
+        det_layer = models.get_det_layer(cfg)
         for level_i in range(len(cfg['model.fpn.out_channels'])):
             self.det_layers.append(det_layer(level_i=level_i, cfg=cfg))
 
         self.check_gt_assignment = cfg.get('train.check_gt_assignment', False)
-        self.bb_format = cfg.get('general.pred_bbox_format')
-        self.input_format = cfg['general.input_format']
+        self.bb_format           = cfg.get('general.pred_bbox_format')
+        self.input_format        = cfg['general.input_format']
 
-        self.hidden = None
-    
-    def clear_hidden_state(self):
         self.hidden = None
 
     def forward(self, x, is_start: torch.BoolTensor=None,
-                labels: List[ImageObjects]=None):
+                         labels: List[ImageObjects]=None):
         '''
         Forwar pass
 
@@ -53,9 +50,10 @@ class SimpleVOD(torch.nn.Module):
         features = self.fpn(features)
         # feature aggregation
         features = self.agg(features, self.hidden, is_start)
-        self.hidden = [f.detach() for f in features]
         # prediction
         all_branch_preds = self.rpn(features)
+
+        self.record_hidden_state(features, all_branch_preds)
         
         dts_all = []
         losses_all = []
@@ -87,3 +85,17 @@ class SimpleVOD(torch.nn.Module):
                 self.loss_str += m.loss_str + '\n'
             loss = sum(losses_all)
             return loss
+
+    def clear_hidden_state(self):
+        self.hidden = None
+    
+    def record_hidden_state(self, features, all_branch_preds):
+        fpn_copy = [f.detach().clone() for f in features]
+        pred_copy = []
+        for level_pred in all_branch_preds:
+            _copy = dict([(k, v.detach().clone()) for k,v in level_pred.items()])
+            pred_copy.append(_copy)
+        self.hidden = {
+            'fpn_feature': fpn_copy,
+            'pred': pred_copy
+        }

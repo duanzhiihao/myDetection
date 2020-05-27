@@ -87,11 +87,11 @@ class RAPiDLayer(nn.Module):
         self.valid_gts = []
         # Initialize prediction targets
         PositiveMask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
-        IgnoredMask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
-        weighted = torch.zeros(nB, nA, nH, nW)
-        TargetXYWH = torch.zeros(nB, nA, nH, nW, 4)
-        TargetAngle = torch.zeros(nB, nA, nH, nW)
-        TargetConf = torch.zeros(nB, nA, nH, nW, 1)
+        IgnoredMask  = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
+        weighted     = torch.zeros(nB, nA, nH, nW)
+        TargetXYWH   = torch.zeros(nB, nA, nH, nW, 4)
+        TargetAngle  = torch.zeros(nB, nA, nH, nW)
+        TargetConf   = torch.zeros(nB, nA, nH, nW, 1)
         if self.n_cls > 0:
             TargetCls = torch.zeros(nB, nA, nH, nW, self.n_cls)
         

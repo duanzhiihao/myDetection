@@ -10,7 +10,7 @@ class SimpleBase(nn.Module):
     def __init__(self):
         super().__init__()
     
-    def forward(self, features, hidden, is_start: torch.BoolTensor):
+    def forward(self, features, hidden, is_start: torch.BoolTensor, additional=None):
         '''
         Forward pass with sanity check.
 
@@ -33,10 +33,10 @@ class SimpleBase(nn.Module):
                     assert level_hid.shape[0] == len(is_start)
                     level_hid[is_start].zero_()
         
-        fused = self.fuse(features, hidden)
+        fused = self.fuse(features, hidden, additional)
         return fused
 
-    def fuse(self, features, hidden):
+    def fuse(self, features, hidden, additional):
         raise NotImplementedError()
 
 
@@ -50,7 +50,8 @@ class WeightedAvg(SimpleBase):
         self.num_levels = len(global_cfg['model.fpn.out_channels'])
         self.weights = nn.Parameter(torch.zeros(self.num_levels), requires_grad=True)
 
-    def fuse(self, features, hidden):
+    def fuse(self, features, hidden, additional=None):
+        raise NotImplementedError()
         out_feats = []
         for i in range(self.num_levels):
             cur = features[i]
@@ -81,7 +82,41 @@ class Concat(SimpleBase):
             )
             self.rnns.append(fusion)
 
-    def fuse(self, features, hidden) -> List[torch.tensor]:
+    def fuse(self, features, hidden, additional=None) -> List[torch.tensor]:
+        out_feats = []
+        for i, fusion in enumerate(self.rnns):
+            cur: torch.tensor = features[i]
+            hid: torch.tensor = hidden[i]
+            assert cur.shape == hid.shape and cur.dim() == 4
+
+            # concatenate and conv
+            x = torch.cat([hid, cur], dim=1)
+            x = fusion(x)
+            assert x.shape == cur.shape
+            out_feats.append(x)
+
+        out_feats: List[torch.tensor]
+        return out_feats
+
+
+class CrossCorrelation(SimpleBase):
+    '''
+    Previous detected features + cross-corelation
+    '''
+    def __init__(self, global_cfg: dict):
+        super().__init__()
+        from .modules import ConvBnLeaky
+        fpn_out_chs = global_cfg['model.fpn.out_channels']
+        self.num_levels = len(fpn_out_chs)
+        self.rnns = nn.ModuleList()
+        for ch in fpn_out_chs:
+            fusion = nn.Sequential(
+                ConvBnLeaky(ch, ch//2, k=1, s=1),
+                ConvBnLeaky(ch//2, ch, k=3, s=1)
+            )
+            self.rnns.append(fusion)
+
+    def fuse(self, features, hidden, additional=None) -> List[torch.tensor]:
         out_feats = []
         for i, fusion in enumerate(self.rnns):
             cur: torch.tensor = features[i]

@@ -75,6 +75,9 @@ def get_agg(cfg: dict):
     elif agg_name == 'concatenate':
         from .aggregation import Concat
         agg = Concat(cfg)
+    elif agg_name == 'cross-correlation':
+        from .aggregation import CrossCorrelation
+        agg = CrossCorrelation(cfg)
     else:
         raise NotImplementedError()
     return agg
