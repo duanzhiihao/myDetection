@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--demo_interval',       type=int, default=100)
     parser.add_argument('--demo_images_dir',     type=str, default='./images/fisheye/')
     
-    parser.add_argument('--debug_mode',          type=str, default=None)
+    parser.add_argument('--debug_mode', type=str, default=None)
     args = parser.parse_args()
 
     assert torch.cuda.is_available()
@@ -168,7 +168,11 @@ def main():
     optimizer = optim.get_optimizer(name=args.optimizer, params=params,
                                     lr=args.lr, cfg=global_cfg)
     if args.checkpoint and args.optimizer in previous_state:
-        optimizer.load_state_dict(previous_state[args.optimizer])
+        try:
+            optimizer.load_state_dict(previous_state[args.optimizer])
+        except:
+            print('Failed loading optimizer state. Initialize optimizer from scratch.')
+            start_iter = -1
     # Learning rate scheduler
     lr_schedule_func = lambda x: lr_warmup(x, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR

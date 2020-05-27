@@ -62,25 +62,22 @@ class RAPiDLayer(nn.Module):
         p_xywha[..., 4] = p_radian / np.pi * 180
         p_xywha = p_xywha.cpu()
         
+        # Logistic activation for confidence score
+        p_conf = torch.sigmoid(conf_logits.detach())
+        # Logistic activation for categories
+        if self.n_cls > 0:
+            p_cls = torch.sigmoid(cls_logits.detach())
+            cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
+            p_conf = torch.sqrt(p_conf * cls_score)
+            cls_idx = cls_idx.view(nB, nA*nH*nW).cpu()
+        else:
+            cls_idx = torch.zeros(nB, nA*nH*nW, dtype=torch.int64)
+        preds = {
+            'bbox': p_xywha.view(nB, nA*nH*nW, 5),
+            'class_idx': cls_idx,
+            'score': p_conf.view(nB, nA*nH*nW).cpu(),
+        }
         if labels is None:
-            # Logistic activation for confidence score
-            p_conf = torch.sigmoid(conf_logits)
-            # Logistic activation for categories
-            if self.n_cls > 0:
-                p_cls = torch.sigmoid(cls_logits)
-                cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
-                confs = torch.sqrt(p_conf * cls_score)
-                preds = {
-                    'bbox': p_xywha.view(nB, nA*nH*nW, 5),
-                    'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
-                    'score': confs.view(nB, nA*nH*nW).cpu(),
-                }
-            else:
-                preds = {
-                    'bbox': p_xywha.view(nB, nA*nH*nW, 5),
-                    'class_idx': torch.zeros(nB, nA*nH*nW, dtype=torch.int64),
-                    'score': p_conf.view(nB, nA*nH*nW).cpu(),
-                }
             return preds, None
 
         assert isinstance(labels, list)
@@ -210,4 +207,4 @@ class RAPiDLayer(nn.Module):
                         f'angle/gt {loss_angle/ngt:.3f}, conf {loss_conf:.3f}, ' \
                         f'class {loss_cls:.3f}'
         self._assigned_num = pos_num
-        return None, loss
+        return preds, loss
