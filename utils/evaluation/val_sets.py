@@ -2,7 +2,13 @@ import os
 import json
 
 
-def get_valset(valset_name):
+def get_valset(valset_name: str):
+    '''
+    Get validation set.
+
+    Args:
+        valset_name: name of the validation set. Available names can be found below.
+    '''
     # ------------------------ image datasets ------------------------
     if valset_name == 'COCOval2017':
         from settings import COCO_DIR
@@ -28,9 +34,9 @@ def get_valset(valset_name):
         validation_func = lambda x: evaluate_json(x, val_json_path)
 
     elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
-                        'High_activity', 'All_off', 'IRfilter', 'IRill',
-                        'Meeting1', 'Meeting2', 'Lab1', 'Lab2',
-                        'MW-R'}:
+                         'High_activity', 'All_off', 'IRfilter', 'IRill',
+                         'Meeting1', 'Meeting2', 'Lab1', 'Lab2',
+                         'MW-R'}:
         from settings import COSSY_DIR
         img_dir = f'{COSSY_DIR}/frames/{valset_name}'
         val_json_path = f'{COSSY_DIR}/annotations/{valset_name}.json'
@@ -43,7 +49,9 @@ def get_valset(valset_name):
         validation_func = lambda x: evaluate_json(x, val_json_path)
 
     # ------------------------ video datasets ------------------------
-    elif valset_name in {'Lab1_mot'}:
+    elif valset_name in {'Lab1_mot',
+                         'Lunch2_mot', 'Edge_cases_mot', 'High_activity_mot',
+                         'All_off_mot', 'IRfilter_mot', 'IRill_mot'}:
         from settings import COSSY_DIR
         val_json_path = f'{COSSY_DIR}/annotations/{valset_name}.json'
         gt_json = json.load(open(val_json_path, 'r'))

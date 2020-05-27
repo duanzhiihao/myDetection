@@ -18,9 +18,8 @@
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
-    "model.agg.name": "feature_block_matching",
-    "model.agg.hidden_state_names": ["fpn", "raw_pred"],
-    "model.agg.matching_metric": "correlation",
+    "model.agg.name": "concatenate",
+    "model.agg.hidden_state_names": ["fpn"],
 
     "model.rpn.name": "yolov3",
     

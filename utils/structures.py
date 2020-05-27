@@ -93,6 +93,21 @@ class ImageObjects():
         self.cats = self.cats[keep_mask]
         if self.scores is not None:
             self.scores = self.scores[keep_mask]
+    
+    def post_process(self, conf_thres, nms_thres):
+        '''
+        Confidence threshold + NMS
+        '''
+        self.cpu_()
+        dts = self[self.scores >= conf_thres]
+        if len(dts) > 512:
+            _, idx = torch.topk(dts.scores, k=512)
+            dts = dts[idx]
+        # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
+        # np_im = np.array(pil_img)
+        # dts.draw_on_np(np_im, imshow=True)
+        dts = dts.nms(nms_thres=nms_thres)
+        return dts
 
     def nms(self, nms_thres=0.45):
         return ImageObjects.non_max_suppression(self, nms_thres)
