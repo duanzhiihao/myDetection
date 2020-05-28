@@ -37,8 +37,8 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images', type=str, default='debug_zebra')
     
-    # parser.add_argument('--debug_mode', action='store_true')
-    parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', action='store_true')
+    # parser.add_argument('--debug_mode', type=bool, default=True)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -232,6 +232,10 @@ def main():
                     s = os.path.join(log_dir, f'{imname[:-4]}_iter{iter_i}.jpg')
                     cv2.imwrite(s, cv2_im)
                 else:
+                    if min(np_img.shape[:2]) > 512:
+                        _h, _w = np_img.shape[:2]
+                        _r = 512 / min(_h, _w)
+                        np_img = cv2.resize(np_img, (int(_w*_r), int(_h*_r)))
                     logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
 

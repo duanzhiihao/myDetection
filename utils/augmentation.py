@@ -232,9 +232,9 @@ def hflip(image: PIL.Image.Image, labels: ImageObjects):
     labels.bboxes[:,0] = image.width - labels.bboxes[:,0]
     if labels._bb_format == 'cxcywhd':
         labels.bboxes[:,4] = -labels.bboxes[:,4]
-    if labels.makss is not None:
+    if labels.masks is not None:
         assert labels.masks.dim() == 3
-        labels.masks  = torch.flip(labels.masks, dims=[2])
+        labels.masks = torch.from_numpy(np.flip(labels.masks.numpy(), axis=2).copy())
     return image, labels
 
 
@@ -249,7 +249,7 @@ def vflip(image: PIL.Image.Image, labels: ImageObjects):
     labels.bboxes[:,4] = -labels.bboxes[:,4]
     if labels.makss is not None:
         assert labels.masks.dim() == 3
-        labels.masks  = torch.flip(labels.masks, dims=[1])
+        labels.masks = torch.from_numpy(np.flip(labels.masks.numpy(), axis=1).copy())
     return image, labels
 
 
