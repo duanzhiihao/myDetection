@@ -9,10 +9,11 @@
 - [x] EfficientDet + FCOS
 - [x] EfficientDet + custom FCOS
 - [x] EfficientDet + custom FCOS + ATSS
-- [ ] Feature aggregation
-- [ ] Mosaic training data augmentation
-- [ ] Attention
 - [ ] Hard example mining
+- [ ] Attention
+- [ ] Mosaic training data augmentation
+- [ ] DETR
+- [ ] Feature aggregation
 - [ ] EfficientDet + FCOS + angle
 - [ ] EfficientDet + FCOS + mask
 
