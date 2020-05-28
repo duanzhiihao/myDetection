@@ -24,7 +24,18 @@ def today():
 
 
 def sec2str(seconds):
-    return datetime.timedelta(seconds=seconds)
+    ms = int(seconds * 1e3)
+    ss, ms = divmod(ms, 1000)
+    mm, ss = divmod(ss, 60)
+    hh, mm = divmod(mm, 60)
+    dd, hh = divmod(hh, 24)
+    if dd > 1:
+        str_ = f'{dd} days, {hh}:{mm:02d}:{ss:02d}:{ms:02d}'
+    elif dd == 1:
+        str_ =  f'{dd} day, {hh}:{mm:02d}:{ss:02d}:{ms:02d}'
+    else:
+        str_ =            f'{hh}:{mm:02d}:{ss:02d}:{ms:02d}'
+    return str_
 
 
 if __name__ == "__main__":

@@ -7,11 +7,12 @@ def get_backbone(cfg: dict):
     '''
     backbone_name = cfg['model.backbone.name']
     if backbone_name == 'dark53':
+        from settings import PROJECT_ROOT
         from .backbones import Darknet53
         assert cfg['model.backbone.num_levels'] == 3
         backbone = Darknet53(cfg)
         print("Using backbone Darknet-53. Loading ImageNet weights....")
-        pretrained = torch.load('./weights/dark53_imgnet.pth')
+        pretrained = torch.load(f'{PROJECT_ROOT}/weights/dark53_imgnet.pth')
         if cfg.get('general.input.frame_concatenation', None):
             print('Using frame concatenation. Skipping the first conv...')
             to_pop = [k for k in pretrained.keys() if k.startswith('netlist.0')]

@@ -20,7 +20,7 @@ class Detector():
     '''Wrapper for image object detectors
 
     Args:
-        model_name: str, see /configs/
+        model_name: str, see the configs/ folder for avaible names 
         cpu (optional): run on CPU or not. default=False
     '''
     def __init__(self, model_name:str=None, model_and_cfg:tuple=None,

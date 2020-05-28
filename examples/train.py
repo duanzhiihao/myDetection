@@ -13,6 +13,7 @@ from datasets import get_trainingset
 from utils.evaluation import get_valset
 from utils import timer, image_ops, optim
 import api
+from settings import PROJECT_ROOT
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
+    parser.add_argument('--demo_images', type=str, default='debug_zebra')
     
     # parser.add_argument('--debug_mode', action='store_true')
     parser.add_argument('--debug_mode', type=bool, default=True)
@@ -98,7 +99,7 @@ def main():
     start_iter = -1
     if args.checkpoint:
         print("Loading checkpoint...", args.checkpoint)
-        weights_path = os.path.join('./weights/', args.checkpoint)
+        weights_path = f'{PROJECT_ROOT}/weights/{args.checkpoint}'
         previous_state = torch.load(weights_path)
         try:
             model.load_state_dict(previous_state['model'])
@@ -111,9 +112,9 @@ def main():
 
     print('Initializing tensorboard SummaryWriter...')
     if args.debug_mode:
-        logger = SummaryWriter(f'./logs/debug/{job_name}')
+        logger = SummaryWriter(f'{PROJECT_ROOT}/logs/debug/{job_name}')
     else:
-        logger = SummaryWriter(f'./logs/{job_name}')
+        logger = SummaryWriter(f'{PROJECT_ROOT}/logs/{job_name}')
 
     print(f'Initializing optimizer with lr: {args.lr}')
     # set weight decay only on conv.weight
@@ -168,12 +169,6 @@ def main():
             loss = model(imgs, labels)
             assert not torch.isnan(loss)
             loss.backward()
-            # if args.adversarial:
-            #     imgs = imgs + imgs.grad*0.05
-            #     imgs = imgs.detach()
-            #     # visualization.imshow_tensor(imgs)
-            #     loss = model(imgs, targets)
-            #     loss.backward()
         for p in model.parameters():
             if p.grad is not None:
                 p.grad.data.mul_(1.0/subdivision)
@@ -182,16 +177,17 @@ def main():
 
         # logging
         if iter_i % args.print_interval == 0:
-            sec_used = timer.tic() - start_time
+            sec_used  = timer.tic() - start_time
             time_used = timer.sec2str(sec_used)
-            avg_iter = timer.sec2str(sec_used/(iter_i+1-start_iter))
-            avg_img = avg_iter / batch_size / subdivision
-            avg_epoch = avg_img * 118287
-            print(f'\nTotal time: {time_used}, 100 imgs: {avg_img*100}, ',
-                  f'iter: {avg_iter}, epoch: {avg_epoch}')
+            _ai       = sec_used / (iter_i+1-start_iter)
+            avg_iter  = timer.sec2str(_ai)
+            avg_100img   = timer.sec2str(_ai / batch_size / subdivision * 100)
+            avg_epoch = timer.sec2str(_ai / batch_size / subdivision * 118287)
+            print(f'\nTotal time: {time_used}, 100 imgs: {avg_100img}, ',
+                  f'iter: {avg_iter}, COCO epoch: {avg_epoch}')
             print(f'effective batch size = {batch_size} * {subdivision}')
             max_cuda = torch.cuda.max_memory_allocated(0) / 1024 / 1024 / 1024
-            print(f'Max GPU memory usage: {max_cuda} GigaBytes')
+            print(f'Max GPU memory usage: {max_cuda:.3f} GB')
             current_lr = scheduler.get_last_lr()[0]
             print(f'[Iteration {iter_i}] [learning rate {current_lr:.3g}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')
@@ -199,13 +195,7 @@ def main():
 
         # random resizing
         if enable_multiscale and iter_i > 0 and (iter_i % 10 == 0):
-            # Calculate probability distribution according to batch_sizes
-            # probs = [AUTO_BATCHSIZE[str(res)] for res in TRAIN_RESOLUTIONS]
-            # probs = [np.prod(probs) / p for p in probs]
-            # probs = [p / sum(probs) for p in probs]
-            # print(probs)
             # # Randomly pick a input resolution
-            # imgsize = np.random.choice(TRAIN_RESOLUTIONS, p=probs)
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
@@ -221,7 +211,7 @@ def main():
                 'model': model.state_dict(),
                 args.optimizer: optimizer.state_dict(),
             }
-            save_path = os.path.join('./weights', f'{job_name}_{today}_{iter_i}.pth')
+            save_path = f'{PROJECT_ROOT}/weights/{job_name}_{today}_{iter_i}.pth'
             torch.save(state_dict, save_path)
 
         # save detection
@@ -229,14 +219,15 @@ def main():
             if not args.debug_mode:
                 model.eval()
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
-            for imname in os.listdir(args.demo_images_dir):
+            demo_images_dir = f'{PROJECT_ROOT}/images/{args.demo_images}'
+            for imname in os.listdir(demo_images_dir):
                 if not imname.endswith('.jpg'): continue
-                impath = os.path.join(args.demo_images_dir, imname)
+                impath = os.path.join(demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                         conf_thres=0.3, input_size=target_size)
                 if args.debug_mode:
                     cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
-                    log_dir = f'./logs/{args.model}_debug/'
+                    log_dir = f'{PROJECT_ROOT}/logs/{args.model}_debug/'
                     if not os.path.exists(log_dir): os.mkdir(log_dir)
                     s = os.path.join(log_dir, f'{imname[:-4]}_iter{iter_i}.jpg')
                     cv2.imwrite(s, cv2_im)
