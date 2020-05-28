@@ -6,22 +6,23 @@ import PIL.Image
 import torch
 import torchvision.transforms.functional as tvf
 
+from .base import InfiniteDataset
 import utils.image_ops as imgUtils
 import utils.augmentation as augUtils
 import utils.mask_ops as maskUtils
 from utils.structures import ImageObjects
 
 
-class Dataset4ObjDet(torch.utils.data.Dataset):
+class ImageDataset(InfiniteDataset):
     """
     Dataset for training object detection CNNs.
 
     Args:
-        img_dir: str, imgs folder, e.g. 'someDir/COCO/train2017/'
-        ann_path: str, e.g. 'someDir/COCO/annotations/instances_train2017.json'
-        img_size: int, target image size input to the YOLO, default: 608
-        augmentation: bool, default: True
-        debug: bool, if True, only one data id is selected from the dataset
+        dataset_cfg:
+            img_dir: str, imgs folder
+            ann_path: str, path to the annotation file
+            ann_bbox_format: str, e.g., 'x1y1wh' for COCO
+        global_cfg: global config
     """
     def __init__(self, dataset_cfg: dict, global_cfg: dict):
         self.img_dir            = dataset_cfg['img_dir']
@@ -30,14 +31,11 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         self.aug_setting        = global_cfg['train.data_augmentation']
         self.input_divisibility = global_cfg['general.input_divisibility']
 
-        # Special settings
-        self.frame_concat = global_cfg.get('general.input.frame_concatenation', None)
-        self.mosaic       = self.aug_setting.get('mosaic', False) if (self.aug_setting is not None) else None
-        self.is_video     = dataset_cfg.get('is_video', False) # TODO:
-
         self.skip_crowd_ann = True
         self.skip_crowd_img = False
         self.skip_empty_img = True
+
+        self.HEM = global_cfg['train.hard_example_mining']
 
         self.img_ids    = []
         self.imgId2info = dict()
@@ -47,8 +45,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
 
     def _load_json(self, json_path, ann_bbox_format):
         '''load json file'''
-        if self.is_video: # TODO:
-            raise NotImplementedError()
         print(f'Loading annotations {json_path} into memory...')
         with open(json_path, 'r') as f:
             json_data = json.load(f)
@@ -86,7 +82,6 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 ann['rle'] = maskUtils.segm2rle(ann.pop('segmentation'), imh, imw)
             self.imgId2anns[ann['image_id']].append(ann)
 
-        # self.imgId2labels = dict()
         for img in json_data['images']:
             img_id = img['id']
             anns = self.imgId2anns[img_id]
@@ -97,38 +92,52 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 # if there is no object in this image, skip this image
                 continue
             self.img_ids.append(img_id)
-            # convert annotations from json format to ImageObjects format
-            # bboxes = []
-            # cat_idxs = []
-            # for ann in anns:
-            #     bboxes.append(ann['bbox'])
-            #     cat_idxs.append(ann['cat_idx'])
-            # if anns[0].get('segmentation', []) == []:
-            #     segms = None
-            # else:
-            #     segms = [ann['segmentation'] for ann in anns]
-            # labels = ImageObjects(
-            #     bboxes=torch.FloatTensor(bboxes),
-            #     cats=torch.LongTensor(cat_idxs),
-            #     segms=segms,
-            #     bb_format=self.bb_format,
-            #     img_hw=(img['height'], img['width'])
-            # )
-            # assert img_id not in self.imgId2labels
-            # self.imgId2labels[img_id] = labels
+
+        self._length = len(self.img_ids)
+        if self.HEM == 'epoch_shuffle':
+            self.hem_state = {
+                'iter': -1,
+                'order': torch.randperm(self._length)
+            }
+        elif self.HEM == 'hardest':
+            raise NotImplementedError()
+            self.hem_state = {
+                'iter': -1,
+                'APs': torch.ones(self._length)
+            }
+        elif self.HEM == 'probability':
+            raise NotImplementedError()
+            self.hem_state = {
+                'iter': -1,
+                'APs': torch.ones(self._length)
+            }
+        else:
+            raise NotImplementedError()
         # breakpoint()
 
-    def __len__(self):
-        return len(self.img_ids)
+    def get_hem_index(self):
+        assert self.hem_state is not None
+        self.hem_state['iter'] += 1
 
-    def __getitem__(self, index):
+        if self.HEM == 'epoch_shuffle':
+            _iter = self.hem_state['iter']
+            if _iter >= self._length:
+                _iter = 0
+                self.hem_state['order'] = torch.randperm(self._length)
+            index = self.hem_state['order'][_iter].item()
+        
+        return index
+
+    def __len__(self):
+        return 1000000000
+
+    def __getitem__(self, _):
         """
-        Args:
-            index (int): data index
+        Get an image-label pair
         """
-        if self.frame_concat is not None:
-            img_label_pair = self._load_concat_frames(index, to_square=True)
-        elif self.mosaic == True:
+        mosaic = self.aug_setting['mosaic'] if self.aug_setting is not None else None
+        if mosaic:
+            raise NotImplementedError()
             index = random.randint(0, len(self.img_ids)-1)
             pairs = []
             for _ in range(4):
@@ -136,6 +145,7 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
                 pairs.append(img_label_pair)
             img_label_pair = augUtils.mosaic(pairs, self.img_size)
         else:
+            index = self.get_hem_index()
             img_label_pair = self._load_single_pil(index, to_square=True)
         
         img, labels, img_id, pad_info = img_label_pair
@@ -175,35 +185,31 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         assert img.dim() == 3 and img.shape[1] == img.shape[2]
         return img, labels, img_id, pad_info
 
-    def _load_concat_frames(self, index, to_square=True) -> tuple:
-        raise NotImplementedError()
-
-        if self.is_video: # TODO:
-            raise NotImplementedError()
-        assert self.frame_concat >= 2
-        # load the image
-        img_id = self.img_ids[index]
-        img_name = self.imgId2info[img_id]['file_name']
-        img_path = os.path.join(self.img_dir, img_name)
-        img = imgUtils.imread_pil(img_path)
-        # get labels
-        anns = self.imgId2anns[img_id]
-        labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
-        assert labels.masks is not None
-        # if dataset is not videos, try to generate previous frames
-        bg_img_dir = self.img_dir + '_np' # background image path
-        assert os.path.exists(bg_img_dir)
-        bg_path = os.path.join(bg_img_dir, img_name)
-        background = imgUtils.imread_pil(bg_path)
-        # import numpy as np; import matplotlib.pyplot as plt;
-        # plt.imshow(np.array(img)); plt.show()
-        # plt.imshow(np.array(background)); plt.show()
-        t_interval = 1 / self.aug_setting['simulation_fps']
-        augUtils.random_place(img, labels, background, dt=t_interval)
-        labels.masks
-        debug = 1
-        # augUtils.augment_PIL()
-        # return (img, labels, img_id, pad_info)
+    # def _load_concat_frames(self, index, to_square=True) -> tuple:
+    #     raise NotImplementedError()
+    #     # load the image
+    #     img_id = self.img_ids[index]
+    #     img_name = self.imgId2info[img_id]['file_name']
+    #     img_path = os.path.join(self.img_dir, img_name)
+    #     img = imgUtils.imread_pil(img_path)
+    #     # get labels
+    #     anns = self.imgId2anns[img_id]
+    #     labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
+    #     assert labels.masks is not None
+    #     # if dataset is not videos, try to generate previous frames
+    #     bg_img_dir = self.img_dir + '_np' # background image path
+    #     assert os.path.exists(bg_img_dir)
+    #     bg_path = os.path.join(bg_img_dir, img_name)
+    #     background = imgUtils.imread_pil(bg_path)
+    #     # import numpy as np; import matplotlib.pyplot as plt;
+    #     # plt.imshow(np.array(img)); plt.show()
+    #     # plt.imshow(np.array(background)); plt.show()
+    #     t_interval = 1 / self.aug_setting['simulation_fps']
+    #     augUtils.random_place(img, labels, background, dt=t_interval)
+    #     labels.masks
+    #     debug = 1
+    #     # augUtils.augment_PIL()
+    #     # return (img, labels, img_id, pad_info)
 
     def _load_single_pil(self, index, to_square=True) -> tuple:
         '''
@@ -262,7 +268,3 @@ class Dataset4ObjDet(torch.utils.data.Dataset):
         ids_batch = [items[2] for items in batch]
         pad_info_batch = [items[3] for items in batch]
         return img_batch, label_batch, ids_batch, pad_info_batch
-    
-    def to_dataloader(self, **kwargs):
-        return torch.utils.data.DataLoader(self,
-                    collate_fn=Dataset4ObjDet.collate_func, **kwargs)

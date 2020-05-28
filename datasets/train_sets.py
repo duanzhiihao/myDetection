@@ -18,8 +18,8 @@ def get_trainingset(cfg: dict):
         if cfg['train.data_augmentation'] is not None:
             assert cfg['train.data_augmentation']['rotation'] == False
 
-        from .image_dataset import Dataset4ObjDet
-        return Dataset4ObjDet(training_set_cfg, cfg)
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
 
     elif dataset_name in {'rotbbox_train2017', 'rotbbox_val2017',
                           'personrbb_train2017', 'personrbb_val2017'}:
@@ -36,8 +36,8 @@ def get_trainingset(cfg: dict):
             assert cfg['train.data_augmentation']['rotation'] == True
             cfg['train.data_augmentation'].update(rotation_expand=True)
 
-        from .image_dataset import Dataset4ObjDet
-        return Dataset4ObjDet(training_set_cfg, cfg)
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
 
     # ------------------------ video datasets ------------------------
     elif dataset_name in {'HBMWR_mot_train'}:
@@ -57,26 +57,27 @@ def get_trainingset(cfg: dict):
     
     # ------------------------ datasets for debugging ------------------------
     elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
-        raise NotImplementedError()
+        from settings import PROJECT_ROOT
         training_set_cfg = {
-            'img_dir': f'./images/{dataset_name}/',
-            'ann_path': f'./utils/debug/{dataset_name}.json',
+            'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',
+            'ann_path': f'{PROJECT_ROOT}/utils/debug/{dataset_name}.json',
             'ann_bbox_format': 'x1y1wh',
-            'is_video': False,
         }
         # These datasets are not designed for rotation augmentation
         assert cfg['train.data_augmentation'] is None
-        from .image_dataset import Dataset4ObjDet
-        return Dataset4ObjDet(training_set_cfg, cfg)
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
     elif dataset_name in {'rotbb_debug3', 'debug_lunch31', 'rot80_debug1'}:
-        raise NotImplementedError()
+        from settings import PROJECT_ROOT
         training_set_cfg = {
-            'img_dir': f'./images/{dataset_name}/',
-            'ann_path': f'./utils/debug/{dataset_name}.json',
+            'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',
+            'ann_path': f'{PROJECT_ROOT}/utils/debug/{dataset_name}.json',
             'ann_bbox_format': 'cxcywhd'
         }
         assert cfg['train.data_augmentation'] is None
-        from .image_dataset import Dataset4ObjDet
-        return Dataset4ObjDet(training_set_cfg, cfg)
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
+
+    # --------------------------------- end ---------------------------------
     else:
         raise NotImplementedError()

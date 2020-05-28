@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as tnf
 
 import models.losses as lossLib
-# from models.fcos import _xywh_to_ltrb, _ltrb_to_xywh
 from utils.bbox_ops import bboxes_iou
 
 

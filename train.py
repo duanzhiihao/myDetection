@@ -9,15 +9,17 @@ import numpy as np
 import cv2
 
 from models.general import name_to_model
-from utils import timer, image_ops, datasets, optim
+from datasets import get_trainingset
+from utils.evaluation import get_valset
+from utils import timer, image_ops, optim
 import api
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='rapid_psl1_fc')
-    parser.add_argument('--train_set', type=str, default='personrbb_val2017')
-    parser.add_argument('--val_set', type=str, default='debug_lunch31')
+    parser.add_argument('--model', type=str, default='yolov3')
+    parser.add_argument('--train_set', type=str, default='debug_zebra')
+    parser.add_argument('--val_set', type=str, default='debug_zebra')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--initial_imgsize', type=int, default=None)
@@ -32,7 +34,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_lunch31/')
+    parser.add_argument('--demo_images_dir', type=str, default='./images/debug_zebra/')
     
     parser.add_argument('--debug_mode', action='store_true')
     # parser.add_argument('--debug_mode', type=bool, default=True)
@@ -87,12 +89,11 @@ def main():
     # Training set and validation set setting
     print(f'Initializing training set {args.train_set}...')
     global_cfg['train.dataset_name'] = args.train_set
-    dataset = datasets.get_trainingset(global_cfg)
-    dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True, 
-                                       num_workers=num_cpu, pin_memory=True)
-    dataiterator = iter(dataloader)
+    dataset = get_trainingset(global_cfg)
+    dataset.to_iterator(batch_size=batch_size, shuffle=True, 
+                        num_workers=num_cpu, pin_memory=True)
     print(f'Initializing validation set {args.val_set}...')
-    eval_info, validation_func = datasets.get_valset(args.val_set)
+    eval_info, validation_func = get_valset(args.val_set)
 
     start_iter = -1
     if args.checkpoint:
@@ -159,11 +160,7 @@ def main():
         # subdivision loop
         optimizer.zero_grad()
         for _ in range(subdivision):
-            try:
-                imgs, labels, imid, _ = next(dataiterator)  # load a batch
-            except StopIteration:
-                dataiterator = iter(dataloader)
-                imgs, labels, imid, _ = next(dataiterator)  # load a batch
+            imgs, labels, imid, _ = dataset.get_next()
             # pil_img = image_ops.tensor_img_to_pil(imgs[0], model.input_format)
             # np_im = np.array(pil_img)
             # labels[0].draw_on_np(np_im, imshow=True)
@@ -214,9 +211,8 @@ def main():
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = int(np.ceil(super_batchsize / batch_size))
             dataset.img_size = imgsize
-            dataloader = dataset.to_dataloader(batch_size=batch_size, shuffle=True,
-                                            num_workers=num_cpu, pin_memory=True)
-            dataiterator = iter(dataloader)
+            dataset.to_iterator(batch_size=batch_size, shuffle=True,
+                                num_workers=num_cpu, pin_memory=True)
 
         # save checkpoint
         if iter_i > 0 and (iter_i % args.checkpoint_interval == 0):

@@ -1,5 +1,4 @@
-raise NotImplementedError()
-
+import torch
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -19,10 +18,21 @@ class InfiniteDataset(Dataset):
         """Should be overridden by all subclasses."""
         raise NotImplementedError()
 
-    def to_iter(self, **kwargs):
-        # self.dataloader = DataLoader(self, **kwargs)
-        self.iter = iter(DataLoader(self, **kwargs))
-    
+    @staticmethod
+    def collate_func(batch):
+        raise NotImplementedError()
+
+    def to_iterator(self, **kwargs):
+        self.iterator = iter(DataLoader(self, collate_fn=self.collate_func,
+                                        **kwargs))
+        self._iter_args = kwargs
+
     def get_next(self):
-        data = next(self.iter)
+        assert hasattr(self, 'to_iterator'), 'Please call to_iterator() first'
+        try:
+            data = next(self.iterator)
+        except StopIteration:
+            print(f'Warning: loaded {len(self)} images!')
+            self.to_iterator(**self._iter_args)
+            data = next(self.iterator)
         return data
