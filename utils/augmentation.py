@@ -226,12 +226,15 @@ def hflip(image: PIL.Image.Image, labels: ImageObjects):
     '''
     left-right flip
     '''
-    assert not labels.masks
     image = tvf.hflip(image)
+
     assert labels._bb_format in {'cxcywh', 'cxcywhd'}
     labels.bboxes[:,0] = image.width - labels.bboxes[:,0]
     if labels._bb_format == 'cxcywhd':
         labels.bboxes[:,4] = -labels.bboxes[:,4]
+    if labels.makss is not None:
+        assert labels.masks.dim() == 3
+        labels.masks  = torch.flip(labels.masks, dims=[2])
     return image, labels
 
 
@@ -239,11 +242,14 @@ def vflip(image: PIL.Image.Image, labels: ImageObjects):
     '''
     up-down flip
     '''
-    assert isinstance(labels, ImageObjects)
-    assert labels._bb_format == 'cxcywhd'
     image = tvf.vflip(image)
-    labels.bboxes[:,1] = image.height - labels.bboxes[:,1] # x,y,w,h,(angle)
+
+    assert labels._bb_format == 'cxcywhd'
+    labels.bboxes[:,1] = image.height - labels.bboxes[:,1] # x,y,w,h,angle
     labels.bboxes[:,4] = -labels.bboxes[:,4]
+    if labels.makss is not None:
+        assert labels.masks.dim() == 3
+        labels.masks  = torch.flip(labels.masks, dims=[1])
     return image, labels
 
 

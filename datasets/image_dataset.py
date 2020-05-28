@@ -128,9 +128,6 @@ class ImageDataset(InfiniteDataset):
         
         return index
 
-    def __len__(self):
-        return 1000000000
-
     def __getitem__(self, _):
         """
         Get an image-label pair

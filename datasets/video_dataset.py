@@ -89,7 +89,7 @@ class Dataset4VODT(Dataset):
         self.video_start = torch.BoolTensor(video_start)
 
     def __len__(self):
-        return 1000000000
+        return 100
 
     def __getitem__(self, _):
         assert len(self.frame_paths) == len(self.annotations) == len(self.video_start)

@@ -12,7 +12,7 @@ class InfiniteDataset(Dataset):
 
     def __len__(self):
         '''Dummy function'''
-        return 1000000000
+        return 100
 
     def __getitem__(self, _):
         """Should be overridden by all subclasses."""

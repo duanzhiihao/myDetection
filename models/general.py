@@ -36,7 +36,7 @@ class OneStageBBox(torch.nn.Module):
 
         self.check_gt_assignment = cfg.get('train.check_gt_assignment', False)
         self.bb_format = cfg.get('general.pred_bbox_format', 'cxcywh')
-        # self.input_format = cfg['general.input_format']
+        self.input_format = cfg['general.input_format']
 
     def forward(self, x, labels: List[ImageObjects]=None):
         '''

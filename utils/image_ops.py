@@ -1,7 +1,8 @@
 import random
 import numpy as np
-import PIL.Image
 import cv2
+import PIL.Image
+import matplotlib.pyplot as plt
 import torch
 import torchvision.transforms.functional as tvf
 
@@ -35,81 +36,104 @@ def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
     return pil_img
 
 
-def rect_to_square(image, labels, target_size:int, aug:bool=False,
-                   resize_step:int=128):
+def rect_to_square(image, labels, target_size:int, aug=False, resize_step=128,
+                   _aug_rsz=None, _fill_val=None, _rand_plc=True):
     '''
-    Resize and pad the input image to square. \\
-    If aug, the input image will be randomly resized such that the longer side is \
-        between [target_size-resize_step, target_size].\\
-    Otherwise, the input is resied such that longer side = target_size.
+    Resize and pad the input image to square.
+
+    If aug == True,
+        1. The input image will be randomly resized such that the longer side is
+           between [target_size-resize_step, target_size].
+        2. The input image will be randomly placed on a colored background.
+    Otherwise,
+        1. the input will be resied such that longer side = target_size.
+        2. The input image will be zero-padded to square.
 
     Args:
         image: PIL.Image or list of PIL.Image
         labels: ImageObjects or list of ImageObjects
         target_size: int, the width/height of the output square
         aug: bool, if Ture, perform random resizing and placing augmentation
-        resize_step: int, the input image is re
+        resize_step: int
     '''
-    if isinstance(image, PIL.Image.Image):
-        imgs, labels = [image], [labels]
-    else:
-        imgs = image
+    assert isinstance(image, PIL.Image.Image) and image.mode == 'RGB'
     if labels is not None:
-        assert len(imgs) == len(labels)
-    pad_info = []
-    aug_resize = torch.rand(1).item()
-    fill_value = tuple([random.randint(0,255) for _ in range(3)]) if aug else 0
-    for i in range(len(imgs)):
-        _img = imgs[i]
-        assert isinstance(_img, PIL.Image.Image) and _img.mode == 'RGB'
-    
-        ori_h, ori_w = _img.height, _img.width
-        # resize to target input size (usually smaller)
-        resize_scale = target_size / max(ori_w,ori_h)
-        if aug:
-            low_ = (target_size - resize_step) / target_size
-            resize_scale = resize_scale * (low_ + aug_resize*(1-low_))
-        assert resize_scale > 0
-        nopad_w, nopad_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
-        _img = tvf.resize(_img, (nopad_h,nopad_w))
+        assert isinstance(labels, ImageObjects)
 
-        # pad to square
-        if aug and isinstance(image, PIL.Image.Image):
-            # random placing if enable aug. and input is a single image
-            left = random.randint(0, target_size - nopad_w)
-            top = random.randint(0, target_size - nopad_h)
-        else:
-            left = (target_size - nopad_w) // 2
-            top = (target_size - nopad_h) // 2
-        right = target_size - nopad_w - left
-        bottom = target_size - nopad_h - top
-
-        _img = tvf.pad(_img, padding=(left,top,right,bottom), fill=fill_value)
-        imgs[i] = _img
-
-        # record the padding info
-        img_tl = (left, top) # start of the true image
-        img_wh = (nopad_w, nopad_h)
-        _info = (ori_w, ori_h) + img_tl + img_wh
-        pad_info.append(_info)
-
-        # modify labels
-        _lab = labels[i]
-        if _lab is not None:
-            assert isinstance(_lab, ImageObjects)
-            assert _lab._bb_format in {'cxcywh', 'cxcywhd'}
-            _lab.bboxes[:,:4] *= resize_scale
-            _lab.bboxes[:,0] += left
-            _lab.bboxes[:,1] += top
-            if _lab.img_hw is not None:
-                assert _lab.img_hw == (ori_h, ori_w)
-            _lab.img_hw = (target_size, target_size)
-        
-    if isinstance(image, PIL.Image.Image):
-        image, labels, pad_info = imgs[0], labels[0], pad_info[0]
+    # augmentation settings
+    _aug_rsz = _aug_rsz or torch.rand(1).item()
+    if aug:
+        _fill_val = _fill_val or tuple([random.randint(0,255) for _ in range(3)])
     else:
-        image = imgs
+        _fill_val = 0
+
+    ori_h, ori_w = image.height, image.width
+    # resize to target input size
+    resize_scale = target_size / max(ori_w,ori_h)
+    if aug:
+        low_ = (target_size - resize_step) / target_size
+        resize_scale = resize_scale * (low_ + _aug_rsz*(1-low_))
+    assert resize_scale > 0
+    resized_w, resized_h = int(ori_w*resize_scale), int(ori_h*resize_scale)
+    image = tvf.resize(image, (resized_h,resized_w))
+
+    # random placing parematers
+    if aug and _rand_plc:
+        left = random.randint(0, target_size - resized_w)
+        top = random.randint(0, target_size - resized_h)
+    else:
+        left = (target_size - resized_w) // 2
+        top = (target_size - resized_h) // 2
+    right = target_size - resized_w - left
+    bottom = target_size - resized_h - top
+    # pad to square
+    image = tvf.pad(image, padding=(left,top,right,bottom), fill=_fill_val)
+
+    # record the padding info
+    pad_info = (ori_w, ori_h, left, top, resized_w, resized_h)
+
+    # modify labels
+    if labels is not None:
+        assert isinstance(labels, ImageObjects)
+        assert labels._bb_format in {'cxcywh', 'cxcywhd'}
+        labels.bboxes[:,:4] *= resize_scale
+        labels.bboxes[:,0] += left
+        labels.bboxes[:,1] += top
+        if labels.img_hw is not None:
+            assert labels.img_hw == (ori_h, ori_w)
+        labels.img_hw = (target_size, target_size)
+        if labels.masks is not None:
+            old_masks = labels.masks
+            assert old_masks.shape[1:] == (ori_h, ori_w)
+            new_masks = torch.zeros(old_masks.shape[0], target_size, target_size,
+                                    dtype=torch.bool)
+            for i in range(old_masks.shape[0]):
+                m = PIL.Image.fromarray(old_masks[i].numpy())
+                # plt.figure(figsize=(8,8)); plt.imshow(m, cmap='gray')
+                m = tvf.resize(m, (resized_h,resized_w))
+                m = tvf.pad(m, padding=(left,top,right,bottom), fill=0)
+                # plt.figure(figsize=(8,8)); plt.imshow(m, cmap='gray')
+                # plt.show()
+                new_masks[i] = torch.from_numpy(np.array(m, dtype=np.bool))
+            labels.masks = new_masks
+        labels.sanity_check()
+
     return image, labels, pad_info
+
+
+def seq_rect_to_square(images, labels, target_size:int, aug:bool=False,
+                       resize_step:int=128):
+    '''
+    Resize and pad a sequence of image to square.
+
+    See rect_to_square() for detailed docs.
+    '''
+    raise NotImplementedError()
+    assert isinstance(images, list)
+    if labels is not None:
+        assert isinstance(labels, list) and len(images) == len(labels)
+    # for i in range(len(imgs)):
+    #     rect_to_square()
 
 
 def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:

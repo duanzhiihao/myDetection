@@ -69,7 +69,7 @@ def get_valset(valset_name: str):
     elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
         from settings import PROJECT_ROOT
         img_dir = f'{PROJECT_ROOT}/images/{valset_name}/'
-        val_json_path = f'{PROJECT_ROOT}/datasets/debug/debug3.json'
+        val_json_path = f'{PROJECT_ROOT}/datasets/debug/{valset_name}.json'
         gt_json = json.load(open(val_json_path, 'r'))
         eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
                      for imi in gt_json['images']]

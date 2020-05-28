@@ -60,7 +60,7 @@ def get_trainingset(cfg: dict):
         from settings import PROJECT_ROOT
         training_set_cfg = {
             'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',
-            'ann_path': f'{PROJECT_ROOT}/utils/debug/{dataset_name}.json',
+            'ann_path': f'{PROJECT_ROOT}/datasets/debug/{dataset_name}.json',
             'ann_bbox_format': 'x1y1wh',
         }
         # These datasets are not designed for rotation augmentation
@@ -71,7 +71,7 @@ def get_trainingset(cfg: dict):
         from settings import PROJECT_ROOT
         training_set_cfg = {
             'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',
-            'ann_path': f'{PROJECT_ROOT}/utils/debug/{dataset_name}.json',
+            'ann_path': f'{PROJECT_ROOT}/datasets/debug/{dataset_name}.json',
             'ann_bbox_format': 'cxcywhd'
         }
         assert cfg['train.data_augmentation'] is None
