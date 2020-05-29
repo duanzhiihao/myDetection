@@ -19,8 +19,8 @@ from settings import PROJECT_ROOT
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='yolov3')
-    parser.add_argument('--train_set', type=str, default='debug_zebra')
-    parser.add_argument('--val_set', type=str, default='debug_zebra')
+    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--val_set', type=str, default='debug3')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--initial_imgsize', type=int, default=None)
@@ -35,17 +35,17 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images', type=str, default='debug_zebra')
+    parser.add_argument('--demo_images', type=str, default='debug3')
     
-    parser.add_argument('--debug_mode', action='store_true')
-    # parser.add_argument('--debug_mode', type=bool, default=True)
+    parser.add_argument('--debug_mode', type=str, default=None)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
     model, global_cfg = name_to_model(args.model)
 
     # -------------------------- settings ---------------------------
-    if args.debug_mode:
+    if args.debug_mode == 'overfit':
+        print(f'Running debug mode: {args.debug_mode}...')
         global_cfg['train.img_sizes'] = [640]
         global_cfg['train.initial_imgsize'] = 640
         global_cfg['test.preprocessing'] = 'resize_pad_square'
@@ -53,13 +53,29 @@ def main():
         global_cfg['train.data_augmentation'] = None
         enable_multiscale = False
         batch_size = 1
-        num_cpu = 0
         subdivision = 1
+        num_cpu = 0
         warmup_iter = 40
-    else:
+    elif args.debug_mode == 'local':
+        print(f'Running debug mode: {args.debug_mode}...')
+        # train on local laptop with a small resolution and batch size
+        TRAIN_RESOLUTIONS = [384, 512]
+        AUTO_BATCHSIZE = {'384': 4, '512': 2}
+        initial_size = TRAIN_RESOLUTIONS[-1]
+        global_cfg['train.initial_imgsize'] = initial_size
+        batch_size = 2
+        super_batchsize = 8
+        subdivision = int(np.ceil(super_batchsize / batch_size))
+        # data augmentation setting
+        enable_multiscale = True
+        num_cpu = 0
+        warmup_iter = args.warmup
+        # testing setting
+        target_size = global_cfg.get('test.default_input_size', None)
+    elif args.debug_mode == None:
         # training setting
-        AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         TRAIN_RESOLUTIONS = global_cfg['train.img_sizes']
+        AUTO_BATCHSIZE = global_cfg['train.imgsize_to_batch_size']
         if args.initial_imgsize is not None:
             initial_size = args.initial_imgsize
             assert initial_size in TRAIN_RESOLUTIONS
@@ -78,6 +94,8 @@ def main():
         warmup_iter = args.warmup
         # testing setting
         target_size = global_cfg.get('test.default_input_size', None)
+    else:
+        raise Exception('Unknown debug mode')
 
     job_name = f'{args.model}_{args.train_set}_{args.lr}'
     
@@ -161,7 +179,8 @@ def main():
         # subdivision loop
         optimizer.zero_grad()
         for _ in range(subdivision):
-            imgs, labels, imid, _ = dataset.get_next()
+            batch = dataset.get_next()
+            imgs, labels = batch['images'], batch['labels']
             # pil_img = image_ops.tensor_img_to_pil(imgs[0], model.input_format)
             # np_im = np.array(pil_img)
             # labels[0].draw_on_np(np_im, imshow=True)

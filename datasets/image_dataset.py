@@ -97,7 +97,8 @@ class ImageDataset(InfiniteDataset):
         if self.HEM == 'epoch_shuffle':
             self.hem_state = {
                 'iter': -1,
-                'order': torch.randperm(self._length)
+                'order': torch.randperm(self._length),
+                'counts': torch.zeros(self._length, dtype=torch.long)
             }
         elif self.HEM == 'hardest':
             raise NotImplementedError()
@@ -109,7 +110,8 @@ class ImageDataset(InfiniteDataset):
             raise NotImplementedError()
             self.hem_state = {
                 'iter': -1,
-                'APs': torch.ones(self._length)
+                'APs': torch.zeros(self._length) + 1e-8,
+                'counts': torch.zeros(self._length, dtype=torch.long)
             }
         else:
             raise NotImplementedError()
@@ -120,13 +122,24 @@ class ImageDataset(InfiniteDataset):
         self.hem_state['iter'] += 1
 
         if self.HEM == 'epoch_shuffle':
-            _iter = self.hem_state['iter']
-            if _iter >= self._length:
-                _iter = 0
+            _iter = self.hem_state['iter'] % self._length
+            if _iter == 0:
                 self.hem_state['order'] = torch.randperm(self._length)
             index = self.hem_state['order'][_iter].item()
+        elif self.HEM == 'probability':
+            raise NotImplementedError()
+            
+        else:
+            raise NotImplementedError()
         
         return index
+    
+    def update_ap(self, img_idx, aps):
+        raise NotImplementedError()
+        momentum = 0.8
+        prev = self.hem_state['APs'][img_idx]
+        self.hem_state['APs'][img_idx] = 0
+
 
     def __getitem__(self, _):
         """
@@ -135,10 +148,10 @@ class ImageDataset(InfiniteDataset):
         mosaic = self.aug_setting['mosaic'] if self.aug_setting is not None else None
         if mosaic:
             raise NotImplementedError()
-            index = random.randint(0, len(self.img_ids)-1)
             pairs = []
-            for _ in range(4):
-                img_label_pair = self._load_single_pil(index, to_square=False)
+            index = [random.randint(0, len(self.img_ids)-1) for _ in range(4)]
+            for idx in range(index):                
+                img_label_pair = self._load_single_pil(idx, to_square=False)
                 pairs.append(img_label_pair)
             img_label_pair = augUtils.mosaic(pairs, self.img_size)
         else:
@@ -180,7 +193,14 @@ class ImageDataset(InfiniteDataset):
             print('image id:', img_id)
         labels.bboxes[:,0:4].clamp_(min=0)
         assert img.dim() == 3 and img.shape[1] == img.shape[2]
-        return img, labels, img_id, pad_info
+        pair = {
+            'image': img,
+            'labels': labels,
+            'index': index,
+            'image_id': img_id,
+            'pad_info': pad_info
+        }
+        return pair
 
     # def _load_concat_frames(self, index, to_square=True) -> tuple:
     #     raise NotImplementedError()
@@ -211,6 +231,10 @@ class ImageDataset(InfiniteDataset):
     def _load_single_pil(self, index, to_square=True) -> tuple:
         '''
         One image-label pair for the given index is picked up and pre-processed.
+
+        Args:
+            index: image index
+            to_square: if True, the image will be pad to square
         
         Returns:
             img: PIL.Image
@@ -260,8 +284,11 @@ class ImageDataset(InfiniteDataset):
 
     @staticmethod
     def collate_func(batch):
-        img_batch = torch.stack([items[0] for items in batch])
-        label_batch = [items[1] for items in batch]
-        ids_batch = [items[2] for items in batch]
-        pad_info_batch = [items[3] for items in batch]
-        return img_batch, label_batch, ids_batch, pad_info_batch
+        batch = {
+            'images':    torch.stack([items['image'] for items in batch]),
+            'labels':    [items['labels'] for items in batch],
+            'image_ids': [items['image_id'] for items in batch],
+            'indices':   torch.LongTensor([items['index'] for items in batch]),
+            'pad_infos': [items['pad_info'] for items in batch]
+        }
+        return batch

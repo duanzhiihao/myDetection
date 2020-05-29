@@ -12,7 +12,7 @@ class InfiniteDataset(Dataset):
 
     def __len__(self):
         '''Dummy function'''
-        return 100
+        return 16384
 
     def __getitem__(self, _):
         """Should be overridden by all subclasses."""
@@ -32,7 +32,6 @@ class InfiniteDataset(Dataset):
         try:
             data = next(self.iterator)
         except StopIteration:
-            print(f'Warning: loaded {len(self)} images!')
             self.to_iterator(**self._iter_args)
             data = next(self.iterator)
         return data

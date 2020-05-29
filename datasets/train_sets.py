@@ -64,7 +64,6 @@ def get_trainingset(cfg: dict):
             'ann_bbox_format': 'x1y1wh',
         }
         # These datasets are not designed for rotation augmentation
-        assert cfg['train.data_augmentation'] is None
         from .image_dataset import ImageDataset
         return ImageDataset(training_set_cfg, cfg)
     elif dataset_name in {'rotbb_debug3', 'debug_lunch31', 'rot80_debug1'}:
