@@ -42,6 +42,7 @@ class ImageDataset(InfiniteDataset):
         self.imgId2info = dict()
         self.imgId2anns = defaultdict(list)
         self.catId2idx  = dict()
+        self.categories = []
         self._load_json(dataset_cfg['ann_path'])
 
     def _load_json(self, json_path):
@@ -60,6 +61,7 @@ class ImageDataset(InfiniteDataset):
         for img in json_data['images']:
             self.imgId2info[img['id']] = img
 
+        self.categories = json_data['categories']
         for idx, cat in enumerate(json_data['categories']):
             self.catId2idx[cat['id']] = idx
             
@@ -99,13 +101,12 @@ class ImageDataset(InfiniteDataset):
             raise NotImplementedError()
             self.hem_state = {
                 'iter': -1,
-                'APs': torch.ones(self._length) + 1e-8
+                'APs': torch.ones(self._length)
             }
         elif self.HEM == 'probability':
-            raise NotImplementedError()
             self.hem_state = {
                 'iter': -1,
-                'APs': torch.zeros(self._length) + 1e-8,
+                'APs': torch.zeros(self._length),
                 'counts': torch.zeros(self._length, dtype=torch.long)
             }
         else:
@@ -122,7 +123,7 @@ class ImageDataset(InfiniteDataset):
                 self.hem_state['order'] = torch.randperm(self._length)
             index = self.hem_state['order'][_iter].item()
         elif self.HEM == 'probability':
-            probs = -torch.log(self.hem_state['APs'])
+            probs = -torch.log(self.hem_state['APs'] + 1e-8)
             index = torch.multinomial(probs, num_samples=1)
         else:
             raise NotImplementedError()
@@ -188,12 +189,16 @@ class ImageDataset(InfiniteDataset):
         labels.bboxes[:,0:4].clamp_(min=0)
         assert img.dim() == 3 and img.shape[1] == img.shape[2]
         pair = {
-            'image': img,
-            'labels': labels,
-            'index': index,
+            'image':    img,
+            'labels':   labels,
+            'index':    index,
             'image_id': img_id,
             'pad_info': pad_info,
-            'anns': self.imgId2anns[img_id]
+            'anns': {
+                'images': [self.imgId2info[img_id]],
+                'annotations': self.imgId2anns[img_id],
+                'categories': self.categories
+            }
         }
         return pair
 

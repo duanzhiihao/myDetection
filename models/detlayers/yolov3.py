@@ -50,19 +50,19 @@ class YOLOLayer(nn.Module):
         p_xywh[...,2:4] = torch.exp(p_xywh[...,2:4]) * anch_wh
         p_xywh = p_xywh.view(nB, nA*nH*nW, 4).cpu()
 
+        # Logistic activation for confidence score
+        p_conf = torch.sigmoid(conf_logits.detach())
+        # Logistic activation for categories
+        if self.n_cls > 0:
+            p_cls = torch.sigmoid(cls_logits.detach())
+        cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
+        confs = p_conf * cls_score
+        preds = {
+            'bbox': p_xywh,
+            'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
+            'score': confs.view(nB, nA*nH*nW).cpu(),
+        }
         if labels is None:
-            # Logistic activation for confidence score
-            p_conf = torch.sigmoid(conf_logits)
-            # Logistic activation for categories
-            if self.n_cls > 0:
-                p_cls = torch.sigmoid(cls_logits)
-            cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
-            confs = p_conf * cls_score
-            preds = {
-                'bbox': p_xywh,
-                'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),
-                'score': confs.view(nB, nA*nH*nW).cpu(),
-            }
             return preds, None
             
         assert isinstance(labels, list)
@@ -157,4 +157,4 @@ class YOLOLayer(nn.Module):
                         f'xy/gt {loss_xy/ngt:.3f}, wh/gt {loss_wh/ngt:.3f}, ' \
                         f'conf {loss_conf:.3f}, class {loss_cls:.3f}'
         self._assigned_num = valid_gt_num
-        return None, loss
+        return preds, loss

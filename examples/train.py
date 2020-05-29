@@ -19,7 +19,7 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov3')
+    parser.add_argument('--model', type=str, default='yolov3_phem')
     parser.add_argument('--train_set', type=str, default='debug3')
     parser.add_argument('--val_set', type=str, default='debug3')
 
@@ -38,13 +38,14 @@ def main():
     parser.add_argument('--demo_interval', type=int, default=20)
     parser.add_argument('--demo_images', type=str, default='debug3')
     
-    parser.add_argument('--debug_mode', type=str, default=None)
+    parser.add_argument('--debug_mode', type=str, default='overfit')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
     model, global_cfg = name_to_model(args.model)
 
     # -------------------------- settings ---------------------------
+    ap_conf_thres = global_cfg.get('test.ap_conf_thres', 0.005)
     if args.debug_mode == 'overfit':
         print(f'Running debug mode: {args.debug_mode}...')
         global_cfg['train.img_sizes'] = [640]
@@ -165,7 +166,7 @@ def main():
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
                 dts = model_eval.evaluation_predict(eval_info,
                     input_size=target_size,
-                    conf_thres=global_cfg.get('test.ap_conf_thres', 0.005))
+                    conf_thres=ap_conf_thres)
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
@@ -196,8 +197,10 @@ def main():
                 idxs,img_ids,anns = batch['indices'],batch['image_ids'],batch['anns']
                 for d, _idx, _id, g in zip(dts, idxs, img_ids, anns):
                     d: ImageObjects
+                    d = d.post_process(conf_thres=ap_conf_thres,
+                                       nms_thres=global_cfg['test.nms_thres'])
                     d = d.to_json(img_id=_id, eval_type=eval_info['eval_type'])
-                    _, ap, ap50, ap75 = eval_func_(d, g)
+                    _, ap, ap50, ap75 = eval_func_(d, g, str_print=False)
                     dataset.update_ap(_idx, ap)
 
         for p in model.parameters():
