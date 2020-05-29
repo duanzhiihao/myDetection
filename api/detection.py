@@ -45,25 +45,30 @@ class Detector():
         self.on_cpu = cpu
     
     def _init_preprocess(self, cfg):
-        self.divisibe = cfg['general.input_divisibility']
+        # default settings
+        self.divisibe   = cfg['general.input_divisibility']
         self.input_size = cfg.get('test.default_input_size', None)
         self.preprocess = cfg['test.preprocessing']
     
     def _init_postprocess(self, cfg):
+        # default settings
         self.conf_thres = cfg['test.default_conf_thres']
-        self.nms_thres = cfg['test.nms_thres']
+        self.nms_thres  = cfg['test.nms_thres']
 
-    def evaluation_predict(self, eval_info, **kwargs):
+    def evaluation_predict(self, eval_info: dict, **kwargs):
         '''
         Args:
-            eval_info: list of (img_path, img_id)
-            See _predict_pil() for optinal arguments
+            eval_info: evaluation information
+            kwargs:    see _predict_pil() for keyword arguments
         '''
-        print('Warning: will be deprecated')
+        img_dir = eval_info['image_dir']
+        images_info = eval_info['image_info']['images']
         detection_json = []
-        for (impath, imgId) in tqdm(eval_info):
+        for imgInfo in tqdm(images_info):
+            impath = os.path.join(img_dir, imgInfo['file_name'])
             detections = self.detect_one(img_path=impath, **kwargs)
-            detection_json += detections.to_json(img_id=imgId)
+            detection_json += detections.to_json(img_id=imgInfo['id'],
+                                    eval_type=eval_info['eval_type'])
         return detection_json
 
     def eval_predict_vod(self, eval_info, **kwargs):
@@ -87,7 +92,7 @@ class Detector():
         
         Args:
             img_dir: str
-            See _predict_pil() for optinal arguments
+            kwargs:  see _predict_pil() for keyword arguments
         '''
         img_names = os.listdir(img_dir)
         detection_json = []
@@ -129,19 +134,20 @@ class Detector():
             plt.show()
         return detections
 
-    def _predict_pil(self, pil_img, **kwargs):
+    def _predict_pil(self, pil_img: PIL.Image.Image, **kwargs):
         '''
         Args:
-            test_aug: str, test-time augmentation, can be: 'h'
-            input_size: int, default: 640
-            conf_thres: float, confidence threshold
+            pil_img:              input image
+            preprocessing: str,   see _preprocess_pil() for available options
+            input_size:    int,   input image size, default: no resizing
+            conf_thres:    float, confidence threshold
+            nms_thres:     float, non-maximum suppresion IoU threshold
         '''
         assert isinstance(pil_img, PIL.Image.Image), 'input must be a PIL.Image'
-        # test_aug = kwargs['test_aug'] if 'test_aug' in kwargs else None
-        pre_proc = kwargs.get('preprocessing', self.preprocess)
-        input_size = kwargs.get('input_size', self.input_size)
-        conf_thres = kwargs.get('conf_thres', self.conf_thres)
-        nms_thres = kwargs.get('nms_thres', self.nms_thres)
+        pre_proc   = kwargs.get('preprocessing', self.preprocess)
+        input_size = kwargs.get('input_size',    self.input_size)
+        conf_thres = kwargs.get('conf_thres',    self.conf_thres)
+        nms_thres  = kwargs.get('nms_thres',     self.nms_thres)
 
         # pre-process the input image
         pil_img, pad_info = self._preprocess_pil(pil_img, pre_proc, input_size)
@@ -158,19 +164,7 @@ class Detector():
         assert isinstance(dts, list)
         dts = dts[0]
         dts: ImageObjects
-        # post-processing
-        dts = dts.post_process(conf_thres, nms_thres)
-        # dts.cpu_()
-        # dts = dts[dts.scores >= conf_thres]
-        # if len(dts) > 512:
-        #     _, idx = torch.topk(dts.scores, k=512)
-        #     dts = dts[idx]
-        # if kwargs.get('category_set', None) is not None:
-        #     dts.category_filter_(kwargs['category_set'])
-        # # pil_img = imgUtils.tensor_img_to_pil(input_[0], self.model.input_format)
-        # # np_im = np.array(pil_img)
-        # # dts.draw_on_np(np_im, imshow=True)
-        # dts = dts.nms(nms_thres=nms_thres)
+        dts = dts.post_process(conf_thres, nms_thres) # post-processing
         if pad_info is not None:
             dts.bboxes_to_original_(pad_info)
         return dts

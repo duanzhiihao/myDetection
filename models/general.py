@@ -68,26 +68,27 @@ class OneStageBBox(torch.nn.Module):
             dts_all.append(dts)
             losses_all.append(loss)
 
-        if labels is None:
-            batch_bbs = torch.cat([d['bbox'] for d in dts_all], dim=1)
-            batch_cls_idx = torch.cat([d['class_idx'] for d in dts_all], dim=1)
-            batch_scores = torch.cat([d['score'] for d in dts_all], dim=1)
+        batch_bbs     = torch.cat([d['bbox']      for d in dts_all], dim=1)
+        batch_cls_idx = torch.cat([d['class_idx'] for d in dts_all], dim=1)
+        batch_scores  = torch.cat([d['score']     for d in dts_all], dim=1)
 
-            batch_pred_objects = []
-            # iterate over every image in the batch
-            for bbs, cls_idx, scores in zip(batch_bbs, batch_cls_idx, batch_scores):
-                # initialize the pred objects in current image
-                p_objs = ImageObjects(bboxes=bbs, cats=cls_idx, scores=scores,
-                                      bb_format=self.bb_format)
-                batch_pred_objects.append(p_objs)
+        batch_pred_objects = []
+        # iterate over every image in the batch
+        for bbs, cls_idx, scores in zip(batch_bbs, batch_cls_idx, batch_scores):
+            # initialize the pred objects in current image
+            p_objs = ImageObjects(bboxes=bbs, cats=cls_idx, scores=scores,
+                                  bb_format=self.bb_format, img_hw=self.img_size)
+            batch_pred_objects.append(p_objs)
+
+        if labels is None:
             return batch_pred_objects
-        else:
-            if self.check_gt_assignment:
-                total_gt_num = sum([len(t) for t in labels])
-                assigned = sum(branch._assigned_num for branch in self.det_layers)
-                assert assigned == total_gt_num, f'{assigned} != {total_gt_num}'
-            self.loss_str = ''
-            for m in self.det_layers:
-                self.loss_str += m.loss_str + '\n'
-            loss = sum(losses_all)
-            return loss
+
+        if self.check_gt_assignment:
+            total_gt_num = sum([len(t) for t in labels])
+            assigned = sum(branch._assigned_num for branch in self.det_layers)
+            assert assigned == total_gt_num, f'{assigned} != {total_gt_num}'
+        self.loss_str = ''
+        for m in self.det_layers:
+            self.loss_str += m.loss_str + '\n'
+        loss = sum(losses_all)
+        return batch_pred_objects, loss

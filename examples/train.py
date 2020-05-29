@@ -12,6 +12,7 @@ from models.general import name_to_model
 from datasets import get_trainingset
 from utils.evaluation import get_valset
 from utils import timer, image_ops, optim
+from utils.structures import ImageObjects
 import api
 from settings import PROJECT_ROOT
 
@@ -113,6 +114,8 @@ def main():
                         num_workers=num_cpu, pin_memory=True)
     print(f'Initializing validation set {args.val_set}...')
     eval_info, validation_func = get_valset(args.val_set)
+    # validation function for hard example mining
+    eval_func_ = eval_info['val_func']
 
     start_iter = -1
     if args.checkpoint:
@@ -185,9 +188,18 @@ def main():
             # np_im = np.array(pil_img)
             # labels[0].draw_on_np(np_im, imshow=True)
             imgs = imgs.cuda()
-            loss = model(imgs, labels)
+            dts, loss = model(imgs, labels)
             assert not torch.isnan(loss)
             loss.backward()
+            if global_cfg['train.hard_example_mining'] in {'probability'}:
+                # calculate AP for each image
+                idxs,img_ids,anns = batch['indices'],batch['image_ids'],batch['anns']
+                for d, _idx, _id, g in zip(dts, idxs, img_ids, anns):
+                    d: ImageObjects
+                    d = d.to_json(img_id=_id, eval_type=eval_info['eval_type'])
+                    _, ap, ap50, ap75 = eval_func_(d, g)
+                    dataset.update_ap(_idx, ap)
+
         for p in model.parameters():
             if p.grad is not None:
                 p.grad.data.mul_(1.0/subdivision)
@@ -229,6 +241,7 @@ def main():
                 'iter': iter_i,
                 'model': model.state_dict(),
                 args.optimizer: optimizer.state_dict(),
+                'dataset': dataset.hem_state
             }
             save_path = f'{PROJECT_ROOT}/weights/{job_name}_{today}_{iter_i}.pth'
             torch.save(state_dict, save_path)

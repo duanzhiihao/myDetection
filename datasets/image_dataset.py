@@ -26,6 +26,7 @@ class ImageDataset(InfiniteDataset):
     """
     def __init__(self, dataset_cfg: dict, global_cfg: dict):
         self.img_dir            = dataset_cfg['img_dir']
+        self.ann_bbox_format    = dataset_cfg['ann_bbox_format']
         self.img_size           = global_cfg['train.initial_imgsize']
         self.input_format       = global_cfg['general.input_format']
         self.aug_setting        = global_cfg['train.data_augmentation']
@@ -41,20 +42,18 @@ class ImageDataset(InfiniteDataset):
         self.imgId2info = dict()
         self.imgId2anns = defaultdict(list)
         self.catId2idx  = dict()
-        self._load_json(dataset_cfg['ann_path'], dataset_cfg['ann_bbox_format'])
+        self._load_json(dataset_cfg['ann_path'])
 
-    def _load_json(self, json_path, ann_bbox_format):
+    def _load_json(self, json_path):
         '''load json file'''
         print(f'Loading annotations {json_path} into memory...')
         with open(json_path, 'r') as f:
             json_data = json.load(f)
 
-        if ann_bbox_format in {'x1y1wh', 'cxcywh'}:
-            self.bb_format = 'cxcywh'
-            self.bb_param = 4
-        elif ann_bbox_format == 'cxcywhd':
-            self.bb_format = 'cxcywhd'
-            self.bb_param = 5
+        if self.ann_bbox_format in {'x1y1wh', 'cxcywh'}:
+            bb_param = 4
+        elif self.ann_bbox_format == 'cxcywhd':
+            bb_param = 5
         else:
             raise Exception('Bounding box format is not supported')
 
@@ -66,13 +65,9 @@ class ImageDataset(InfiniteDataset):
             
         for ann in json_data['annotations']:
             # Parse bounding box annotation
-            assert len(ann['bbox']) == self.bb_param
+            assert len(ann['bbox']) == bb_param
             if self.skip_crowd_ann and ann['iscrowd']:
                 continue
-            # If the dataset is using (x1,y1,w,h), convert to (cx,cy,w,h)
-            if ann_bbox_format == 'x1y1wh':
-                ann['bbox'][0] = ann['bbox'][0] + ann['bbox'][2] / 2
-                ann['bbox'][1] = ann['bbox'][1] + ann['bbox'][3] / 2
             # category inddex
             ann['cat_idx'] = self.catId2idx[ann['category_id']]
             # segmentation mask
@@ -104,7 +99,7 @@ class ImageDataset(InfiniteDataset):
             raise NotImplementedError()
             self.hem_state = {
                 'iter': -1,
-                'APs': torch.ones(self._length)
+                'APs': torch.ones(self._length) + 1e-8
             }
         elif self.HEM == 'probability':
             raise NotImplementedError()
@@ -127,19 +122,18 @@ class ImageDataset(InfiniteDataset):
                 self.hem_state['order'] = torch.randperm(self._length)
             index = self.hem_state['order'][_iter].item()
         elif self.HEM == 'probability':
-            raise NotImplementedError()
-            
+            probs = -torch.log(self.hem_state['APs'])
+            index = torch.multinomial(probs, num_samples=1)
         else:
             raise NotImplementedError()
-        
+
+        self.hem_state['counts'][index] += 1
         return index
     
     def update_ap(self, img_idx, aps):
-        raise NotImplementedError()
         momentum = 0.8
         prev = self.hem_state['APs'][img_idx]
-        self.hem_state['APs'][img_idx] = 0
-
+        self.hem_state['APs'][img_idx] = momentum*prev + (1-momentum)*aps
 
     def __getitem__(self, _):
         """
@@ -198,7 +192,8 @@ class ImageDataset(InfiniteDataset):
             'labels': labels,
             'index': index,
             'image_id': img_id,
-            'pad_info': pad_info
+            'pad_info': pad_info,
+            'anns': self.imgId2anns[img_id]
         }
         return pair
 
@@ -251,7 +246,7 @@ class ImageDataset(InfiniteDataset):
         assert imgInfo['height'] == img.height and imgInfo['width'] == img.width
         # get annotations
         anns = self.imgId2anns[img_id]
-        labels = self._ann2labels(anns, img.height, img.width, self.bb_format)
+        labels = self._ann2labels(anns, img.height, img.width, self.ann_bbox_format)
         # augmentation
         if self.aug_setting is not None:
             img, labels = augUtils.augment_PIL([img], [labels], self.aug_setting)
@@ -266,8 +261,19 @@ class ImageDataset(InfiniteDataset):
         return (img, labels, img_id, pad_info)
 
     @staticmethod
-    def _ann2labels(anns, img_h, img_w, bb_format):
-        bboxes = [a['bbox'] for a in anns]
+    def _ann2labels(anns, img_h, img_w, ann_format):
+        # If the dataset is using (x1,y1,w,h), convert to (cx,cy,w,h)
+        if ann_format == 'x1y1wh':
+            bboxes = []
+            for ann in anns:
+                _b = ann['bbox']
+                _cxcywh = [_b[0]+_b[2]/2, _b[1]+_b[3]/2, _b[2], _b[3]]
+                bboxes.append(_cxcywh)
+            ann_format = 'cxcywh'
+        elif ann_format in {'cxcywh', 'cxcywhd'}:
+            bboxes = [a['bbox'] for a in anns]
+        else:
+            raise NotImplementedError()
         cat_idxs = [a['cat_idx'] for a in anns]
         if 'rle' not in anns[0]:
             rles = None
@@ -277,7 +283,7 @@ class ImageDataset(InfiniteDataset):
             bboxes=torch.FloatTensor(bboxes),
             cats=torch.LongTensor(cat_idxs),
             masks=None if rles is None else maskUtils.rle2mask(rles),
-            bb_format=bb_format,
+            bb_format=ann_format,
             img_hw=(img_h, img_w)
         )
         return labels
@@ -286,9 +292,10 @@ class ImageDataset(InfiniteDataset):
     def collate_func(batch):
         batch = {
             'images':    torch.stack([items['image'] for items in batch]),
-            'labels':    [items['labels'] for items in batch],
-            'image_ids': [items['image_id'] for items in batch],
             'indices':   torch.LongTensor([items['index'] for items in batch]),
-            'pad_infos': [items['pad_info'] for items in batch]
+            'labels':    [items['labels']   for items in batch],
+            'image_ids': [items['image_id'] for items in batch],
+            'pad_infos': [items['pad_info'] for items in batch],
+            'anns':      [items['anns']     for items in batch]
         }
         return batch

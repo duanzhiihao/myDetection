@@ -4,12 +4,12 @@ import numpy as np
 from pycocotools import cocoeval
 
 
-def coco_evaluate_json(dts_json, gt_json_path):
+def coco_evaluate_bbox(dts_json, gt_json):
     # json.dump(dts_json, open('./tmp.json','w'), indent=1)
     print('Initialing validation set...')
-    # cocoGt = COCO(gt_json_path)
+    # cocoGt = COCO(gt_json)
     # cocoDt = cocoGt.loadRes('./tmp.json')
-    cocoEval = myCOCOeval(gt_json_path, dts_json, 'bbox')
+    cocoEval = myCOCOeval(gt_json, dts_json, 'bbox')
     cocoEval.evaluate()
     cocoEval.accumulate()
     # have to manually get the evaluation string 
