@@ -19,9 +19,9 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='yolov3_phem')
-    parser.add_argument('--train_set', type=str, default='debug3')
-    parser.add_argument('--val_set', type=str, default='debug3')
+    parser.add_argument('--model', type=str, default='d1_fcs2s')
+    parser.add_argument('--train_set', type=str, default='debug_kitchen')
+    parser.add_argument('--val_set', type=str, default='debug_kitchen')
 
     parser.add_argument('--super_batchsize', type=int, default=32)
     parser.add_argument('--initial_imgsize', type=int, default=None)
@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--eval_interval', type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images', type=str, default='debug3')
+    parser.add_argument('--demo_images', type=str, default='debug_kitchen')
     
     parser.add_argument('--debug_mode', type=str, default=None)
     args = parser.parse_args()

@@ -44,27 +44,27 @@ class FCOSLayer(torch.nn.Module):
         else:
             raise Exception('Unknown ltrb_setting')
 
-        # When testing, calculate and return the final predictions
+        # ---------------------------- testing ----------------------------
+        # Force the prediction to be in the image
+        p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
+        p_xyxy[..., 0].clamp_(min=0, max=img_w)
+        p_xyxy[..., 1].clamp_(min=0, max=img_h)
+        p_xyxy[..., 2].clamp_(min=0, max=img_w)
+        p_xyxy[..., 3].clamp_(min=0, max=img_h)
+        p_xywh = _xyxy_to_xywh(p_xyxy)
+        # Logistic activation for 'centerness'
+        p_conf = torch.sigmoid(conf_logits.detach())
+        # Logistic activation for categories
+        p_cls = torch.sigmoid(cls_logits.detach())
+        cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
+        confs = torch.sqrt(p_conf * cls_score)
+        preds = {
+            'bbox': p_xywh.view(nB, nH*nW, 4),
+            'class_idx': cls_idx.view(nB, nH*nW),
+            'score': confs.view(nB, nH*nW),
+        }
+        # Return the final predictions when testing
         if labels is None:
-            # ---------------------------- testing ----------------------------
-            # Force the prediction to be in the image
-            p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
-            p_xyxy[..., 0].clamp_(min=0, max=img_w)
-            p_xyxy[..., 1].clamp_(min=0, max=img_h)
-            p_xyxy[..., 2].clamp_(min=0, max=img_w)
-            p_xyxy[..., 3].clamp_(min=0, max=img_h)
-            p_xywh = _xyxy_to_xywh(p_xyxy)
-            # Logistic activation for 'centerness'
-            p_conf = torch.sigmoid(conf_logits)
-            # Logistic activation for categories
-            p_cls = torch.sigmoid(cls_logits)
-            cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
-            confs = torch.sqrt(p_conf * cls_score)
-            preds = {
-                'bbox': p_xywh.view(nB, nH*nW, 4),
-                'class_idx': cls_idx.view(nB, nH*nW),
-                'score': confs.view(nB, nH*nW),
-            }
             return preds, None
 
         p_xywh = _ltrb_to(p_ltrb, nH, nW, stride, 'cxcywh').cpu()
@@ -185,7 +185,7 @@ class FCOSLayer(torch.nn.Module):
                         f'ignored {ignored_num}/{total_sample_num}: ' \
                         f'bbox/gt {loss_bbox:.3f}, conf {loss_conf:.3f}, ' \
                         f'class/gt {loss_cls:.3f}'
-        return None, loss
+        return preds, loss
 
 
 class FCOS_ATSS_Layer(torch.nn.Module):
@@ -225,27 +225,27 @@ class FCOS_ATSS_Layer(torch.nn.Module):
         else:
             raise Exception('Unknown ltrb_setting')
 
-        # When testing, calculate and return the final predictions
+        # ---------------------------- testing ----------------------------
+        # Force the prediction to be in the image
+        p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
+        p_xyxy[..., 0].clamp_(min=0, max=img_w)
+        p_xyxy[..., 1].clamp_(min=0, max=img_h)
+        p_xyxy[..., 2].clamp_(min=0, max=img_w)
+        p_xyxy[..., 3].clamp_(min=0, max=img_h)
+        p_xywh = _xyxy_to_xywh(p_xyxy)
+        # Logistic activation for 'centerness'
+        p_conf = torch.sigmoid(conf_logits.detach())
+        # Logistic activation for categories
+        p_cls = torch.sigmoid(cls_logits.detach())
+        cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
+        confs = torch.sqrt(p_conf * cls_score)
+        preds = {
+            'bbox': p_xywh.view(nB, nH*nW, 4),
+            'class_idx': cls_idx.view(nB, nH*nW),
+            'score': confs.view(nB, nH*nW),
+        }
+        # Return the final predictions when testing
         if labels is None:
-            # ---------------------------- testing ----------------------------
-            # Force the prediction to be in the image
-            p_xyxy = _ltrb_to(p_ltrb, nH, nW, stride, 'x1y1x2y2')
-            p_xyxy[..., 0].clamp_(min=0, max=img_w)
-            p_xyxy[..., 1].clamp_(min=0, max=img_h)
-            p_xyxy[..., 2].clamp_(min=0, max=img_w)
-            p_xyxy[..., 3].clamp_(min=0, max=img_h)
-            p_xywh = _xyxy_to_xywh(p_xyxy)
-            # Logistic activation for 'centerness'
-            p_conf = torch.sigmoid(conf_logits)
-            # Logistic activation for categories
-            p_cls = torch.sigmoid(cls_logits)
-            cls_score, cls_idx = torch.max(p_cls, dim=3, keepdim=True)
-            confs = torch.sqrt(p_conf * cls_score)
-            preds = {
-                'bbox': p_xywh.view(nB, nH*nW, 4),
-                'class_idx': cls_idx.view(nB, nH*nW),
-                'score': confs.view(nB, nH*nW),
-            }
             return preds, None
 
         p_xywh = _ltrb_to(p_ltrb, nH, nW, stride, 'cxcywh').cpu()
@@ -377,7 +377,7 @@ class FCOS_ATSS_Layer(torch.nn.Module):
                         f'ignored {ignored_num}/{total_sample_num}: ' \
                         f'bbox/gt {loss_bbox:.3f}, conf {loss_conf:.3f}, ' \
                         f'class/gt {loss_cls:.3f}'
-        return None, loss
+        return preds, loss
 
 
 def _get_atss_threshold(gtbb, all_anchors, k):

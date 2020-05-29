@@ -26,7 +26,7 @@
     "model.effrpn.repeat_num": 3,
     "model.effrpn.num_anchor_per_level": 1,
     "model.effrpn.enable_conf": true,
-    "model.effrpn.bbox_last": "lr_tb",
+    "model.effrpn.bbox_last": "default",
     "model.effrpn.cls_last": "spconv",
 
     "model.pred_layer": "FCOS2",
@@ -41,12 +41,18 @@
         "640": 9,
         "768": 6
     },
+    "train.hard_example_mining": "epoch_shuffle",
     "train.data_augmentation": {
-        "satpepper_noise_density": 0.01,
-        "brightness": [0.6, 1.4],
-        "contrast": [0.6, 1.4],
+        "mosaic": false,
+        "satpepper_noise_density": 0.02,
+        "brightness": [0.5, 1.5],
+        "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
-        "saturation": [0, 2]
+        "saturation": [0, 2],
+        "resize": true,
+        "horizontal_flip": true,
+        "vertical_flip": false,
+        "rotation": false
     },
 
     "test.preprocessing": "resize_pad_divisible",
