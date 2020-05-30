@@ -110,7 +110,7 @@ class YOLOLayer(nn.Module):
             gt_bboxes = gt_bboxes[valid_mask,:]
             grid_tx = gt_bboxes[:,0] / self.stride
             grid_ty = gt_bboxes[:,1] / self.stride
-            ti, tj = grid_tx.long(), grid_ty.long()
+            ti, tj = grid_tx.long().clamp(max=nW-1), grid_ty.long().clamp(max=nH-1)
             tn = best_n[valid_mask] # target anchor box number
             
             conf_loss_mask[b,tn,tj,ti] = 1
