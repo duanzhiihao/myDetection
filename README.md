@@ -9,7 +9,8 @@
 - [x] EfficientDet + FCOS
 - [x] EfficientDet + custom FCOS
 - [x] EfficientDet + custom FCOS + ATSS
-- [ ] Hard example mining
+- [x] Hard example mining
+- [ ] Ultralytics YOLO
 - [ ] Attention
 - [ ] Mosaic training data augmentation
 - [ ] DETR
