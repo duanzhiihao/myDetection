@@ -133,6 +133,43 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
         plt.show()
 
 
+def draw_dt_on_np(im, detections, print_dt=False, color=(255,0,0),
+                  text_size=1, **kwargs):
+    '''
+    im: image numpy array, shape(h,w,3), RGB
+    detections: rows of [x,y,w,h,a,conf], angle in degree
+    '''
+    line_width = kwargs.get('line_width', im.shape[0] // 300)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_bold = max(int(2*text_size), 1)
+    for bb in detections:
+        if len(bb) == 6:
+            x,y,w,h,a,conf = bb
+        else:
+            x,y,w,h,a = bb[:5]
+            conf = -1
+        x1, y1 = x - w/2, y - h/2
+        if print_dt:
+            print(f'[{x} {y} {w} {h} {a}], confidence: {conf}')
+        _draw_xywha(im, x, y, w, h, a, color=color, linewidth=line_width)
+        if kwargs.get('show_conf', True):
+            cv2.putText(im, f'{conf:.2f}', (int(x1),int(y1)), font, 1*text_size,
+                        (255,255,255), font_bold, cv2.LINE_AA)
+        if kwargs.get('show_angle', False):
+            cv2.putText(im, f'{int(a)}', (x,y), font, 1*text_size,
+                        (255,255,255), font_bold, cv2.LINE_AA)
+    if kwargs.get('show_count', True):
+        caption_w = int(im.shape[0] / 4.8)
+        caption_h = im.shape[0] // 25
+        start = (im.shape[1] - caption_w, im.shape[0] // 20)
+        end = (im.shape[1], start[1] + caption_h)
+        # cv2.rectangle(im, start, end, color=(0,0,0), thickness=-1)
+        cv2.putText(im, f'Count: {len(detections)}',
+                    (im.shape[1] - caption_w + im.shape[0]//100, end[1]-im.shape[1]//200),
+                    font, 1.2*text_size,
+                    (255,255,255), font_bold*2, cv2.LINE_AA)
+
+
 def random_colors(num: int, order: str='RGB', dtype: str='uint8') -> np.ndarray:
     '''
     Generate random distinct colors
