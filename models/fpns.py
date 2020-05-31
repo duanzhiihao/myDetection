@@ -74,6 +74,42 @@ class YOLOBranch(nn.Module):
         return x, feature
 
 
+class UltralyticsFPN(nn.Module):
+    '''
+    https://github.com/ultralytics/yolov5
+    '''
+    def __init__(self, global_cfg):
+        super().__init__()
+        from .modules import UBottleneck, UConvBnLeaky
+        assert global_cfg['model.backbone.num_levels'] == 3
+        ch3, ch4, ch5 = global_cfg['model.backbone.out_channels']
+        depm          = global_cfg['model.ultralytics.depth_muliple']
+        chm           = global_cfg['model.ultralytics.channel_muliple']
+        scale_ = lambda x: max(round(x*chm), 1)
+
+        self.to_p5 = nn.Sequential(
+            *[UBottleneck(ch5, ch5, shortcut=False) for _ in range(scale_(3))]
+        )
+        self.to_p4 = nn.Sequential(
+            UConvBnLeaky(ch4*2, ch4, k=1, s=1),
+            *[UBottleneck(ch4, ch4, shortcut=False) for _ in range(scale_(3))]
+        )
+        self.to_p3 = nn.Sequential(
+            UConvBnLeaky(ch3*2, ch3, k=1, s=1),
+            *[UBottleneck(ch3, ch3, shortcut=False) for _ in range(scale_(3))]
+        )
+
+    def forward(self, features):
+        c3, c4, c5 = features
+        p5 = self.to_p5(c5)
+        _x = tnf.interpolate(p5, scale_factor=2, mode='nearset')
+        p4 = self.to_p4(torch.cat([_x, c4], dim=1))
+        _x = tnf.interpolate(p4, scale_factor=2, mode='nearset')
+        p3 = self.to_p3(torch.cat([_x, c3], dim=1))
+
+        return [p3, p4, p5]
+
+
 # class LastLevelP6P7(nn.Module):
 #     """
 #     This module is used in RetinaNet to generate extra layers, P6 and P7.

@@ -1,5 +1,5 @@
 {
-    "__doc": "YOLO version 3",
+    "__doc": "Ultralytics's YOLO 5m",
 
     "base": "OneStageBBox",
     
@@ -9,12 +9,15 @@
     "general.pred_bbox_format": "cxcywh",
     "general.bbox_param": 4,
 
-    "model.backbone.name": "dark53",
+    "model.backbone.name": "ultralytics",
     "model.backbone.num_levels": 3,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
+    "model.ultralytics.first": "Focus",
+    "model.ultralytics.depth_muliple": 0.67,
+    "model.ultralytics.channel_muliple": 0.75,
 
-    "model.fpn.name": "yolov3",
+    "model.fpn.name": "ultralytics",
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
@@ -33,11 +36,11 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704,768],
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 768],
     "train.imgsize_to_batch_size": {
         "352": 32,
-        "384": 26, "416": 23, "448": 19, "480": 17,
-        "512": 14, "544": 13, "576": 11, "608": 10,
+        "384": 26, "416": 23, "448": 20, "480": 17,
+        "512": 15, "544": 13, "576": 11, "608": 10,
         "640": 9, "672": 8, "704": 8, "768": 6
     },
     "train.hard_example_mining": "epoch_shuffle",

@@ -22,6 +22,11 @@ def get_backbone(cfg: dict):
             backbone.load_state_dict(pretrained, strict=True)
         out_feature_channels = (256, 512, 1024)
         out_strides = (8, 16, 32)
+    elif backbone_name == 'ultralytics':
+        from .backbones import UltralyticsBackbone
+        backbone = UltralyticsBackbone(cfg)
+        out_feature_channels = backbone.feature_chs
+        out_strides = backbone.feature_strides
     elif backbone_name.startswith('efficientnet'):
         from .backbones import EfNetBackbone
         backbone = EfNetBackbone(cfg)
@@ -43,6 +48,11 @@ def get_fpn(cfg: dict):
     if fpn_name == 'yolov3':
         from .fpns import YOLOv3FPN
         fpn = YOLOv3FPN(cfg)
+        out_feature_channels = cfg['model.backbone.out_channels']
+        out_strides = cfg['model.backbone.out_strides']
+    elif fpn_name == 'ultralytics':
+        from .fpns import UltralyticsFPN
+        fpn = UltralyticsFPN(cfg)
         out_feature_channels = cfg['model.backbone.out_channels']
         out_strides = cfg['model.backbone.out_strides']
     elif fpn_name == 'bifpn':

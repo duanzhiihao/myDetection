@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -12,29 +13,29 @@ class Darknet53(nn.Module):
         # first conv layer
         self.netlist.append(ConvBnLeaky(3*in_imgs, 32, k=3, s=1))
 
-        # Downsampled by 2 (accumulatively), followed by residual blocks
+        # Downsample by 2 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(32, 64, k=3, s=2))
         for _ in range(1):
             self.netlist.append(DarkBlock(in_out=64, hidden=32))
 
-        # Downsampled by 4 (accumulatively), followed by residual blocks
+        # Downsample by 4 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(64, 128, k=3, s=2))
         for _ in range(2):
             self.netlist.append(DarkBlock(in_out=128, hidden=64))
         
-        # Downsampled by 8 (accumulatively), followed by residual blocks
+        # Downsample by 8 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(128, 256, k=3, s=2))
         for _ in range(8):
             self.netlist.append(DarkBlock(in_out=256, hidden=128))
         assert len(self.netlist) == 15
 
-        # Downsampled by 16 (accumulatively), followed by residual blocks
+        # Downsample by 16 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(256, 512, k=3, s=2))
         for _ in range(8):
             self.netlist.append(DarkBlock(in_out=512, hidden=256))
         assert len(self.netlist) == 24
 
-        # Downsampled by 32 (accumulatively), followed by residual blocks
+        # Downsample by 32 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(512, 1024, k=3, s=2))
         for _ in range(4):
             self.netlist.append(DarkBlock(in_out=1024, hidden=512))
@@ -56,6 +57,64 @@ class Darknet53(nn.Module):
         return [C3, C4, C5]
 
 
+class UltralyticsBackbone(nn.Module):
+    '''
+    https://github.com/ultralytics/yolov5
+    '''
+    def __init__(self, global_cfg):
+        super().__init__()
+        from .modules import Focus, UConvBnLeaky, UBottleneck, SPP
+        depm     = global_cfg['model.ultralytics.depth_muliple']
+        chm      = global_cfg['model.ultralytics.channel_muliple']
+        in_imgs  = global_cfg.get('general.input.frame_concatenation', 1)
+        ceil8    = lambda x: int(np.ceil(x/8) * 8)
+        scale_   = lambda x: max(round(x*chm), 1)
+        channels = [ceil8(ch*depm) for ch in [64, 128, 256, 512, 1024]]
+        self.feature_chs      = channels[2:]
+        self.feature_strides  = [8, 16, 32]
+
+        self.netlist = nn.ModuleList()
+        if global_cfg['model.ultralytics.first'] == 'Focus':
+            assert in_imgs == 1
+            self.netlist.append(Focus(3, channels[0], k=3))
+        elif global_cfg['model.ultralytics.first'] == 'Conv2d':
+            raise NotImplementedError()
+        # 2x
+        # downsample
+        self.netlist.append(UConvBnLeaky(channels[0], channels[1], k=3, s=2))
+        # 4x
+        for _ in range(scale_(3)):
+            self.netlist.append(UBottleneck(channels[1], channels[1]))
+        # downsample
+        self.netlist.append(UConvBnLeaky(channels[1], channels[2], k=3, s=2))
+        # 8x
+        for _ in range(scale_(9)):
+            self.netlist.append(UBottleneck(channels[2], channels[2]))
+        # downsample
+        self.netlist.append(UConvBnLeaky(channels[2], channels[3], k=3, s=2))
+        # 16 x
+        for _ in range(scale_(9)):
+            self.netlist.append(UBottleneck(channels[3], channels[3]))
+        # downsample
+        self.netlist.append(UConvBnLeaky(channels[3], channels[4], k=3, s=2))
+        # 32 x
+        self.netlist.append(SPP(channels[4], channels[4], k=[5,9,13]))
+        for _ in range(scale_(3)):
+            self.netlist.append(UBottleneck(channels[4], channels[4]))
+        
+    def forward(self, x):
+        features = []
+        for module in self.netlist:
+            y = self.module(x)
+            if y.shape[2:4] != x.shape[2:4]:
+                assert y.shape[2] == x.shape[2] // 2
+                features.append(x)
+            x = y
+        features.append(x)
+        assert len(features) == 5
+        return features[2:]
+
+
 class ResNetBackbone(nn.Module):
     '''
     Args:
@@ -63,9 +122,9 @@ class ResNetBackbone(nn.Module):
     '''
     def __init__(self, tv_model):
         super().__init__()
-        self.conv1 = tv_model.conv1
-        self.bn1 = tv_model.bn1
-        self.relu = tv_model.relu
+        self.conv1   = tv_model.conv1
+        self.bn1     = tv_model.bn1
+        self.relu    = tv_model.relu
         self.maxpool = tv_model.maxpool
 
         self.layer1 = tv_model.layer1

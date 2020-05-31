@@ -111,7 +111,7 @@ def main():
     print(f'Initializing training set {args.train_set}...')
     global_cfg['train.dataset_name'] = args.train_set
     dataset = get_trainingset(global_cfg)
-    dataset.to_iterator(batch_size=batch_size, shuffle=True, 
+    dataset.to_iterator(batch_size=batch_size,
                         num_workers=num_cpu, pin_memory=True)
     print(f'Initializing validation set {args.val_set}...')
     eval_info, validation_func = get_valset(args.val_set)
@@ -146,11 +146,11 @@ def main():
         params += [{'params': value, 'weight_decay': decay}]
     # Initialize optimizer
     optimizer = optim.get_optimizer(name=args.optimizer, params=params,
-                                         lr=args.lr, cfg=global_cfg)
+                                    lr=args.lr, cfg=global_cfg)
     if args.checkpoint and args.optimizer in previous_state:
         optimizer.load_state_dict(previous_state[args.optimizer])
     # Learning rate scheduler
-    lr_schedule_func = lambda x: lr_warmup(x, warm_up=warmup_iter)
+    lr_schedule_func = lambda x: optim.lr_warmup(x, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
     scheduler = LambdaLR(optimizer, lr_schedule_func, last_epoch=start_iter)
 
@@ -189,9 +189,21 @@ def main():
             # np_im = np.array(pil_img)
             # labels[0].draw_on_np(np_im, imshow=True)
             imgs = imgs.cuda()
-            dts, loss = model(imgs, labels)
-            assert not torch.isnan(loss)
-            loss.backward()
+            try:
+                dts, loss = model(imgs, labels)
+                assert not torch.isnan(loss)
+                loss.backward()
+            except RuntimeError as e:
+                print(e)
+                if 'CUDA out of memory' in str(e):
+                    print(f'CUDA out of memory at imgsize={dataset.img_size},',
+                          f'batchsize={batch_size}')
+                    print('Trying to reduce the batchsize at that image size...')
+                    AUTO_BATCHSIZE[str(dataset.img_size)] -= 1
+                    dataset.to_iterator(batch_size=batch_size-1,
+                                        num_workers=num_cpu, pin_memory=True)
+                else:
+                    exit()
             if global_cfg['train.hard_example_mining'] in {'probability'}:
                 # calculate AP for each image
                 idxs,img_ids,anns = batch['indices'],batch['image_ids'],batch['anns']
@@ -235,7 +247,7 @@ def main():
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = int(np.ceil(super_batchsize / batch_size))
             dataset.img_size = imgsize
-            dataset.to_iterator(batch_size=batch_size, shuffle=True,
+            dataset.to_iterator(batch_size=batch_size,
                                 num_workers=num_cpu, pin_memory=True)
 
         # save checkpoint
@@ -273,25 +285,6 @@ def main():
                         np_img = cv2.resize(np_img, (int(_w*_r), int(_h*_r)))
                     logger.add_image(impath, np_img, iter_i, dataformats='HWC')
             model.train()
-
-
-# Learning rate setup
-def lr_warmup(i, warm_up=1000):
-    if i < warm_up:
-        factor = i / warm_up
-    else:
-        factor = 1
-    # elif i < 70000:
-    #     factor = 0.5
-    # elif i < 90000:
-    #     factor = 0.25
-    # elif i < 100000:
-    #     factor = 0.1
-    # elif i < 200000:
-    #     factor = 1
-    # else:
-    #     factor = 0.01
-    return factor
 
 
 if __name__ == "__main__":
