@@ -19,26 +19,26 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='d1_fcs2s')
-    parser.add_argument('--train_set', type=str, default='debug_kitchen')
-    parser.add_argument('--val_set', type=str, default='debug_kitchen')
+    parser.add_argument('--model',     type=str, default='yolov3_phem')
+    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--val_set',   type=str, default='debug3')
 
-    parser.add_argument('--super_batchsize', type=int, default=32)
-    parser.add_argument('--initial_imgsize', type=int, default=None)
-    parser.add_argument('--optimizer', type=str, default='SGDMR')
-    parser.add_argument('--lr', type=float, default=0.0001)
-    parser.add_argument('--warmup', type=int, default=1000)
+    parser.add_argument('--super_batchsize', type=int,   default=32)
+    parser.add_argument('--initial_imgsize', type=int,   default=None)
+    parser.add_argument('--optimizer',       type=str,   default='SGDMR')
+    parser.add_argument('--lr',              type=float, default=0.0001)
+    parser.add_argument('--warmup',          type=int,   default=1000)
 
     parser.add_argument('--checkpoint', type=str,
                         default='')
 
-    parser.add_argument('--print_interval', type=int, default=20)
-    parser.add_argument('--eval_interval', type=int, default=200)
+    parser.add_argument('--print_interval',      type=int, default=20)
+    parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
-    parser.add_argument('--demo_interval', type=int, default=20)
-    parser.add_argument('--demo_images', type=str, default='debug_kitchen')
+    parser.add_argument('--demo_interval',       type=int, default=20)
+    parser.add_argument('--demo_images',         type=str, default='debug3')
     
-    parser.add_argument('--debug_mode', type=str, default=None)
+    parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -129,7 +129,7 @@ def main():
             print('Cannot load weights. Trying to set strict=False...')
             model.load_state_dict(previous_state['model'], strict=False)
             print('Successfully loaded part of the weights.')
-        start_iter = previous_state['iter']
+        start_iter = previous_state['iter'] + 1
         print(f'Start from iteration: {start_iter}')
 
     print('Initializing tensorboard SummaryWriter...')
@@ -189,21 +189,22 @@ def main():
             # np_im = np.array(pil_img)
             # labels[0].draw_on_np(np_im, imshow=True)
             imgs = imgs.cuda()
-            try:
-                dts, loss = model(imgs, labels)
-                assert not torch.isnan(loss)
-                loss.backward()
-            except RuntimeError as e:
-                print(e)
-                if 'CUDA out of memory' in str(e):
-                    print(f'CUDA out of memory at imgsize={dataset.img_size},',
-                          f'batchsize={batch_size}')
-                    print('Trying to reduce the batchsize at that image size...')
-                    AUTO_BATCHSIZE[str(dataset.img_size)] -= 1
-                    dataset.to_iterator(batch_size=batch_size-1,
-                                        num_workers=num_cpu, pin_memory=True)
-                else:
-                    exit()
+            # try:
+            dts, loss = model(imgs, labels)
+            assert not torch.isnan(loss)
+            loss.backward()
+            # except RuntimeError as e:
+            #     print(e)
+            #     if 'CUDA out of memory' in str(e):
+            #         print(f'CUDA out of memory at imgsize={dataset.img_size},',
+            #               f'batchsize={batch_size}')
+            #         print('Trying to reduce the batchsize at that image size...')
+            #         AUTO_BATCHSIZE[str(dataset.img_size)] -= 1
+            #         dataset.to_iterator(batch_size=batch_size-1,
+            #                             num_workers=num_cpu, pin_memory=True)
+            #     else:
+            #         raise e
+            assert AUTO_BATCHSIZE[str(dataset.img_size)] == batch_size
             if global_cfg['train.hard_example_mining'] in {'probability'}:
                 # calculate AP for each image
                 idxs,img_ids,anns = batch['indices'],batch['image_ids'],batch['anns']
