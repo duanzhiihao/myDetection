@@ -116,7 +116,7 @@ def main():
     print(f'Initializing training set {args.train_set}...')
     global_cfg['train.dataset_name'] = args.train_set
     dataset = get_trainingset(global_cfg)
-    dataset.to_iter(batch_size=batch_size, num_workers=num_cpu, pin_memory=True)
+    dataset.to_iterator(batch_size=batch_size, num_workers=num_cpu, pin_memory=True)
     print(f'Initializing validation set {args.val_set}...')
     eval_info, validation_func = get_valset(args.val_set)
 
@@ -244,11 +244,12 @@ def main():
             time_used = timer.sec2str(sec_used)
             _ai       = sec_used / (iter_i+1-start_iter)
             avg_iter  = timer.sec2str(_ai)
-            avg_100img   = timer.sec2str(_ai / batch_size / subdivision * 100)
-            avg_epoch = timer.sec2str(_ai / batch_size / subdivision * 118287)
+            avg_img = _ai / batch_size / subdivision / seq_len
+            avg_100img   = timer.sec2str(avg_img * 100)
+            avg_epoch = timer.sec2str(avg_img * 118287)
             print(f'\nTotal time: {time_used}, 100 imgs: {avg_100img}, ',
                   f'iter: {avg_iter}, COCO epoch: {avg_epoch}')
-            print(f'effective batch size = {batch_size} * {subdivision}')
+            print(f'effective batch size = {batch_size} * {subdivision} * {seq_len}')
             max_cuda = torch.cuda.max_memory_allocated(0) / 1024 / 1024 / 1024
             print(f'Max GPU memory usage: {max_cuda:.3f} GB')
             current_lr = scheduler.get_last_lr()[0]
@@ -264,8 +265,8 @@ def main():
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = int(np.ceil(super_batchsize / batch_size / seq_len))
             dataset.img_size = imgsize
-            dataset.to_iter(batch_size=batch_size, num_workers=num_cpu,
-                            pin_memory=True)
+            dataset.to_iterator(batch_size=batch_size, num_workers=num_cpu,
+                                pin_memory=True)
 
         # save checkpoint
         if iter_i > 0 and (iter_i % args.checkpoint_interval == 0):

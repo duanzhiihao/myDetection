@@ -4,16 +4,16 @@ import json
 import random
 import PIL.Image
 import torch
-from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms.functional as tvf
 
+from .base import InfiniteDataset
 import utils.mask_ops as maskUtils
 import utils.image_ops as imgUtils
 import utils.augmentation as augUtils
 from utils.structures import ImageObjects
 
 
-class Dataset4VODT(Dataset):
+class Dataset4VODT(InfiniteDataset):
     """
     Dataset for training video object detection and tracking algorithms.
     """
@@ -89,7 +89,7 @@ class Dataset4VODT(Dataset):
         self.video_start = torch.BoolTensor(video_start)
 
     def __len__(self):
-        return 100
+        return 16384
 
     def __getitem__(self, _):
         assert len(self.frame_paths) == len(self.annotations) == len(self.video_start)
@@ -209,11 +209,3 @@ class Dataset4VODT(Dataset):
         seq_flags:  List[torch.tensor] = [torch.stack(b) for b in zip(*_flags)]
         img_ids:    List[tuple]        = [list(b) for b in zip(*_ids)]
         return seq_imgs, seq_labels, seq_flags, img_ids
-    
-    def to_iter(self, **kwargs):
-        self.iter = iter(DataLoader(self, collate_fn=self.collate_func, **kwargs))
-
-    def get_next(self):
-        assert hasattr(self, 'to_iter'), 'Please call to_iter() first'
-        data = next(self.iter)
-        return data

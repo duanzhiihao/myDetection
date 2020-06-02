@@ -128,7 +128,7 @@ class ConvConcat(nn.Module):
         for ch in fpn_out_chs:
             fusion = nn.Sequential(
                 ConvBnLeaky(ch*2, ch, k=1, s=1),
-                ConvBnLeaky(ch, ch//2, k=1, s=1),
+                ConvBnLeaky(ch, ch//2, k=3, s=1),
                 ConvBnLeaky(ch//2, ch, k=3, s=1)
             )
             self.rnns.append(fusion)
