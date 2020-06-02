@@ -187,7 +187,7 @@ class FullRNNVOD(torch.nn.Module):
         features = self.fpn(features)
         if 'fpn' in self.hid_names:
             hid = self.hidden.get('fpn', None)
-            features = self.agg(features, hid, is_start)
+            features = self.agg_fpn(features, hid, is_start)
             _hidden['fpn'] = [f.detach().clone() for f in features]
 
         # raw prediction

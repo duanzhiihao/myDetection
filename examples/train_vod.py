@@ -240,16 +240,17 @@ def main():
 
         # logging
         if iter_i % args.print_interval == 0:
-            sec_used = timer.tic() - start_time
+            sec_used  = timer.tic() - start_time
             time_used = timer.sec2str(sec_used)
-            avg_iter = timer.sec2str(sec_used/(iter_i+1-start_iter))
-            avg_img = avg_iter / batch_size / subdivision
-            avg_epoch = avg_img * 118287
-            print(f'\nTotal time: {time_used}, 100 imgs: {avg_img*100}, ',
-                  f'iter: {avg_iter}, epoch: {avg_epoch}')
-            print(f'Effective batchsize = {subdivision} * {batch_size} * {seq_len}')
+            _ai       = sec_used / (iter_i+1-start_iter)
+            avg_iter  = timer.sec2str(_ai)
+            avg_100img   = timer.sec2str(_ai / batch_size / subdivision * 100)
+            avg_epoch = timer.sec2str(_ai / batch_size / subdivision * 118287)
+            print(f'\nTotal time: {time_used}, 100 imgs: {avg_100img}, ',
+                  f'iter: {avg_iter}, COCO epoch: {avg_epoch}')
+            print(f'effective batch size = {batch_size} * {subdivision}')
             max_cuda = torch.cuda.max_memory_allocated(0) / 1024 / 1024 / 1024
-            print(f'Max GPU memory usage: {max_cuda:.2f} GB')
+            print(f'Max GPU memory usage: {max_cuda:.3f} GB')
             current_lr = scheduler.get_last_lr()[0]
             print(f'[Iteration {iter_i}] [learning rate {current_lr:.3g}]',
                   f'[Total loss {loss:.2f}] [img size {dataset.img_size}]')
