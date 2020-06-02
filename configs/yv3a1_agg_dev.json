@@ -1,7 +1,7 @@
 {
     "__doc": "yolov3, angle, 1-class, aggreagation",
 
-    "base": "SimpleVOD",
+    "base": "FullRNNVOD",
     
     "general.input_format": "RGB_1",
     "general.input_divisibility": 64,
@@ -11,6 +11,7 @@
 
     "model.backbone.name": "dark53",
     "model.backbone.num_levels": 3,
+    "model.backbone.input_channels": 6,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
 
@@ -18,9 +19,8 @@
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
-    "model.agg.name": "feature_block_matching",
-    "model.agg.hidden_state_names": ["fpn", "raw_pred"],
-    "model.agg.matching_metric": "correlation",
+    "model.agg.name": "ConvConcat",
+    "model.agg.hidden_state_names": ["input", "backbone", "fpn"],
 
     "model.rpn.name": "yolov3",
     

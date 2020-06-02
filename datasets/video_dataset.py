@@ -178,8 +178,8 @@ class Dataset4VODT(Dataset):
         # pad to square
         aug_flag = self.clip_aug['resize']
         if to_square:
-            seq_imgs, labels, pad_info = imgUtils.rect_to_square(seq_imgs, seq_labels,
-                    self.img_size, aug=aug_flag, resize_step=self.input_divisibility)
+            seq_imgs, labels, pad_info = imgUtils.seq_rect_to_square(seq_imgs,
+                    seq_labels, self.img_size, aug_flag, self.input_divisibility)
         else:
             pad_info = None
         return (seq_imgs, labels, start_flags, img_paths, pad_info)

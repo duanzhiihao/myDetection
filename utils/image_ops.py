@@ -37,7 +37,7 @@ def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
 
 
 def rect_to_square(image, labels, target_size:int, aug=False, resize_step=128,
-                   _aug_rsz=None, _fill_val=None, _rand_plc=True):
+                   _aug_rsz=1, _fill_val=None, _rand_plc=True):
     '''
     Resize and pad the input image to square.
 
@@ -50,10 +50,10 @@ def rect_to_square(image, labels, target_size:int, aug=False, resize_step=128,
         2. The input image will be zero-padded to square.
 
     Args:
-        image: PIL.Image or list of PIL.Image
-        labels: ImageObjects or list of ImageObjects
+        image:       PIL.Image or list of PIL.Image
+        labels:      ImageObjects or list of ImageObjects
         target_size: int, the width/height of the output square
-        aug: bool, if Ture, perform random resizing and placing augmentation
+        aug:         bool, if Ture, perform random resizing and placing augmentation
         resize_step: int
     '''
     assert isinstance(image, PIL.Image.Image) and image.mode == 'RGB'
@@ -128,12 +128,22 @@ def seq_rect_to_square(images, labels, target_size:int, aug:bool=False,
 
     See rect_to_square() for detailed docs.
     '''
-    raise NotImplementedError()
     assert isinstance(images, list)
     if labels is not None:
         assert isinstance(labels, list) and len(images) == len(labels)
-    # for i in range(len(imgs)):
-    #     rect_to_square()
+    _aug_rsz = torch.rand(1).item() if aug else 1
+    _fill_val = tuple([random.randint(0,255) for _ in range(3)]) if aug else 0
+    new_images = []
+    new_labels = []
+    pad_infos  = []
+    for i in range(len(images)):
+        img, lbl, info = rect_to_square(images[i], labels[i], target_size=target_size,
+                            aug=aug, resize_step=resize_step,
+                            _aug_rsz=_aug_rsz, _fill_val=_fill_val, _rand_plc=False)
+        new_images.append(img)
+        new_labels.append(lbl)
+        pad_infos.append(info)
+    return new_images, new_labels, pad_infos
 
 
 def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
@@ -150,7 +160,7 @@ def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
         pass
     elif code == 'RGB_1_norm':
         means = [0.485,0.456,0.406]
-        stds = [0.229,0.224,0.225]
+        stds  = [0.229,0.224,0.225]
         t_img = tvf.normalize(t_img, means, stds)
     elif code == 'BGR_255_norm':
         # to BGR, to 255

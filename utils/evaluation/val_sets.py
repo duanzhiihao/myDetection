@@ -58,18 +58,18 @@ def get_valset(valset_name: str):
     elif valset_name in {'Lab1_mot',
                          'Lunch2_mot', 'Edge_cases_mot', 'High_activity_mot',
                          'All_off_mot', 'IRfilter_mot', 'IRill_mot'}:
-        raise NotImplementedError()
         from settings import COSSY_DIR
+        from .cepdof import evaluate_json
         val_json_path = f'{COSSY_DIR}/annotations/{valset_name}.json'
         gt_json = json.load(open(val_json_path, 'r'))
         for vid in gt_json['videos']:
             vid['annotations'] = []
         eval_info = {
             'image_dir': f'{COSSY_DIR}/frames',
-            'eval_json': gt_json,
-            'eval_type': 'cxcywhd'
+            'image_info': gt_json,
+            'eval_type': 'cxcywhd',
+            'val_func': evaluate_json
         }
-        from .cepdof import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path.replace('_mot',''))
 
     # ------------------------ datasets for debugging ------------------------

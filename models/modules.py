@@ -79,7 +79,7 @@ def ConvBnLeaky(in_, out_, k, s):
     return nn.Sequential(
         nn.Conv2d(in_, out_, k, s, padding=pad, bias=False),
         nn.BatchNorm2d(out_, eps=1e-5, momentum=0.01),
-        nn.LeakyReLU(0.1)
+        nn.LeakyReLU(0.1, inplace=True)
     )
 
 

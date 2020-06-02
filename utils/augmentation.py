@@ -247,7 +247,7 @@ def vflip(image: PIL.Image.Image, labels: ImageObjects):
     assert labels._bb_format == 'cxcywhd'
     labels.bboxes[:,1] = image.height - labels.bboxes[:,1] # x,y,w,h,angle
     labels.bboxes[:,4] = -labels.bboxes[:,4]
-    if labels.makss is not None:
+    if labels.masks is not None:
         assert labels.masks.dim() == 3
         labels.masks = torch.from_numpy(np.flip(labels.masks.numpy(), axis=1).copy())
     return image, labels

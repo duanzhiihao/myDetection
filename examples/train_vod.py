@@ -15,6 +15,7 @@ from utils import timer, image_ops, optim
 from datasets import get_trainingset
 from utils.evaluation import get_valset
 import api
+from settings import PROJECT_ROOT
 
 
 def main():
@@ -36,7 +37,7 @@ def main():
     parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=100)
-    parser.add_argument('--demo_images_dir',     type=str, default='./images/fisheye/')
+    parser.add_argument('--demo_images',         type=str, default='fisheye')
     
     parser.add_argument('--debug_mode', type=str, default=None)
     args = parser.parse_args()
@@ -122,8 +123,12 @@ def main():
     start_iter = -1
     if args.checkpoint:
         print("Loading checkpoint...", args.checkpoint)
-        weights_path = os.path.join('./weights/', args.checkpoint)
+        weights_path = os.path.join(f'{PROJECT_ROOT}/weights', args.checkpoint)
         previous_state = torch.load(weights_path)
+        if 'input' in global_cfg['model.agg.hidden_state_names']:
+            for k in list(previous_state['model'].keys()):
+                if 'netlist.0' in k:
+                    previous_state['model'].pop(k)
         try:
             model.load_state_dict(previous_state['model'])
         except:
@@ -135,9 +140,9 @@ def main():
 
     print('Initializing tensorboard SummaryWriter...')
     if args.debug_mode:
-        logger = SummaryWriter(f'./logs/debug/{job_name}')
+        logger = SummaryWriter(f'{PROJECT_ROOT}logs/debug/{job_name}')
     else:
-        logger = SummaryWriter(f'./logs/{job_name}')
+        logger = SummaryWriter(f'{PROJECT_ROOT}logs/{job_name}')
 
     print(f'Initializing optimizer with lr: {args.lr}')
     # set weight decay only on conv.weight
@@ -268,7 +273,7 @@ def main():
                 'model': model.state_dict(),
                 args.optimizer: optimizer.state_dict(),
             }
-            save_path = os.path.join('./weights', f'{job_name}_{today}_{iter_i}.pth')
+            save_path = '{PROJECT_ROOT}/weights/{job_name}_{today}_{iter_i}.pth'
             torch.save(state_dict, save_path)
 
         # save detection
@@ -276,15 +281,16 @@ def main():
             if args.debug_mode != 'overfit':
                 model.eval()
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
-            for imname in os.listdir(args.demo_images_dir):
+            demo_images_dir = f'{PROJECT_ROOT}/images/{args.demo_images}'
+            for imname in os.listdir():
                 if not imname.endswith('.jpg'): continue
-                impath = os.path.join(args.demo_images_dir, imname)
+                impath = os.path.join(demo_images_dir, imname)
                 model_eval.model.clear_hidden_state()
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                         conf_thres=0.3, input_size=target_size)
                 if args.debug_mode is not None:
                     cv2_im = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
-                    log_dir = f'./logs/{args.model}_debug/'
+                    log_dir = f'{PROJECT_ROOT}/logs/{args.model}_debug/'
                     if not os.path.exists(log_dir): os.mkdir(log_dir)
                     s = os.path.join(log_dir, f'{imname[:-4]}_iter{iter_i}.jpg')
                     cv2.imwrite(s, cv2_im)

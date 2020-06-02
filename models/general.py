@@ -15,6 +15,9 @@ def name_to_model(model_name):
     elif cfg['base'] == 'SimpleVOD':
         from .vod import SimpleVOD
         model = SimpleVOD(cfg)
+    elif cfg['base'] == 'FullRNNVOD':
+        from .vod import FullRNNVOD
+        model = FullRNNVOD(cfg)
     else:
         raise Exception('Unknown model name')
     

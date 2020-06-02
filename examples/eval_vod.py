@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 import api
 from utils.evaluation import get_valset
+from settings import PROJECT_ROOT
 
 
 model_name = 'yv3a1_agg_rnn'
@@ -17,7 +18,7 @@ conf_thres = 0.005
 
 model_eval = api.Detector(
     model_name=model_name,
-    weights_path=f'./weights/{weight_name}.pth'
+    weights_path=f'{PROJECT_ROOT}/weights/{weight_name}.pth'
 )
 
 csv_dic = OrderedDict()

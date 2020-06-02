@@ -13,7 +13,7 @@ def get_backbone(cfg: dict):
         backbone = Darknet53(cfg)
         print("Using backbone Darknet-53. Loading ImageNet weights....")
         pretrained = torch.load(f'{PROJECT_ROOT}/weights/dark53_imgnet.pth')
-        if cfg.get('general.input.frame_concatenation', None):
+        if 'input' in cfg.get('model.agg.hidden_state_names', []):
             print('Using frame concatenation. Skipping the first conv...')
             to_pop = [k for k in pretrained.keys() if k.startswith('netlist.0')]
             [pretrained.pop(k) for k in to_pop]
@@ -89,6 +89,9 @@ def get_agg(cfg: dict):
     elif agg_name == 'cross-correlation':
         from .aggregation import CrossCorrelation
         agg = CrossCorrelation(cfg)
+    elif agg_name == 'ConvConcat':
+        from .aggregation import ConvConcat
+        agg = ConvConcat(cfg)
     else:
         raise NotImplementedError()
     return agg

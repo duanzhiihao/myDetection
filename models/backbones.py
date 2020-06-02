@@ -9,9 +9,9 @@ class Darknet53(nn.Module):
         from .modules import ConvBnLeaky, DarkBlock
         self.netlist = nn.ModuleList()
         
-        in_imgs = global_cfg.get('general.input.frame_concatenation', 1)
+        in_ch = global_cfg.get('model.backbone.input_channels', 3)
         # first conv layer
-        self.netlist.append(ConvBnLeaky(3*in_imgs, 32, k=3, s=1))
+        self.netlist.append(ConvBnLeaky(in_ch, 32, k=3, s=1))
 
         # Downsample by 2 (accumulatively), followed by residual blocks
         self.netlist.append(ConvBnLeaky(32, 64, k=3, s=2))

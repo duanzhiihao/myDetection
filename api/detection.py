@@ -74,16 +74,16 @@ class Detector():
     def eval_predict_vod(self, eval_info, **kwargs):
         assert isinstance(eval_info, dict)
         img_dir = eval_info['image_dir']
-        out_format = eval_info['out_format']
+        eval_type = eval_info['eval_type']
         detection_json = []
-        for vid_info in eval_info['eval_json']['videos']:
+        for vid_info in eval_info['image_info']['videos']:
             file_names = vid_info['file_names']
             self.model.clear_hidden_state()
             for fname in tqdm(file_names):
                 impath = os.path.join(img_dir, fname)
                 dts = self.detect_one(img_path=impath, **kwargs)
                 imgId = fname.split('/')[-1][:-4]
-                detection_json += dts.to_json(img_id=imgId, out_format=out_format)
+                detection_json += dts.to_json(img_id=imgId, eval_type=eval_type)
         return detection_json
 
     def predict_imgDir(self, img_dir, **kwargs):

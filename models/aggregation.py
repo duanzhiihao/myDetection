@@ -115,6 +115,55 @@ class Concat(nn.Module):
         return out_feats
 
 
+class ConvConcat(nn.Module):
+    '''
+    Concatenate + convolutional layers
+    '''
+    def __init__(self, global_cfg: dict):
+        super().__init__()
+        from .modules import ConvBnLeaky
+        fpn_out_chs = global_cfg['model.fpn.out_channels']
+        self.num_levels = len(fpn_out_chs)
+        self.rnns = nn.ModuleList()
+        for ch in fpn_out_chs:
+            fusion = nn.Sequential(
+                ConvBnLeaky(ch*2, ch, k=1, s=1),
+                ConvBnLeaky(ch, ch//2, k=1, s=1),
+                ConvBnLeaky(ch//2, ch, k=3, s=1)
+            )
+            self.rnns.append(fusion)
+
+    def forward(self, features, hidden, is_start) -> List[torch.tensor]:
+        assert is_start.dim() == 1 and is_start.dtype == torch.bool
+        assert len(features) == self.num_levels
+
+        if hidden is None:
+            hidden = [torch.zeros_like(f) for f in features]
+        else:
+            assert len(features) == len(hidden) == self.num_levels
+            # if any image in the batch is a start of a video,
+            # reset the corresponding hidden state
+            if is_start.any():
+                for level_hid in hidden:
+                    assert level_hid.shape[0] == len(is_start)
+                    level_hid[is_start].zero_()
+
+        out_feats = []
+        for i, fusion in enumerate(self.rnns):
+            cur: torch.tensor = features[i]
+            hid: torch.tensor = hidden[i]
+            assert cur.shape == hid.shape and cur.dim() == 4
+
+            # concatenate and conv
+            x = torch.cat([hid, cur], dim=1)
+            x = fusion(x)
+            assert x.shape == cur.shape
+            out_feats.append(x)
+
+        out_feats: List[torch.tensor]
+        return out_feats
+
+
 class CrossCorrelation(nn.Module):
     '''
     Previous detected features + cross-corelation
