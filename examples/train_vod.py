@@ -275,7 +275,7 @@ def main():
                 'model': model.state_dict(),
                 args.optimizer: optimizer.state_dict(),
             }
-            save_path = '{PROJECT_ROOT}/weights/{job_name}_{today}_{iter_i}.pth'
+            save_path = f'{PROJECT_ROOT}/weights/{job_name}_{today}_{iter_i}.pth'
             torch.save(state_dict, save_path)
 
         # save detection

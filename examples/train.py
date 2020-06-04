@@ -20,7 +20,7 @@ from settings import PROJECT_ROOT
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model',     type=str, default='yolov3_phem')
-    parser.add_argument('--train_set', type=str, default='debug3')
+    parser.add_argument('--train_set', type=str, default='COCOtrain2017')
     parser.add_argument('--val_set',   type=str, default='debug3')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
