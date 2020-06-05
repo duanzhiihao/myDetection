@@ -41,7 +41,7 @@ def drawpoly(img,pts,color,thickness=1,style='dotted',):
         drawline(img,s,e,color,thickness,style)
 
 
-def _draw_xywha(im, x, y, w, h, angle, color=(255,0,0), linewidth=5,
+def _draw_xywha(im, x, y, w, h, angle, color=(0,255,0), linewidth=5,
                 linestyle='-'):
     '''
     Draw a single rotated bbox on an image in-place.

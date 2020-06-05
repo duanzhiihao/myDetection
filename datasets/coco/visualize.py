@@ -7,11 +7,13 @@ import cv2
 import matplotlib.pyplot as plt
 
 from utils.visualization import _draw_xywha
-from settings import COCO_DIR
+from settings import COCO_DIR, ILSVRC_DIR
 
-json_path = f'{COCO_DIR}/annotations/instances_train2017.json'
-img_dir = f'{COCO_DIR}/train2017/'
+# json_path = f'{COCO_DIR}/annotations/instances_train2017.json'
+# img_dir = f'{COCO_DIR}/train2017/'
 # img_dir = '../COCO/val2017/'
+json_path = f'{ILSVRC_DIR}/Annotations/DET_train_30classes.json'
+img_dir = f'{ILSVRC_DIR}/Data/DET'
 
 
 json_data = json.load(open(json_path, 'r'))
@@ -19,8 +21,8 @@ json_data = json.load(open(json_path, 'r'))
 img_ids = []
 imgid2anns = defaultdict(list)
 for img in json_data['images']:
-    if img['id'] != 79841:
-        continue
+    # if img['id'] != 79841:
+    #     continue
     img_ids.append((img['id'], img['file_name']))
 for ann in json_data['annotations']:
     img_id = ann['image_id']
@@ -50,6 +52,7 @@ for (img_id, imname) in choices(img_ids, k=10):
         text = catId2name[ann['category_id']]
         cv2.putText(im, text, (int(x1),int(y1)), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (255,255,255), 1, cv2.LINE_AA)
+        print(text)
     
     plt.figure(figsize=(8,8))
     plt.imshow(im)

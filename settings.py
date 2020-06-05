@@ -14,5 +14,5 @@ COCO_DIR = '/home/duanzh/Projects/Datasets/COCO'
 # MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
 COSSY_DIR = '/home/duanzh/Projects/Datasets/COSSY'
 
-# ImageNet VID dataaset
+# ImageNet dataaset
 ILSVRC_DIR = '/home/duanzh/Projects/Datasets/ILSVRC'
