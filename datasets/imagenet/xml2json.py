@@ -35,7 +35,9 @@ if __name__ == "__main__":
     # images and annotations
     for i, iminfo in enumerate(tqdm(img_names)):
         imname = iminfo.split()[0]
-        impath = f'{ILSVRC_DIR}/Data/DET/{imname}.JPEG'
+        if imname.startswith('train/'):
+            imname = imname[6:]
+        impath = f'{ILSVRC_DIR}/Data/DET/train/{imname}.JPEG'
         img = PIL.Image.open(impath)
 
         # add image
@@ -49,7 +51,7 @@ if __name__ == "__main__":
         ann_data['images'].append(imgInfo)
 
         # read xml annotations
-        xml_path = f'{ILSVRC_DIR}/Annotations/DET/{imname}.xml'
+        xml_path = f'{ILSVRC_DIR}/Annotations/DET/train/{imname}.xml'
         xml_tree = ElementTree.parse(xml_path)
         imgw = int(xml_tree.find('size').find('width').text)
         imgh = int(xml_tree.find('size').find('height').text)
@@ -89,8 +91,3 @@ if __name__ == "__main__":
     debug = 1
     save_path = f'{ILSVRC_DIR}/Annotations/{name}.json'
     json.dump(ann_data, open(save_path, 'w'), indent=1)
-
-
-
-
-

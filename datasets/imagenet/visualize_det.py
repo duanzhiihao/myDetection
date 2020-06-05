@@ -11,24 +11,23 @@ from utils.visualization import _draw_xywha
 from class_map import catId_to_name
 
 
-def visualize_json():
-    pass
-
-
 def visualize_xml():
-    imgset_path = f'{PROJECT_ROOT}/datasets/ImageNet/DET_train_30classes.txt'
+    imgset_path = f'{PROJECT_ROOT}/datasets/imagenet/VID_val_2017new.txt'
+    task = 'VID'
+    split = 'val'
+
     assert os.path.exists(imgset_path)
     img_names = open(imgset_path, 'r').read().strip().split('\n')
 
-    # for iminfo in random.choices(img_names, k=10):
     ignored = 0
     count = 0
+    # for iminfo in random.choices(img_names, k=10):
     for iminfo in tqdm(img_names):
         imgId = iminfo.split()[0]
-        impath = f'{ILSVRC_DIR}/Data/DET/{imgId}.JPEG'
+        impath = f'{ILSVRC_DIR}/Data/{task}/{split}/{imgId}.JPEG'
         im = cv2.imread(impath)
 
-        xml_path = f'{ILSVRC_DIR}/Annotations/DET/{imgId}.xml'
+        xml_path = f'{ILSVRC_DIR}/Annotations/{task}/{split}/{imgId}.xml'
         # if not os.path.exists(xml_path):
         #     plt.imshow(im[:,:,::-1]); plt.show()
         xml_tree = ElementTree.parse(xml_path)
@@ -63,4 +62,3 @@ def visualize_xml():
 
 if __name__ == "__main__":
     visualize_xml()
-

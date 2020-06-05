@@ -3,7 +3,9 @@
 
 def get_trainingset(cfg: dict):
     dataset_name: str = cfg['train.dataset_name']
-    # ------------------------ image datasets ------------------------
+
+    # ------------------------------------------------------------------------
+    # ---------------------------- image datasets ----------------------------
     if dataset_name in {'COCOtrain2017', 'COCOval2017'}:
         # Official COCO dataset
         from settings import COCO_DIR
@@ -13,11 +15,9 @@ def get_trainingset(cfg: dict):
             'ann_path': f'{COCO_DIR}/annotations/instances_{split_name}.json',
             'ann_bbox_format': 'x1y1wh',
         }
-
         # These datasets are not designed for rotation augmentation
         if cfg['train.data_augmentation'] is not None:
             assert cfg['train.data_augmentation']['rotation'] == False
-
         from .image_dataset import ImageDataset
         return ImageDataset(training_set_cfg, cfg)
 
@@ -31,15 +31,28 @@ def get_trainingset(cfg: dict):
             'ann_path': f'{COCO_DIR}/annotations/{dataset_name}.json',
             'ann_bbox_format': 'cxcywhd',
         }
-
         if cfg['train.data_augmentation'] is not None:
             assert cfg['train.data_augmentation']['rotation'] == True
             cfg['train.data_augmentation'].update(rotation_expand=True)
-
         from .image_dataset import ImageDataset
         return ImageDataset(training_set_cfg, cfg)
 
-    # ------------------------ video datasets ------------------------
+    if dataset_name == 'ImageNet_DET_train_30':
+        # Official COCO dataset
+        from settings import ILSVRC_DIR
+        training_set_cfg = {
+            'img_dir': f'{ILSVRC_DIR}/DET',
+            'ann_path': f'{ILSVRC_DIR}/Annotations/DET_train_30classes.json',
+            'ann_bbox_format': 'x1y1wh',
+        }
+        # These datasets are not designed for rotation augmentation
+        if cfg['train.data_augmentation'] is not None:
+            assert cfg['train.data_augmentation']['rotation'] == False
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
+
+    # ------------------------------------------------------------------------
+    # ----------------------------- video datasets ---------------------------
     elif dataset_name in {'HBMWR_mot_train'}:
         # COSSY multi object tracking dataset
         from settings import COSSY_DIR
@@ -55,6 +68,7 @@ def get_trainingset(cfg: dict):
         from .video_dataset import Dataset4VODT
         return Dataset4VODT(training_set_cfg, cfg)
     
+    # ------------------------------------------------------------------------
     # ------------------------ datasets for debugging ------------------------
     elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
         from settings import PROJECT_ROOT
@@ -78,5 +92,6 @@ def get_trainingset(cfg: dict):
         return ImageDataset(training_set_cfg, cfg)
 
     # --------------------------------- end ---------------------------------
+    # -----------------------------------------------------------------------
     else:
         raise NotImplementedError()

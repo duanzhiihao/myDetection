@@ -5,15 +5,15 @@ from collections import defaultdict
 import PIL.Image
 import torch
 import torchvision.transforms.functional as tvf
+from torch.utils.data import Dataset, DataLoader
 
-from .base import InfiniteDataset
 import utils.image_ops as imgUtils
 import utils.augmentation as augUtils
 import utils.mask_ops as maskUtils
 from utils.structures import ImageObjects
 
 
-class ImageDataset(InfiniteDataset):
+class ImageDataset(Dataset):
     """
     Dataset for training object detection CNNs.
 
@@ -117,11 +117,12 @@ class ImageDataset(InfiniteDataset):
         assert self.hem_state is not None
         self.hem_state['iter'] += 1
 
-        if self.HEM == 'epoch_shuffle':
-            _iter = self.hem_state['iter'] % self._length
-            if _iter == 0:
-                self.hem_state['order'] = torch.randperm(self._length)
-            index = self.hem_state['order'][_iter].item()
+        if self.HEM is None:
+            # _iter = self.hem_state['iter'] % self._length
+            # if _iter == 0:
+            #     self.hem_state['order'] = torch.randperm(self._length)
+            # index = self.hem_state['order'][_iter].item()
+            raise Exception()
         elif self.HEM == 'probability':
             probs = -torch.log(self.hem_state['APs'] + 1e-8)
             index = torch.multinomial(probs, num_samples=1)
@@ -136,7 +137,11 @@ class ImageDataset(InfiniteDataset):
         prev = self.hem_state['APs'][img_idx]
         self.hem_state['APs'][img_idx] = momentum*prev + (1-momentum)*aps
 
-    def __getitem__(self, _):
+    def __len__(self):
+        '''Dummy function'''
+        return len(self.img_ids)
+
+    def __getitem__(self, index):
         """
         Get an image-label pair
         """
@@ -149,8 +154,12 @@ class ImageDataset(InfiniteDataset):
                 img_label_pair = self._load_single_pil(idx, to_square=False)
                 pairs.append(img_label_pair)
             img_label_pair = augUtils.mosaic(pairs, self.img_size)
-        else:
+        elif self.HEM is not None:
+            # Hard example mining
             index = self.get_hem_index()
+            img_label_pair = self._load_single_pil(index, to_square=True)
+        else:
+            # Normal sequential sampling
             img_label_pair = self._load_single_pil(index, to_square=True)
         
         img, labels, img_id, pad_info = img_label_pair
@@ -304,3 +313,17 @@ class ImageDataset(InfiniteDataset):
             'anns':      [items['anns']     for items in batch]
         }
         return batch
+
+    def to_iterator(self, **kwargs):
+        self.iterator = iter(DataLoader(self, collate_fn=self.collate_func,
+                                        **kwargs))
+        self._iter_args = kwargs
+
+    def get_next(self):
+        assert hasattr(self, 'to_iterator'), 'Please call to_iterator() first'
+        try:
+            data = next(self.iterator)
+        except StopIteration:
+            self.to_iterator(**self._iter_args)
+            data = next(self.iterator)
+        return data

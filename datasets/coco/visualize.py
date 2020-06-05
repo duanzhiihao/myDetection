@@ -12,8 +12,8 @@ from settings import COCO_DIR, ILSVRC_DIR
 # json_path = f'{COCO_DIR}/annotations/instances_train2017.json'
 # img_dir = f'{COCO_DIR}/train2017/'
 # img_dir = '../COCO/val2017/'
-json_path = f'{ILSVRC_DIR}/Annotations/DET_train_30classes.json'
-img_dir = f'{ILSVRC_DIR}/Data/DET'
+json_path = f'{ILSVRC_DIR}/Annotations/VID_val_2017new.json'
+img_dir = f'{ILSVRC_DIR}/Data/VID/val'
 
 
 json_data = json.load(open(json_path, 'r'))
