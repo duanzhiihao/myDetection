@@ -33,17 +33,17 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 768],
+    "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
     "train.imgsize_to_batch_size": {
         "352": 32,
         "384": 26, "416": 23, "448": 19, "480": 17,
         "512": 15, "544": 13, "576": 11, "608": 10,
         "640": 9, "672": 8, "704": 7, "768": 6
     },
-    "train.hard_example_mining": "epoch_shuffle",
+    "train.hard_example_mining": null,
     "train.data_augmentation": {
         "mosaic": false,
-        "satpepper_noise_density": 0.02,
+        "satpepper_noise_density": 0.01,
         "brightness": [0.5, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],
@@ -55,7 +55,7 @@
     },
 
     "test.preprocessing": "resize_pad_divisible",
-    "test.default_input_size": 640,
+    "test.default_input_size": 608,
     "test.default_conf_thres": 0.5,
     "test.ap_conf_thres": 0.005,
     "test.nms_thres": 0.45

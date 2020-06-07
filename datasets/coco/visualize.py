@@ -12,11 +12,16 @@ from settings import COCO_DIR, ILSVRC_DIR
 # json_path = f'{COCO_DIR}/annotations/instances_train2017.json'
 # img_dir = f'{COCO_DIR}/train2017/'
 # img_dir = '../COCO/val2017/'
-json_path = f'{ILSVRC_DIR}/Annotations/VID_val_2017new.json'
-img_dir = f'{ILSVRC_DIR}/Data/VID/val'
+json_path = f'{ILSVRC_DIR}/Annotations/VID_val2017new_every30.json'
+img_dir = f'{ILSVRC_DIR}/Data'
 
 
 json_data = json.load(open(json_path, 'r'))
+
+img_names = set()
+for img in json_data['images']:
+    assert not img['file_name'] in img_names
+    img_names.add(img['file_name'])
 
 img_ids = []
 imgid2anns = defaultdict(list)
@@ -34,6 +39,7 @@ for cat in json_data['categories']:
     catId2name[cat['id']] = cat['name']
 
 for (img_id, imname) in choices(img_ids, k=10):
+# for (img_id, imname) in img_ids[0:100]:
     img_path = os.path.join(img_dir, imname)
     im = plt.imread(img_path)
     

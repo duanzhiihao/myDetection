@@ -8,10 +8,12 @@ from settings import ILSVRC_DIR, PROJECT_ROOT
 from class_map import class_ids, catId_to_name
 
 if __name__ == "__main__":
-    name = 'DET_train_30classes'
+    name = 'VID_val_2017new'
     imgset_path = f'{name}.txt'
     assert os.path.exists(imgset_path)
     img_names = open(imgset_path, 'r').read().strip().split('\n')
+    img_names = list(set(img_names))
+    img_names.sort()
 
     ann_data = {
         'images': [],
@@ -34,16 +36,18 @@ if __name__ == "__main__":
     count = 0
     # images and annotations
     for i, iminfo in enumerate(tqdm(img_names)):
+        if i % 30 != 0:
+            continue
         imname = iminfo.split()[0]
         if imname.startswith('train/'):
             imname = imname[6:]
-        impath = f'{ILSVRC_DIR}/Data/DET/train/{imname}.JPEG'
+        impath = f'{ILSVRC_DIR}/Data/VID/val/{imname}.JPEG'
         img = PIL.Image.open(impath)
 
         # add image
-        imgId = i
+        imgId = i + 1
         imgInfo = {
-            'file_name': f'{imname}.JPEG',
+            'file_name': f'VID/val/{imname}.JPEG',
             'height': img.height,
             'width': img.width,
             'id': imgId
@@ -51,7 +55,7 @@ if __name__ == "__main__":
         ann_data['images'].append(imgInfo)
 
         # read xml annotations
-        xml_path = f'{ILSVRC_DIR}/Annotations/DET/train/{imname}.xml'
+        xml_path = f'{ILSVRC_DIR}/Annotations/VID/val/{imname}.xml'
         xml_tree = ElementTree.parse(xml_path)
         imgw = int(xml_tree.find('size').find('width').text)
         imgh = int(xml_tree.find('size').find('height').text)
@@ -89,5 +93,5 @@ if __name__ == "__main__":
             ann_data['annotations'].append(ann)
 
     debug = 1
-    save_path = f'{ILSVRC_DIR}/Annotations/{name}.json'
+    save_path = f'{ILSVRC_DIR}/Annotations/{name}_every30.json'
     json.dump(ann_data, open(save_path, 'w'), indent=1)
