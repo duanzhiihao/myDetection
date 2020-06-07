@@ -37,12 +37,12 @@ def get_trainingset(cfg: dict):
         from .image_dataset import ImageDataset
         return ImageDataset(training_set_cfg, cfg)
 
-    if dataset_name == 'ImageNet_DET_train_30':
-        # Official COCO dataset
+    if dataset_name == 'VID30train':
+        # ImageNet dataset
         from settings import ILSVRC_DIR
         training_set_cfg = {
-            'img_dir': f'{ILSVRC_DIR}/DET',
-            'ann_path': f'{ILSVRC_DIR}/Annotations/DET_train_30classes.json',
+            'img_dir': f'{ILSVRC_DIR}/Data',
+            'ann_path': f'{ILSVRC_DIR}/Annotations/DET_30_and_VID_every15.json',
             'ann_bbox_format': 'x1y1wh',
         }
         # These datasets are not designed for rotation augmentation

@@ -91,12 +91,8 @@ class ImageDataset(Dataset):
             self.img_ids.append(img_id)
 
         self._length = len(self.img_ids)
-        if self.HEM == 'epoch_shuffle':
-            self.hem_state = {
-                'iter': -1,
-                'order': torch.randperm(self._length),
-                'counts': torch.zeros(self._length, dtype=torch.long)
-            }
+        if self.HEM is None:
+            pass
         elif self.HEM == 'hardest':
             raise NotImplementedError()
             self.hem_state = {

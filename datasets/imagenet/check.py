@@ -25,8 +25,8 @@ def check():
     img_dir = f'{ILSVRC_DIR}/Data'
     check_det(json_path, img_dir)
 
-    json_path = f'{ILSVRC_DIR}/Annotations/VID_det_val_2017new.json'
-    img_dir = f'{ILSVRC_DIR}/Data/VID/val'
+    json_path = f'{ILSVRC_DIR}/Annotations/VID_val2017new_every30.json'
+    img_dir = f'{ILSVRC_DIR}/Data'
     check_det(json_path, img_dir)
 
 

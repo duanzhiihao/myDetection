@@ -37,6 +37,20 @@ def get_valset(valset_name: str):
         from .cepdof import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
 
+    elif valset_name == 'VIDval2017new_30':
+        from settings import ILSVRC_DIR
+        from .coco import coco_evaluate_bbox
+        val_json_path = f'{ILSVRC_DIR}/Annotations/VID_val2017new_every30.json'
+        ann_data = json.load(open(val_json_path, 'r'))
+        ann_data.pop('annotations')
+        eval_info = {
+            'image_dir': f'{ILSVRC_DIR}/Data',
+            'image_info': ann_data,
+            'eval_type': 'x1y1wh',
+            'val_func': coco_evaluate_bbox
+        }
+        validation_func = lambda x: coco_evaluate_bbox(x, val_json_path)
+
     elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
                          'High_activity', 'All_off', 'IRfilter', 'IRill',
                          'Meeting1', 'Meeting2', 'Lab1', 'Lab2',
