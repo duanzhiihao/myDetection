@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='VIDval2017new_30')
+    parser.add_argument('--demo_images',         type=str, default='imagenet')
     
     parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()

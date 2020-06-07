@@ -64,7 +64,7 @@ class ImageDataset(Dataset):
         self.categories = json_data['categories']
         for idx, cat in enumerate(json_data['categories']):
             self.catId2idx[cat['id']] = idx
-            
+
         for ann in json_data['annotations']:
             # Parse bounding box annotation
             assert len(ann['bbox']) == bb_param
