@@ -36,7 +36,7 @@ if __name__ == "__main__":
     count = 0
     # images and annotations
     for i, iminfo in enumerate(tqdm(img_names)):
-        if i % 30 != 0:
+        if i % 100 != 0:
             continue
         imname = iminfo.split()[0]
         if imname.startswith('train/'):
@@ -93,5 +93,5 @@ if __name__ == "__main__":
             ann_data['annotations'].append(ann)
 
     debug = 1
-    save_path = f'{ILSVRC_DIR}/Annotations/{name}_every30.json'
+    save_path = f'{ILSVRC_DIR}/Annotations/{name}_every100.json'
     json.dump(ann_data, open(save_path, 'w'), indent=1)

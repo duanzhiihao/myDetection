@@ -1,5 +1,5 @@
 {
-    "__doc": "Ultralytics's YOLO 5m",
+    "__doc": "Ultralytics's YOLOv5-m",
 
     "base": "OneStageBBox",
     

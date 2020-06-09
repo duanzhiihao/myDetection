@@ -42,6 +42,7 @@ class ImageDataset(Dataset):
         self.imgId2info = dict()
         self.imgId2anns = defaultdict(list)
         self.catId2idx  = dict()
+        self.catIdx2id  = []
         self.categories = []
         self._load_json(dataset_cfg['ann_path'])
 
@@ -64,6 +65,7 @@ class ImageDataset(Dataset):
         self.categories = json_data['categories']
         for idx, cat in enumerate(json_data['categories']):
             self.catId2idx[cat['id']] = idx
+        self.catIdx2id = [cat['id'] for cat in self.categories]
 
         for ann in json_data['annotations']:
             # Parse bounding box annotation
@@ -92,7 +94,7 @@ class ImageDataset(Dataset):
 
         self._length = len(self.img_ids)
         if self.HEM is None:
-            pass
+            self.hem_state = {}
         elif self.HEM == 'hardest':
             raise NotImplementedError()
             self.hem_state = {

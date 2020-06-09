@@ -1,0 +1,162 @@
+{
+ "categories": [
+  {
+   "id": 1,
+   "name": "airplane"
+  },
+  {
+   "id": 2,
+   "name": "antelope"
+  },
+  {
+   "id": 3,
+   "name": "bear"
+  },
+  {
+   "id": 4,
+   "name": "bicycle"
+  },
+  {
+   "id": 5,
+   "name": "bird"
+  },
+  {
+   "id": 6,
+   "name": "bus"
+  },
+  {
+   "id": 7,
+   "name": "car"
+  },
+  {
+   "id": 8,
+   "name": "cattle"
+  },
+  {
+   "id": 9,
+   "name": "dog"
+  },
+  {
+   "id": 10,
+   "name": "domestic_cat"
+  },
+  {
+   "id": 11,
+   "name": "elephant"
+  },
+  {
+   "id": 12,
+   "name": "fox"
+  },
+  {
+   "id": 13,
+   "name": "giant_panda"
+  },
+  {
+   "id": 14,
+   "name": "hamster"
+  },
+  {
+   "id": 15,
+   "name": "horse"
+  },
+  {
+   "id": 16,
+   "name": "lion"
+  },
+  {
+   "id": 17,
+   "name": "lizard"
+  },
+  {
+   "id": 18,
+   "name": "monkey"
+  },
+  {
+   "id": 19,
+   "name": "motorcycle"
+  },
+  {
+   "id": 20,
+   "name": "rabbit"
+  },
+  {
+   "id": 21,
+   "name": "red_panda"
+  },
+  {
+   "id": 22,
+   "name": "sheep"
+  },
+  {
+   "id": 23,
+   "name": "snake"
+  },
+  {
+   "id": 24,
+   "name": "squirrel"
+  },
+  {
+   "id": 25,
+   "name": "tiger"
+  },
+  {
+   "id": 26,
+   "name": "train"
+  },
+  {
+   "id": 27,
+   "name": "turtle"
+  },
+  {
+   "id": 28,
+   "name": "watercraft"
+  },
+  {
+   "id": 29,
+   "name": "whale"
+  },
+  {
+   "id": 30,
+   "name": "zebra"
+  }
+ ],
+ "images": [
+  {
+   "file_name": "n02391049_249.JPEG",
+   "height": 333,
+   "width": 500,
+   "id": 27114
+  }
+ ],
+ "annotations": [
+  {
+   "area": 46020,
+   "iscrowd": 0,
+   "image_id": 27114,
+   "bbox": [
+    86.0,
+    91.0,
+    260.0,
+    177.0
+   ],
+   "segmentation": [],
+   "category_id": 30,
+   "id": 28742
+  },
+  {
+   "area": 16895,
+   "iscrowd": 0,
+   "image_id": 27114,
+   "bbox": [
+    390.0,
+    150.0,
+    109.0,
+    155.0
+   ],
+   "segmentation": [],
+   "category_id": 30,
+   "id": 28743
+  }
+ ]
+}

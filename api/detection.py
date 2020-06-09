@@ -67,8 +67,11 @@ class Detector():
         for imgInfo in tqdm(images_info):
             impath = os.path.join(img_dir, imgInfo['file_name'])
             detections = self.detect_one(img_path=impath, **kwargs)
-            detection_json += detections.to_json(img_id=imgInfo['id'],
-                                    eval_type=eval_info['eval_type'])
+            detection_json += detections.to_json(
+                img_id=imgInfo['id'],
+                eval_type=eval_info['eval_type'],
+                catIdx2id=kwargs.get('catIdx2id', None)
+            )
         return detection_json
 
     def eval_predict_vod(self, eval_info, **kwargs):

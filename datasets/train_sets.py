@@ -70,7 +70,8 @@ def get_trainingset(cfg: dict):
     
     # ------------------------------------------------------------------------
     # ------------------------ datasets for debugging ------------------------
-    elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
+    elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3',
+                          'imagenet_debug1'}:
         from settings import PROJECT_ROOT
         training_set_cfg = {
             'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',

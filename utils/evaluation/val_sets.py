@@ -37,10 +37,10 @@ def get_valset(valset_name: str):
         from .cepdof import evaluate_json
         validation_func = lambda x: evaluate_json(x, val_json_path)
 
-    elif valset_name == 'VIDval2017new_30':
+    elif valset_name == 'VIDval2017new_100':
         from settings import ILSVRC_DIR
         from .coco import coco_evaluate_bbox
-        val_json_path = f'{ILSVRC_DIR}/Annotations/VID_val2017new_every30.json'
+        val_json_path = f'{ILSVRC_DIR}/Annotations/VID_val2017new_every100.json'
         ann_data = json.load(open(val_json_path, 'r'))
         ann_data.pop('annotations')
         eval_info = {
@@ -87,7 +87,7 @@ def get_valset(valset_name: str):
         validation_func = lambda x: evaluate_json(x, val_json_path.replace('_mot',''))
 
     # ------------------------ datasets for debugging ------------------------
-    elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3'}:
+    elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3', 'imagenet_debug1'}:
         from settings import PROJECT_ROOT
         from .coco import coco_evaluate_bbox
         val_json_path = f'{PROJECT_ROOT}/datasets/debug/{valset_name}.json'

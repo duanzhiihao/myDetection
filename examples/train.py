@@ -20,8 +20,8 @@ from settings import PROJECT_ROOT
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model',     type=str, default='yolov3')
-    parser.add_argument('--train_set', type=str, default='VID30train')
-    parser.add_argument('--val_set',   type=str, default='VIDval2017new_30')
+    parser.add_argument('--train_set', type=str, default='imagenet_debug1')
+    parser.add_argument('--val_set',   type=str, default='imagenet_debug1')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
@@ -36,9 +36,9 @@ def main():
     parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='imagenet')
+    parser.add_argument('--demo_images',         type=str, default='imagenet_debug1')
     
-    parser.add_argument('--debug_mode',          type=str, default=None)
+    parser.add_argument('--debug_mode',          type=str, default='overfit')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -164,9 +164,12 @@ def main():
                 model.eval()
             with timer.contexttimer() as t0:
                 model_eval = api.Detector(model_and_cfg=(model, global_cfg))
-                dts = model_eval.evaluation_predict(eval_info,
+                dts = model_eval.evaluation_predict(
+                    eval_info,
                     input_size=target_size,
-                    conf_thres=ap_conf_thres)
+                    conf_thres=ap_conf_thres,
+                    catIdx2id=dataset.catIdx2id
+                )
                 eval_str, ap, ap50, ap75 = validation_func(dts)
             del model_eval
             s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
@@ -204,7 +207,7 @@ def main():
             #                             num_workers=num_cpu, pin_memory=True)
             #     else:
             #         raise e
-            assert AUTO_BATCHSIZE[str(dataset.img_size)] == batch_size
+            # assert AUTO_BATCHSIZE[str(dataset.img_size)] == batch_size
             if global_cfg['train.hard_example_mining'] in {'probability'}:
                 # calculate AP for each image
                 idxs,img_ids,anns = batch['indices'],batch['image_ids'],batch['anns']
@@ -269,7 +272,7 @@ def main():
             model_eval = api.Detector(model_and_cfg=(model, global_cfg))
             demo_images_dir = f'{PROJECT_ROOT}/images/{args.demo_images}'
             for imname in os.listdir(demo_images_dir):
-                if not imname.endswith('.jpg'): continue
+                # if not imname.endswith('.jpg'): continue
                 impath = os.path.join(demo_images_dir, imname)
                 np_img = model_eval.detect_one(img_path=impath, return_img=True,
                                         conf_thres=0.3, input_size=target_size)

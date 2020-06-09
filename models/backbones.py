@@ -68,8 +68,8 @@ class UltralyticsBackbone(nn.Module):
         chm      = global_cfg['model.ultralytics.channel_muliple']
         in_imgs  = global_cfg.get('general.input.frame_concatenation', 1)
         ceil8    = lambda x: int(np.ceil(x/8) * 8)
-        scale_   = lambda x: max(round(x*chm), 1)
-        channels = [ceil8(ch*depm) for ch in [64, 128, 256, 512, 1024]]
+        scale_   = lambda x: max(round(x*depm), 1)
+        channels = [ceil8(ch*chm) for ch in [64, 128, 256, 512, 1024]]
         self.feature_chs      = channels[2:]
         self.feature_strides  = [8, 16, 32]
 

@@ -5,7 +5,7 @@
     
     "general.input_format": "RGB_1",
     "general.input_divisibility": 32,
-    "general.num_class": 80,
+    "general.num_class": 30,
     "general.pred_bbox_format": "cxcywh",
     "general.bbox_param": 4,
 
@@ -36,9 +36,9 @@
     "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
     "train.imgsize_to_batch_size": {
         "352": 32,
-        "384": 26, "416": 23, "448": 19, "480": 17,
-        "512": 15, "544": 13, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 7, "768": 6
+        "384": 28, "416": 24, "448": 20, "480": 18,
+        "512": 16, "544": 14, "576": 12, "608": 11,
+        "640": 10, "672": 9, "704": 8, "768": 6
     },
     "train.hard_example_mining": null,
     "train.data_augmentation": {

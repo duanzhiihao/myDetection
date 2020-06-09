@@ -216,7 +216,7 @@ class ImageObjects():
         assert self.bboxes.dim() == 2
         draw_bboxes_on_np(im, self, class_map=class_map, **kwargs)
 
-    def to_json(self, img_id, eval_type='x1y1wh') -> list:
+    def to_json(self, img_id, eval_type='x1y1wh', catIdx2id=None) -> list:
         '''
         Generate COCO-like json format for validation
 
@@ -247,7 +247,10 @@ class ImageObjects():
                 raise NotImplementedError()
             else:
                 raise NotImplementedError()
-            cat_id = COCO_CATEGORY_LIST[int(c)]['id']
+            if catIdx2id is not None:
+                cat_id = catIdx2id[int(c)]
+            else:
+                cat_id = COCO_CATEGORY_LIST[int(c)]['id']
             dt_dict = {'image_id': img_id, 'category_id': cat_id,
                        'bbox': bbox, 'score': float(s)}
             list_json.append(dt_dict)

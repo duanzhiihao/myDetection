@@ -91,11 +91,11 @@ class UltralyticsFPN(nn.Module):
             *[UBottleneck(ch5, ch5, shortcut=False) for _ in range(scale_(3))]
         )
         self.to_p4 = nn.Sequential(
-            UConvBnLeaky(ch4*2, ch4, k=1, s=1),
+            UConvBnLeaky(ch4+ch5, ch4, k=1, s=1),
             *[UBottleneck(ch4, ch4, shortcut=False) for _ in range(scale_(3))]
         )
         self.to_p3 = nn.Sequential(
-            UConvBnLeaky(ch3*2, ch3, k=1, s=1),
+            UConvBnLeaky(ch3+ch4, ch3, k=1, s=1),
             *[UBottleneck(ch3, ch3, shortcut=False) for _ in range(scale_(3))]
         )
 
