@@ -50,6 +50,7 @@ class RAPiDLayer(nn.Module):
 
         # ----------------------- logits to prediction -----------------------
         p_xywha = t_xywha.detach().clone()
+        p_xywha: torch.tensor
         # sigmoid activation for xy, angle, obj_conf
         y_ = torch.arange(nH, dtype=torch.float, device=device)
         x_ = torch.arange(nW, dtype=torch.float, device=device)
@@ -60,7 +61,7 @@ class RAPiDLayer(nn.Module):
         anch_wh = self.anchors.view(1,nA,1,1,2).to(device=device)
         p_xywha[..., 2:4] = torch.exp(p_xywha[..., 2:4]) * anch_wh
         p_xywha[..., 4] = p_radian / np.pi * 180
-        p_xywha = p_xywha.cpu()
+        p_xywha = p_xywha.cpu().contiguous()
         
         # Logistic activation for confidence score
         p_conf = torch.sigmoid(conf_logits.detach())

@@ -101,14 +101,17 @@ def get_valset(valset_name: str):
         }
         validation_func = lambda x: coco_evaluate_bbox(x, val_json_path)
     elif valset_name in {'rotbb_debug3', 'debug_lunch31'}:
-        raise NotImplementedError()
         from settings import PROJECT_ROOT
-        img_dir = f'{PROJECT_ROOT}/images/debug_lunch31/'
-        val_json_path = f'{PROJECT_ROOT}/datasets/debug/debug_lunch31.json'
-        gt_json = json.load(open(val_json_path, 'r'))
-        eval_info = [(os.path.join(img_dir, imi['file_name']), imi['id']) \
-                     for imi in gt_json['images']]
         from .cepdof import evaluate_json
+        val_json_path = f'{PROJECT_ROOT}/datasets/debug/{valset_name}.json'
+        ann_data = json.load(open(val_json_path, 'r'))
+        ann_data.pop('annotations')
+        eval_info = {
+            'image_dir': f'{PROJECT_ROOT}/images/{valset_name}/',
+            'image_info': ann_data,
+            'eval_type': 'cxcywhd',
+            'val_func': evaluate_json
+        }
         validation_func = lambda x: evaluate_json(x, val_json_path)
         
     else:

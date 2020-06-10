@@ -19,9 +19,9 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='ulo5m')
-    parser.add_argument('--train_set', type=str, default='debug_kitchen')
-    parser.add_argument('--val_set',   type=str, default='debug_kitchen')
+    parser.add_argument('--model',     type=str, default='d1_rapid')
+    parser.add_argument('--train_set', type=str, default='debug_lunch31')
+    parser.add_argument('--val_set',   type=str, default='debug_lunch31')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
@@ -30,13 +30,13 @@ def main():
     parser.add_argument('--warmup',          type=int,   default=1000)
 
     parser.add_argument('--checkpoint', type=str,
-                        default='yolov3_official_nolast.pth')
+                        default='')
 
     parser.add_argument('--print_interval',      type=int, default=20)
     parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='debug_kitchen')
+    parser.add_argument('--demo_images',         type=str, default='debug_lunch31')
     
     parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()

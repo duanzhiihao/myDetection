@@ -1,0 +1,76 @@
+{
+    "base": "OneStageBBox",
+    
+    "general.input_format": "RGB_1_norm",
+    "general.input_divisibility": 32,
+    "general.num_class": 0,
+    "general.pred_bbox_format": "cxcywhd",
+    "general.bbox_param": 5,
+
+    "model.backbone.name": "efficientnet-b1",
+    "model.backbone.num_levels": 5,
+    "model.backbone.C6C7_out_channels": 88,
+    "model.backbone.out_channels": "PLACEHOLDER",
+    "model.backbone.out_strides": "PLACEHOLDER",
+    "model.efficientnet.enable_dropout": true,
+
+    "model.fpn.name": "bifpn",
+    "model.fpn.out_channels": "PLACEHOLDER",
+    "model.fpn.out_strides": "PLACEHOLDER",
+    "model.bifpn.out_ch": 88,
+    "model.bifpn.repeat_num": 4,
+    "model.bifpn.fusion_method": "linear",
+
+    "model.rpn.name": "effrpn",
+    "model.effrpn.enable_conf": true,
+    "model.effrpn.repeat_num": 3,
+    "model.effrpn.num_anchor_per_level": 3,
+
+    "model.pred_layer": "RAPiD",
+
+    "model.yolo.num_anchor_per_level": 3,
+    "model.rapid.anchors": [
+        [12.6, 13.2], [23.5, 38.1], [57.3, 32.3],
+        [42.9, 75.5], [106.6, 61.2], [60.4, 123.5],
+        [84.5, 191.6], [131.9, 123.9], [212.4, 85.6],
+        [125.4, 278.9], [179.6, 196.4], [347.0, 107.1],
+        [272.3, 199.2], [238.8, 321.5], [373.1, 258.9]
+    ],
+    "model.rapid.anchor_indices": [
+        [0,1,2], [3,4,5], [6,7,8], [9,10,11], [12,13,14]
+    ],
+    "model.rapid.wh_smooth_l1_beta": 1,
+    "model.angle.loss_angle": "Periodic_L1",
+    "model.angle.pred_range": 360,
+
+    "train.check_gt_assignment": true,
+    "train.sgd.weight_decay": 0.00004,
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704,
+                        736, 768],
+    "train.imgsize_to_batch_size": {
+        "352": 32,
+        "384": 26, "416": 23, "448": 20, "480": 17,
+        "512": 15, "544": 13, "576": 11, "608": 10,
+        "640": 9, "672": 8, "704": 8, "736": 7,
+        "768": 6
+    },
+    "train.hard_example_mining": null,
+    "train.data_augmentation": {
+        "mosaic": false,
+        "satpepper_noise_density": 0.02,
+        "brightness": [0.3, 1.5],
+        "contrast": [0.5, 1.5],
+        "hue": [-0.1, 0.1],
+        "saturation": [0, 2],
+        "resize": true,
+        "horizontal_flip": true,
+        "vertical_flip": true,
+        "rotation": true
+    },
+
+    "test.preprocessing": "resize_pad_divisible",
+    "test.default_input_size": 1024,
+    "test.default_conf_thres": 0.3,
+    "test.ap_conf_thres": 0.005,
+    "test.nms_thres": 0.45
+}
