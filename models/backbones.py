@@ -105,14 +105,14 @@ class UltralyticsBackbone(nn.Module):
     def forward(self, x):
         features = []
         for module in self.netlist:
-            y = self.module(x)
+            y = module(x)
             if y.shape[2:4] != x.shape[2:4]:
                 assert y.shape[2] == x.shape[2] // 2
                 features.append(x)
             x = y
         features.append(x)
-        assert len(features) == 5
-        return features[2:]
+        assert len(features) == 6
+        return features[3:]
 
 
 class ResNetBackbone(nn.Module):

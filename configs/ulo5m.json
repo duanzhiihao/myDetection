@@ -36,17 +36,19 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 768],
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
+                        704, 736, 768],
     "train.imgsize_to_batch_size": {
-        "352": 32,
-        "384": 26, "416": 23, "448": 20, "480": 17,
-        "512": 15, "544": 13, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 8, "768": 6
+        "352": 70,
+        "384": 60, "416": 52, "448": 45, "480": 40,
+        "512": 36, "544": 32, "576": 28, "608": 25,
+        "640": 22, "672": 20, "704": 18, "736": 17,
+        "768": 16
     },
-    "train.hard_example_mining": "epoch_shuffle",
+    "train.hard_example_mining": null,
     "train.data_augmentation": {
         "mosaic": false,
-        "satpepper_noise_density": 0.02,
+        "satpepper_noise_density": 0.01,
         "brightness": [0.5, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],

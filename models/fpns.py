@@ -102,9 +102,9 @@ class UltralyticsFPN(nn.Module):
     def forward(self, features):
         c3, c4, c5 = features
         p5 = self.to_p5(c5)
-        _x = tnf.interpolate(p5, scale_factor=2, mode='nearset')
+        _x = tnf.interpolate(p5, scale_factor=(2,2), mode='nearest')
         p4 = self.to_p4(torch.cat([_x, c4], dim=1))
-        _x = tnf.interpolate(p4, scale_factor=2, mode='nearset')
+        _x = tnf.interpolate(p4, scale_factor=(2,2), mode='nearest')
         p3 = self.to_p3(torch.cat([_x, c3], dim=1))
 
         return [p3, p4, p5]
