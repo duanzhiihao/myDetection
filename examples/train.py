@@ -19,9 +19,9 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='d1_rapid')
-    parser.add_argument('--train_set', type=str, default='debug_lunch31')
-    parser.add_argument('--val_set',   type=str, default='debug_lunch31')
+    parser.add_argument('--model',     type=str, default='yolov3')
+    parser.add_argument('--train_set', type=str, default='VID30train')
+    parser.add_argument('--val_set',   type=str, default='VIDval2017new_100')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--eval_interval',       type=int, default=200)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='debug_lunch31')
+    parser.add_argument('--demo_images',         type=str, default='VIDval2017new_100')
     
     parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()
@@ -111,7 +111,7 @@ def main():
     print(f'Initializing training set {args.train_set}...')
     global_cfg['train.dataset_name'] = args.train_set
     dataset = get_trainingset(global_cfg)
-    dataset.to_iterator(batch_size=batch_size,
+    dataset.to_iterator(batch_size=batch_size, shuffle=True,
                         num_workers=num_cpu, pin_memory=True)
     print(f'Initializing validation set {args.val_set}...')
     eval_info, validation_func = get_valset(args.val_set)
@@ -188,9 +188,8 @@ def main():
         for _ in range(subdivision):
             batch = dataset.get_next()
             imgs, labels = batch['images'], batch['labels']
-            # pil_img = image_ops.tensor_img_to_pil(imgs[0], model.input_format)
-            # np_im = np.array(pil_img)
-            # labels[0].draw_on_np(np_im, imshow=True)
+            # np_im = image_ops.img_tensor_to_np(imgs[0], model.input_format, 'BGR_uint8')
+            # labels[0].draw_on_np(np_im, class_map='ImageNet', imshow=True)
             imgs = imgs.cuda()
             # try:
             dts, loss = model(imgs, labels)
@@ -203,7 +202,7 @@ def main():
             #               f'batchsize={batch_size}')
             #         print('Trying to reduce the batchsize at that image size...')
             #         AUTO_BATCHSIZE[str(dataset.img_size)] -= 1
-            #         dataset.to_iterator(batch_size=batch_size-1,
+            #         dataset.to_iterator(batch_size=batch_size-1, shuffle=True,
             #                             num_workers=num_cpu, pin_memory=True)
             #     else:
             #         raise e
@@ -251,7 +250,7 @@ def main():
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
             subdivision = int(np.ceil(super_batchsize / batch_size))
             dataset.img_size = imgsize
-            dataset.to_iterator(batch_size=batch_size,
+            dataset.to_iterator(batch_size=batch_size, shuffle=True,
                                 num_workers=num_cpu, pin_memory=True)
 
         # save checkpoint

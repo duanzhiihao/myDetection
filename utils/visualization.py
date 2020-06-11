@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from .constants import COCO_CATEGORY_LIST
+from .constants import COCO_CATEGORY_LIST, IMAGENET_30_CATEGORY_LIST
 
 
 def drawline(img, pt1, pt2, color, thickness=1, style='dotted', gap=15):
@@ -97,6 +97,10 @@ def draw_bboxes_on_np(im, img_objs, class_map='COCO', **kwargs):
     if class_map == 'COCO':
         cat_idx2name = lambda x: COCO_CATEGORY_LIST[x]['name']
         cat_idx2color = lambda x: COCO_CATEGORY_LIST[x]['color']
+    elif class_map == 'ImageNet':
+        cat_idx2name = lambda x: IMAGENET_30_CATEGORY_LIST[x]['name']
+        colors = random_colors(30)
+        cat_idx2color = lambda x: tuple([int(c) for c in colors[x]])
     else: raise NotImplementedError()
     # Initialize some drawing parameters
     line_width = kwargs.get('line_width', round(im.shape[0] / 300))

@@ -134,3 +134,83 @@ COCO_CATEGORY_LIST = [
     {"color": [102, 102, 156], "isthing": 0, "id": 199, "name": "wall-other-merged"},
     {"color": [250, 141, 255], "isthing": 0, "id": 200, "name": "rug-merged"},
 ]
+
+
+IMAGENET_30_CATEGORY_LIST = [
+    {"id": 1, "name": "airplane"},
+    {"id": 2, "name": "antelope"},
+    {"id": 3, "name": "bear"},
+    {"id": 4, "name": "bicycle"},
+    {"id": 5, "name": "bird"},
+    {"id": 6, "name": "bus"},
+    {"id": 7, "name": "car"},
+    {"id": 8, "name": "cattle"},
+    {"id": 9, "name": "dog"},
+    {"id": 10, "name": "domestic_cat"},
+    {"id": 11, "name": "elephant"},
+    {"id": 12, "name": "fox"},
+    {"id": 13, "name": "giant_panda"},
+    {"id": 14, "name": "hamster"},
+    {"id": 15, "name": "horse"},
+    {"id": 16, "name": "lion"},
+    {"id": 17, "name": "lizard"},
+    {"id": 18, "name": "monkey"},
+    {"id": 19, "name": "motorcycle"},
+    {"id": 20, "name": "rabbit"},
+    {"id": 21, "name": "red_panda"},
+    {"id": 22, "name": "sheep"},
+    {"id": 23, "name": "snake"},
+    {"id": 24, "name": "squirrel"},
+    {"id": 25, "name": "tiger"},
+    {"id": 26, "name": "train"},
+    {"id": 27, "name": "turtle"},
+    {"id": 28, "name": "watercraft"},
+    {"id": 29, "name": "whale"},
+    {"id": 30, "name": "zebra"}
+]
+
+
+IMAGENET_CLASS_CODES = [
+    'n02691156', 'n02419796', 'n02131653', 'n02834778',
+    'n01503061', 'n02924116', 'n02958343', 'n02402425',
+    'n02084071', 'n02121808', 'n02503517', 'n02118333',
+    'n02510455', 'n02342885', 'n02374451', 'n02129165',
+    'n01674464', 'n02484322', 'n03790512', 'n02324045',
+    'n02509815', 'n02411705', 'n01726692', 'n02355227',
+    'n02129604', 'n04468005', 'n01662784', 'n04530566',
+    'n02062744', 'n02391049'
+]
+
+
+IMAGENET_CODE_TO_NAME = {
+    'n02691156': 'airplane',        # in COCO
+    'n02419796': 'antelope',
+    'n02131653': 'bear',            # in COCO
+    'n02834778': 'bicycle',         # in COCO
+    'n01503061': 'bird',            # in COCO
+    'n02924116': 'bus',             # in COCO
+    'n02958343': 'car',             # in COCO
+    'n02402425': 'cattle',          # in COCO (cow)
+    'n02084071': 'dog',             # in COCO
+    'n02121808': 'domestic_cat',    # in COCO (cat)
+    'n02503517': 'elephant',        # in COCO
+    'n02118333': 'fox',
+    'n02510455': 'giant_panda',
+    'n02342885': 'hamster',
+    'n02374451': 'horse',           # in COCO
+    'n02129165': 'lion',
+    'n01674464': 'lizard',
+    'n02484322': 'monkey',
+    'n03790512': 'motorcycle',      # in COCO
+    'n02324045': 'rabbit',
+    'n02509815': 'red_panda',
+    'n02411705': 'sheep',           # in COCO
+    'n01726692': 'snake',
+    'n02355227': 'squirrel',
+    'n02129604': 'tiger',
+    'n04468005': 'train',           # in COCO
+    'n01662784': 'turtle',
+    'n04530566': 'watercraft',
+    'n02062744': 'whale',
+    'n02391049': 'zebra',           # in COCO
+}
