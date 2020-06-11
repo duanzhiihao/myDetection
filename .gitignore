@@ -3,7 +3,6 @@ script*
 run_*
 test_*
 debug_*
-tmp.json
 settings.py
 
 weights/

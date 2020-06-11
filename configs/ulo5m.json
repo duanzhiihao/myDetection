@@ -49,8 +49,8 @@
     "train.data_augmentation": {
         "mosaic": false,
         "satpepper_noise_density": 0.01,
-        "brightness": [0.5, 1.5],
-        "contrast": [0.5, 1.5],
+        "brightness": [0.8, 1.2],
+        "contrast": [0.8, 1.2],
         "hue": [-0.1, 0.1],
         "saturation": [0, 2],
         "resize": true,

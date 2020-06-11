@@ -139,11 +139,16 @@ class ImageObjects():
             _bbs = dts.bboxes.clone()
             single_cls_nms_func = torchvision.ops.nms
         elif dts._bb_format == 'cxcywhd':
-            _bbs = dts.bboxes.clone()
-            def single_cls_nms_func(boxes, scores, nms_thres):
-                img_hw = dts.img_hw or 1024
-                return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,
-                                 img_size=img_hw, majority=None)
+            _bbs = dts.bboxes[:,0:4].clone()
+            _bbs[:,0] = dts.bboxes[:,0] - dts.bboxes[:,2]/2
+            _bbs[:,1] = dts.bboxes[:,1] - dts.bboxes[:,3]/2
+            _bbs[:,2] = dts.bboxes[:,0] + dts.bboxes[:,2]/2
+            _bbs[:,3] = dts.bboxes[:,1] + dts.bboxes[:,3]/2
+            single_cls_nms_func = torchvision.ops.nms
+            # def single_cls_nms_func(boxes, scores, nms_thres):
+            #     img_hw = dts.img_hw or 1024
+            #     return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,
+            #                      img_size=img_hw, majority=None)
         else:
             raise NotImplementedError()
 
