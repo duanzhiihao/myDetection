@@ -145,6 +145,7 @@ class ImageObjects():
             _bbs[:,2] = dts.bboxes[:,0] + dts.bboxes[:,2]/2
             _bbs[:,3] = dts.bboxes[:,1] + dts.bboxes[:,3]/2
             single_cls_nms_func = torchvision.ops.nms
+            # _bbs = dts.bboxes.clone()
             # def single_cls_nms_func(boxes, scores, nms_thres):
             #     img_hw = dts.img_hw or 1024
             #     return nms_rotbb(boxes, scores, nms_thres, bb_format=dts._bb_format,

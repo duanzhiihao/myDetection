@@ -8,7 +8,7 @@
     "general.bbox_param": 5,
 
     "model.backbone.name": "efficientnet-b1",
-    "model.backbone.num_levels": 5,
+    "model.backbone.num_levels": 3,
     "model.backbone.C6C7_out_channels": 88,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
@@ -30,27 +30,24 @@
 
     "model.yolo.num_anchor_per_level": 3,
     "model.rapid.anchors": [
-        [12.6, 13.2], [23.5, 38.1], [57.3, 32.3],
-        [42.9, 75.5], [106.6, 61.2], [60.4, 123.5],
-        [84.5, 191.6], [131.9, 123.9], [212.4, 85.6],
-        [125.4, 278.9], [179.6, 196.4], [347.0, 107.1],
-        [272.3, 199.2], [238.8, 321.5], [373.1, 258.9]
+        [18.8, 33.5], [28.9, 61.8], [48.7, 68.4],
+        [45.1, 101.5], [63.1, 113.5], [81.4, 134.5],
+        [91.7, 145.0], [137.5, 178.5], [194.4, 250.8]
     ],
-    "model.rapid.anchor_indices": [
-        [0,1,2], [3,4,5], [6,7,8], [9,10,11], [12,13,14]
-    ],
+    "model.rapid.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
     "model.rapid.wh_smooth_l1_beta": 1,
     "model.angle.loss_angle": "Periodic_L1",
     "model.angle.pred_range": 360,
 
     "train.check_gt_assignment": false,
     "train.sgd.weight_decay": 0.00004,
-    "train.img_sizes": [512, 640, 768],
+    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608,
+                        640, 672, 704, 736, 768],
     "train.imgsize_to_batch_size": {
-        "352": 32,
-        "384": 26, "416": 23, "448": 20, "480": 17,
+        "352": 26,
+        "384": 23, "416": 20, "448": 18, "480": 16,
         "512": 14, "544": 13, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 8, "736": 7,
+        "640": 9, "672": 8, "704": 7, "736": 7,
         "768": 6
     },
     "train.hard_example_mining": null,

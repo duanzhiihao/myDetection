@@ -12,10 +12,11 @@ model_name = 'rapid'
 weight_name = 'rapid_H1MW1024_Mar11_4000'
 # val_set_names = ['Lunch2_mot', 'Edge_cases_mot', 'High_activity_mot',
 #                  'All_off_mot', 'IRfilter_mot', 'IRill_mot']
-val_set_names = ['Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases', 'High_activity',
-                 'All_off', 'IRfilter', 'IRill']
+# val_set_names = ['Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases', 'High_activity',
+#                  'All_off', 'IRfilter', 'IRill']
+val_set_names = ['Edge_cases']
 input_size = 1024
-conf_thres = 0.005
+conf_thres = 0.3
 
 model_eval = api.Detector(
     model_name=model_name,
