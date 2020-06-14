@@ -8,14 +8,13 @@ from .modules import SeparableConv2d, Swish
 class YOLOHead(nn.Module):
     def __init__(self, cfg: dict):
         super().__init__()
-
         self.n_anch   = cfg['model.yolo.num_anchor_per_level']
         self.n_cls    = cfg['general.num_class']
         self.bb_param = cfg.get('general.bbox_param', 4)
         self.heads    = nn.ModuleList()
         out_ch = (self.bb_param + 1 + self.n_cls) * self.n_anch
         for ch in cfg['model.fpn.out_channels']:
-            self.heads.append(nn.Conv2d(ch, out_ch, 1, stride=1))
+            self.heads.append(nn.Conv2d(ch, out_ch, 1, stride=1, padding=0))
 
     def forward(self, features):
         nBp = self.bb_param

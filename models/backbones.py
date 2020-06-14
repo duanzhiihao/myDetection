@@ -63,10 +63,11 @@ class UltralyticsBackbone(nn.Module):
     '''
     def __init__(self, global_cfg):
         super().__init__()
-        from .modules import Focus, UConvBnLeaky, UBottleneck, SPP
+        # from .modules import Focus, UConvBnLeaky, UBottleneck, SPP
+        from external.ultralytics.common import Focus, Bottleneck, BottleneckCSP, \
+                                                Conv, SPP
         depm     = global_cfg['model.ultralytics.depth_muliple']
         chm      = global_cfg['model.ultralytics.channel_muliple']
-        in_imgs  = global_cfg.get('general.input.frame_concatenation', 1)
         ceil8    = lambda x: int(np.ceil(x/8) * 8)
         scale_   = lambda x: max(round(x*depm), 1)
         channels = [ceil8(ch*chm) for ch in [64, 128, 256, 512, 1024]]
@@ -75,34 +76,33 @@ class UltralyticsBackbone(nn.Module):
 
         self.netlist = nn.ModuleList()
         if global_cfg['model.ultralytics.first'] == 'Focus':
-            assert in_imgs == 1
+            assert global_cfg.get('general.input.frame_concatenation', 1) == 1
             self.netlist.append(Focus(3, channels[0], k=3))
         elif global_cfg['model.ultralytics.first'] == 'Conv2d':
             raise NotImplementedError()
         # 2x
         # downsample
-        self.netlist.append(UConvBnLeaky(channels[0], channels[1], k=3, s=2))
+        self.netlist.append(Conv(channels[0], channels[1], k=3, s=2))
         # 4x
-        for _ in range(scale_(3)):
-            self.netlist.append(UBottleneck(channels[1], channels[1]))
+        m = nn.Sequential(*[Bottleneck(channels[1], channels[1]) \
+                            for _ in range(scale_(3))])
+        self.netlist.append(m)
         # downsample
-        self.netlist.append(UConvBnLeaky(channels[1], channels[2], k=3, s=2))
+        self.netlist.append(Conv(channels[1], channels[2], k=3, s=2))
         # 8x
-        for _ in range(scale_(9)):
-            self.netlist.append(UBottleneck(channels[2], channels[2]))
+        self.netlist.append(BottleneckCSP(channels[2], channels[2], n=scale_(9)))
         # downsample
-        self.netlist.append(UConvBnLeaky(channels[2], channels[3], k=3, s=2))
+        self.netlist.append(Conv(channels[2], channels[3], k=3, s=2))
         # 16 x
-        for _ in range(scale_(9)):
-            self.netlist.append(UBottleneck(channels[3], channels[3]))
+        self.netlist.append(BottleneckCSP(channels[3], channels[3], n=scale_(9)))
         # downsample
-        self.netlist.append(UConvBnLeaky(channels[3], channels[4], k=3, s=2))
+        self.netlist.append(Conv(channels[3], channels[4], k=3, s=2))
         # 32 x
         self.netlist.append(SPP(channels[4], channels[4], k=[5,9,13]))
-        for _ in range(scale_(3)):
-            self.netlist.append(UBottleneck(channels[4], channels[4]))
-        
+        self.netlist.append(BottleneckCSP(channels[4], channels[4], n=scale_(6)))
+
     def forward(self, x):
+        assert x.dim() == 4 and x.shape[2]%32 == 0 and x.shape[3]%32 == 0
         features = []
         for module in self.netlist:
             y = module(x)

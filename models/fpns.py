@@ -80,23 +80,21 @@ class UltralyticsFPN(nn.Module):
     '''
     def __init__(self, global_cfg):
         super().__init__()
-        from .modules import UBottleneck, UConvBnLeaky
+        from external.ultralytics.common import BottleneckCSP, Conv
         assert global_cfg['model.backbone.num_levels'] == 3
         ch3, ch4, ch5 = global_cfg['model.backbone.out_channels']
         depm          = global_cfg['model.ultralytics.depth_muliple']
         chm           = global_cfg['model.ultralytics.channel_muliple']
         scale_ = lambda x: max(round(x*chm), 1)
 
-        self.to_p5 = nn.Sequential(
-            *[UBottleneck(ch5, ch5, shortcut=False) for _ in range(scale_(3))]
-        )
+        self.to_p5 = BottleneckCSP(ch5, ch5, n=scale_(3), shortcut=False)
         self.to_p4 = nn.Sequential(
-            UConvBnLeaky(ch4+ch5, ch4, k=1, s=1),
-            *[UBottleneck(ch4, ch4, shortcut=False) for _ in range(scale_(3))]
+            Conv(ch4+ch5, ch4, k=1, s=1),
+            BottleneckCSP(ch4, ch4, n=scale_(3), shortcut=False)
         )
         self.to_p3 = nn.Sequential(
-            UConvBnLeaky(ch3+ch4, ch3, k=1, s=1),
-            *[UBottleneck(ch3, ch3, shortcut=False) for _ in range(scale_(3))]
+            Conv(ch3+ch4, ch3, k=1, s=1),
+            BottleneckCSP(ch3, ch3, n=scale_(3), shortcut=False)
         )
 
     def forward(self, features):
