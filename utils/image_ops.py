@@ -19,6 +19,22 @@ def imread_pil(img_path):
     return img
 
 
+def resize_pil(img: PIL.Image.Image, img_size: int, shorter=True):
+    '''
+    Resize the PIL image such that the shorter/longer side = img_size
+    '''
+    # assert isinstance(img_size, int)
+    if shorter:
+        pass
+    else:
+        imh, imw = img.height, img.width
+        factor = img_size / max(imh, imw)
+        th, tw = round(imh*factor), round(imw*factor)
+        img_size = (th, tw)
+    img = tvf.resize(img, size=img_size)
+    return img
+
+
 def pad_to_divisible(img: PIL.Image.Image, denom: int) -> PIL.Image.Image:
     '''
     Zero-pad at the right and bottom of the image such that width and height

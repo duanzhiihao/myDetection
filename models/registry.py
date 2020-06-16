@@ -124,6 +124,9 @@ def get_det_layer(cfg: dict):
     if det_layer_name == 'YOLO':
         from .detlayers.yolov3 import YOLOLayer
         return YOLOLayer
+    elif det_layer_name == 'Ultralytics':
+        from .detlayers.uv5 import DetectLayer
+        return DetectLayer
     elif det_layer_name == 'RetinaNet':
         from .detlayers.retinanet import RetinaLayer
         return RetinaLayer

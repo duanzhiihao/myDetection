@@ -35,12 +35,14 @@
     "train.check_gt_assignment": false,
     "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704],
     "train.imgsize_to_batch_size": {
-        "352": 30,
-        "384": 26, "416": 22, "448": 19, "480": 16,
-        "512": 14, "544": 12, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 7
+        "352": 32,
+        "384": 28, "416": 25, "448": 22, "480": 19,
+        "512": 16, "544": 14, "576": 13, "608": 12,
+        "640": 11, "672": 10, "704": 9
     },
+    "train.hard_example_mining": null,
     "train.data_augmentation": {
+        "mosaic": false,
         "satpepper_noise_density": 0.02,
         "brightness": [0.3, 1.5],
         "contrast": [0.5, 1.5],

@@ -187,10 +187,9 @@ class Detector():
             assert input_size is not None
             # resize the image such that the SHORTER side of the image
             # equals to desired input size; then pad it to be divisible
-            pil_img = tvf.resize(pil_img, input_size)
+            pil_img = imgUtils.resize_pil(pil_img, input_size, shorter=False)
             new_h, new_w = pil_img.height, pil_img.width
             pil_img = imgUtils.pad_to_divisible(pil_img, self.divisibe)
-            assert min(new_h, new_w) == input_size
             pad_info = (ori_w, ori_h, 0, 0, new_w, new_h)
         elif pre_proc_name == 'resize_pad_square':
             assert input_size is not None

@@ -23,7 +23,7 @@
 
     "model.rpn.name": "yolov3",
     
-    "model.pred_layer": "YOLO",
+    "model.pred_layer": "Ultralytics",
 
     "model.yolo.num_anchor_per_level": 3,
     "model.yolo.anchors": [
