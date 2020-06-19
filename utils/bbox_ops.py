@@ -170,6 +170,81 @@ def xywha2vertex(box, is_degree, stack=True):
     return torch.stack((tl,tr,br,bl), dim=1)
 
 
+def vertex2masks(vertices, mask_size=128):
+    '''
+    Convert vertices to binary masks
+
+    Args:
+        vertices: tensor, shape(batch,4,2)
+                  4 means 4 corners of the box, in 0~1 normalized range
+                    top left [x,y],
+                    top right [x,y],
+                    bottom right [x,y],
+                    bottom left [x,y]
+        mask_size: int or (h,w), size of the output tensor
+
+    Returns:
+        tensor, shape(batch,size,size), 0/1 mask of the bounding box
+    '''
+    # assert (vertices >= 0).all() and (vertices <= 1).all()
+    assert vertices.dim() == 3 and vertices.shape[1:3] == (4,2)
+    device = vertices.device
+    batch = vertices.shape[0]
+    mh,mw = (mask_size,mask_size) if isinstance(mask_size,int) else mask_size
+
+    # create meshgrid
+    gx = torch.linspace(0, 1, steps=mw, device=device).view(1,1,-1)
+    gy = torch.linspace(0, 1, steps=mh, device=device).view(1,-1,1)
+    gx = torch.arange(0, mw, dtype=torch.float, device=device).view(1,1,-1)
+    gy = torch.arange(0, mh, dtype=torch.float, device=device).view(1,-1,1)
+
+    # for example batch=9, all the following shape(9,1,1)
+    tl_x = vertices[:,0,0].view(-1,1,1)
+    tl_y = vertices[:,0,1].view(-1,1,1)
+    tr_x = vertices[:,1,0].view(-1,1,1)
+    tr_y = vertices[:,1,1].view(-1,1,1)
+    br_x = vertices[:,2,0].view(-1,1,1)
+    br_y = vertices[:,2,1].view(-1,1,1)
+    bl_x = vertices[:,3,0].view(-1,1,1)
+    bl_y = vertices[:,3,1].view(-1,1,1)
+
+    # x1y1=tl, x2y2=tr
+    masks = (tr_y-tl_y)*gx + (tl_x-tr_x)*gy + tl_y*tr_x - tr_y*tl_x < 0
+    # x1y1=tr, x2y2=br
+    masks *= (br_y-tr_y)*gx + (tr_x-br_x)*gy + tr_y*br_x - br_y*tr_x < 0
+    # x1y1=br, x2y2=bl
+    masks *= (bl_y-br_y)*gx + (br_x-bl_x)*gy + br_y*bl_x - bl_y*br_x < 0
+    # x1y1=bl, x2y2=tl
+    masks *= (tl_y-bl_y)*gx + (bl_x-tl_x)*gy + bl_y*tl_x - tl_y*bl_x < 0
+
+    assert masks.shape == (batch, mh, mw)
+    return masks
+
+
+def bbox_to_mask(bboxes: torch.FloatTensor, bb_format='cxcywhd',
+                 mask_size=2048) -> torch.BoolTensor:
+    '''
+    Convert bounding boxes to binary masks
+
+    Args:
+        bboxes: bounding boxes, shape [N, bb_param]
+    
+    Return:
+        masks: shape [N, mask_size, mask_size]
+    '''
+    assert isinstance(bboxes, torch.FloatTensor) and bboxes.dim() == 2
+    if bb_format == 'cxcywhd':
+        assert bboxes.shape[1] == 5
+        bboxes = bboxes.clone()
+        bboxes[:,4] = bboxes[:,4] / 180 * pi
+        vertices = xywha2vertex(bboxes, is_degree=False)
+        masks = vertex2masks(vertices, mask_size=mask_size)
+    else:
+        raise NotImplementedError()
+
+    return masks
+
+
 def nms_rotbb(boxes, scores, nms_thres=0.45, bb_format='cxcywhd', img_size=2048,
               majority=None):
     '''
