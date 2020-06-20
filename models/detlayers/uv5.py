@@ -4,6 +4,7 @@ import torch.nn.functional as tnf
 
 import models.losses as lossLib
 from utils.bbox_ops import bboxes_iou
+from utils.structures import ImageObjects
 
 
 class DetectLayer(nn.Module):
@@ -12,9 +13,10 @@ class DetectLayer(nn.Module):
     '''
     def __init__(self, level_i: int, cfg: dict):
         super().__init__()
-        anchors_all = torch.Tensor(cfg['model.yolo.anchors'])
-        indices = cfg['model.yolo.anchor_indices'][level_i]
-        indices = torch.Tensor(indices).long()
+        anchors_all = torch.Tensor(cfg['model.detect.anchors'])
+        indices     = cfg['model.detect.anchor_indices'][level_i]
+        indices     = torch.Tensor(indices).long()
+
         self.indices = indices
         # anchors: tensor, e.g. shape(3,2), [[116, 90], [156, 198], [373, 326]]
         self.anchors = anchors_all[indices, :]
@@ -23,10 +25,11 @@ class DetectLayer(nn.Module):
         self.anch_00wh_all[:,2:4] = anchors_all # unnormalized
         self.grid = torch.zeros(1) # dummy
 
-        self.ignore_thre = cfg['model.yolo.anchor.negative_threshold']
-        self.num_anchors = len(indices)
-        self.stride = cfg['model.fpn.out_strides'][level_i]
-        self.n_cls = cfg['general.num_class']
+        self.num_anchors      = len(indices)
+        self.stride           = cfg['model.fpn.out_strides'][level_i]
+        self.n_cls            = cfg['general.num_class']
+        self.sample_selection = cfg['model.detect.sample_selection']
+        self.loss_bbox        = cfg['model.detect.loss_bbox']
 
     def _make_grid(self, ny, nx, device):
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
@@ -77,91 +80,87 @@ class DetectLayer(nn.Module):
         if labels is None:
             return preds, None
 
-        raise NotImplementedError()
-
         assert isinstance(labels, list)
         valid_gt_num = 0
-        gt_mask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
-        conf_loss_mask = torch.ones(nB, nA, nH, nW, dtype=torch.bool)
-        weighted = torch.zeros(nB, nA, nH, nW)
-        tgt_xywh = torch.zeros(nB, nA, nH, nW, 4)
-        tgt_conf = torch.zeros(nB, nA, nH, nW, 1)
-        tgt_cls = torch.zeros(nB, nA, nH, nW, self.n_cls)
+        TargetConf = torch.zeros(nB, nA, nH, nW, 1)
+        loss_xy  = 0
+        loss_wh  = 0
+        loss_cls = 0
+        bce_logits = tnf.binary_cross_entropy_with_logits
         # traverse all images in a batch
         for b in range(nB):
             im_labels = labels[b]
+            im_labels: ImageObjects
             im_labels.sanity_check()
             num_gt = len(im_labels)
             if num_gt == 0:
                 # no ground truth
                 continue
             gt_bboxes = im_labels.bboxes
-            gt_cls_idx = im_labels.cats
-            assert gt_bboxes.shape[1] == 4
+            gt_cls_idxs = im_labels.cats
+            assert gt_bboxes.shape[1] == 4 # TODO:
 
-            # calculate iou between truth and reference anchors
-            gt_00wh = torch.zeros(num_gt, 4)
-            gt_00wh[:, 2:4] = gt_bboxes[:, 2:4]
-            anchor_ious = bboxes_iou(gt_00wh, self.anch_00wh_all, xyxy=False)
-            best_n_all = torch.argmax(anchor_ious, dim=1)
-            best_n = best_n_all % self.num_anchors
+            # calculate iou between ground truth and anchor boxes
+            # gt_00wh = torch.zeros(num_gt, 4)
+            # gt_00wh[:, 2:4] = gt_bboxes[:, 2:4]
+            # anchor_ious = bboxes_iou(gt_00wh, self.anch_00wh_all, xyxy=False)
+            # best_n_all = torch.argmax(anchor_ious, dim=1)
 
-            valid_mask = torch.zeros(num_gt, dtype=torch.bool)
-            for ind in self.indices:
-                valid_mask = ( valid_mask | (best_n_all == ind) )
-            if valid_mask.sum() == 0:
-                # no anchor is responsible for any ground truth
-                continue
-            else:
-                valid_gt_num += sum(valid_mask)
+            for gi, (gt_bb, gt_cidx) in enumerate(zip(gt_bboxes, gt_cls_idxs)):
+                # --------------- find positive samples
+                if self.sample_selection == 'best':
+                    _gt_00wh = gt_bb.clone()
+                    _gt_00wh[0:2] = 0
+                    anchor_ious = bboxes_iou(_gt_00wh, self.anch_00wh_all, xyxy=False)
+                    anch_idx_all = torch.argmax(anchor_ious, dim=1).squeeze().item()
+                    if not (self.indices == anch_idx_all).any():
+                        # this layer is not responsible for this GT
+                        continue
+                    ta = anch_idx_all % nA
+                    ti = (gt_bb[0] / self.stride).long() # horizontal
+                    tj = (gt_bb[1] / self.stride).long() # vertical
+                    valid_gt_num += 1
+                    # positive sample is (ta, tj, ti)
+                elif self.sample_selection == 'ATSS':
+                    raise NotImplementedError()
+                else:
+                    raise NotImplementedError()
 
+                # loss for bounding box
+                if self.loss_bbox == 'smooth_L1':
+                    _t_bb = t_bbox[b, ta, tj, ti]
+                    assert _t_bb.dim() == 1
+                    _tgtxy  = ((gt_bb[:2] / self.stride) % 1 + 0.5) / 2
+                    _tgtxy  = _tgtxy.to(device=device)
+                    loss_xy = loss_xy + bce_logits(_t_bb[:2], _tgtxy, reduction='sum')
+                    _tgtwh  = torch.sqrt(gt_bb[2:4] / self.anchors[ta,:]) / 2
+                    _tgtwh  = _tgtwh.to(device=device)
+                    loss_wh = loss_wh + bce_logits(_t_bb[2:4], _tgtwh, reduction='sum')
+                    if _t_bb.shape[0] > 4:
+                        raise NotImplementedError()
+                elif self.loss_bbox == 'GIoU':
+                    raise NotImplementedError()
+
+                # loss for categories
+                if self.n_cls > 0:
+                    _t_cls = cls_logits[b, ta, tj, ti]
+                    assert _t_cls.shape[-1] == self.n_cls
+                    _tgt_cls = torch.zeros_like(_t_cls)
+                    _tgt_cls[..., gt_cidx] = 1
+                    loss_cls = loss_cls + bce_logits(_t_cls, _tgt_cls)
+
+            # loss for confidence score
             pred_ious = bboxes_iou(p_bbox[b], gt_bboxes, xyxy=False)
             iou_with_gt, _ = pred_ious.max(dim=1)
-            # ignore the conf of a pred BB if it matches a gt more than 0.7
-            conf_loss_mask[b] = (iou_with_gt < self.ignore_thre).view(nA,nH,nW)
-            # conf_loss_mask = 1 -> give penalty
-
-            gt_bboxes = gt_bboxes[valid_mask,:]
-            grid_tx = gt_bboxes[:,0] / self.stride
-            grid_ty = gt_bboxes[:,1] / self.stride
-            ti, tj = grid_tx.long().clamp(max=nW-1), grid_ty.long().clamp(max=nH-1)
-            tn = best_n[valid_mask] # target anchor box number
-
-            conf_loss_mask[b,tn,tj,ti] = 1
-            gt_mask[b,tn,tj,ti] = 1
-            tgt_xywh[b,tn,tj,ti,0] = grid_tx - grid_tx.floor()
-            tgt_xywh[b,tn,tj,ti,1] = grid_ty - grid_ty.floor()
-            tgt_xywh[b,tn,tj,ti,2] = torch.log(gt_bboxes[:,2]/self.anchors[tn,0] + 1e-8)
-            tgt_xywh[b,tn,tj,ti,3] = torch.log(gt_bboxes[:,3]/self.anchors[tn,1] + 1e-8)
-            tgt_conf[b,tn,tj,ti] = 1 # objectness confidence
-            if self.n_cls > 0:
-                tgt_cls[b, tn, tj, ti, gt_cls_idx[valid_mask]] = 1
-            # smaller objects have higher losses
-            img_area = img_size[0] * img_size[1]
-            weighted[b,tn,tj,ti] = 2 - gt_bboxes[:,2] * gt_bboxes[:,3] / img_area
+            iou_with_gt = iou_with_gt.view(nA, nH, nW, 1)
+            TargetConf[b] = iou_with_gt
 
         # move the tagerts to GPU
-        gt_mask = gt_mask.to(device=device)
-        conf_loss_mask = conf_loss_mask.to(device=device)
-        weighted = weighted.unsqueeze(-1).to(device=device)
-        tgt_xywh = tgt_xywh.to(device=device)
-        tgt_conf = tgt_conf.to(device=device)
-        tgt_cls = tgt_cls.to(device=device)
+        TargetConf = TargetConf.to(device=device)
 
-        bce_logits = tnf.binary_cross_entropy_with_logits
         # weighted BCE loss for x,y
-        loss_xy = bce_logits(t_bbox[...,0:2][gt_mask], tgt_xywh[...,0:2][gt_mask],
-                             weight=weighted[gt_mask], reduction='sum')
         # weighted squared error for w,h
-        loss_wh = (t_bbox[...,2:4][gt_mask] - tgt_xywh[...,2:4][gt_mask]).pow(2)
-        loss_wh = 0.5*(weighted[gt_mask] * loss_wh).sum()
-        loss_conf = bce_logits(conf_logits[conf_loss_mask],
-                               tgt_conf[conf_loss_mask], reduction='sum')
-        if self.n_cls > 0:
-            loss_cls = bce_logits(cls_logits[gt_mask], tgt_cls[gt_mask], 
-                                  reduction='sum')
-        else:
-            loss_cls = 0
+        loss_conf = bce_logits(conf_logits, TargetConf, reduction='sum')
         loss = loss_xy + loss_wh + loss_conf + loss_cls
         loss = loss / nB
 

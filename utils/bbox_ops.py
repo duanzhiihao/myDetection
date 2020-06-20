@@ -22,6 +22,8 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=False):
         box in :obj:`bbox_b`.
     from: https://github.com/chainer/chainercv
     """
+    if bboxes_a.dim() == 1:
+        bboxes_a = bboxes_a.unsqueeze(0)
     assert bboxes_a.dim() == bboxes_b.dim() == 2
     if bboxes_a.shape[1] != 4 or bboxes_b.shape[1] != 4:
         raise IndexError()
