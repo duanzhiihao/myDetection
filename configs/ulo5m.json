@@ -33,6 +33,7 @@
     ],
     "model.detect.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
     "model.detect.sample_selection": "best",
+    "model.detect.confidence_target": "zero-one",
     "model.detect.negative_threshold": 0.7,
     "model.detect.loss_bbox": "smooth_L1",
 
@@ -41,11 +42,11 @@
     "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
                         704, 736, 768],
     "train.imgsize_to_batch_size": {
-        "352": 70,
-        "384": 60, "416": 52, "448": 45, "480": 40,
-        "512": 36, "544": 32, "576": 28, "608": 25,
-        "640": 22, "672": 20, "704": 18, "736": 17,
-        "768": 16
+        "352": 64,
+        "384": 56, "416": 48, "448": 42, "480": 38,
+        "512": 34, "544": 30, "576": 26, "608": 23,
+        "640": 20, "672": 18, "704": 16, "736": 15,
+        "768": 14
     },
     "train.hard_example_mining": null,
     "train.data_augmentation": {

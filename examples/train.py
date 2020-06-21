@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--demo_interval',       type=int, default=20)
     parser.add_argument('--demo_images',         type=str, default='debug_kitchen')
     
-    parser.add_argument('--debug_mode',          type=str, default=None)
+    parser.add_argument('--debug_mode',          type=str, default='overfit')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')

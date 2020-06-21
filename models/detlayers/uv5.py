@@ -27,9 +27,13 @@ class DetectLayer(nn.Module):
 
         self.num_anchors      = len(indices)
         self.stride           = cfg['model.fpn.out_strides'][level_i]
+        self.strides_all      = cfg['model.fpn.out_strides']
         self.n_cls            = cfg['general.num_class']
         self.sample_selection = cfg['model.detect.sample_selection']
+        self.conf_target      = cfg['model.detect.confidence_target']
+        self.negative_thres   = cfg.get('model.detect.negative_threshold', 0.7)
         self.loss_bbox        = cfg['model.detect.loss_bbox']
+        self.bbox_format      = cfg['general.pred_bbox_format']
 
     def _make_grid(self, ny, nx, device):
         yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
@@ -46,6 +50,13 @@ class DetectLayer(nn.Module):
         conf_logits = raw['conf']
         cls_logits = raw['class']
 
+        if self.bbox_format == 'cxcywh':
+            assert t_bbox.shape[-1] == 4
+        elif self.bbox_format == 'cxcywhd':
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError()
+
         # ----------------------- logits to prediction -----------------------
         p_bbox = t_bbox.detach().clone().contiguous()
         # bounding box
@@ -59,10 +70,9 @@ class DetectLayer(nn.Module):
         anch_wh = self.anchors.view(1, nA, 1, 1, 2).to(device=device)
         p_bbox[..., 2:4] = (p_bbox[..., 2:4] * 2)**2 * anch_wh
         # angle
-        bb_param = p_bbox.shape[-1]
-        if bb_param != 4:
+        if self.bbox_format == 'cxcywhd':
             raise NotImplementedError()
-            assert bb_param == 5
+        bb_param = p_bbox.shape[-1]
         p_bbox = p_bbox.view(nB, nA*nH*nW, bb_param).cpu()
 
         # Logistic activation for confidence score
@@ -80,9 +90,33 @@ class DetectLayer(nn.Module):
         if labels is None:
             return preds, None
 
+        if self.sample_selection == 'ATSS':
+            raise NotImplementedError()
+            # Build x,y meshgrid for all levels
+            # Calculating this at each level is not very efficient
+            # Ideally this should be done only once
+            # But in order to achieve that, code structure must be changed.
+            img_h, img_w = img_size
+            all_anchor_bbs = []
+            for li, s in enumerate(self.strides_all):
+                assert img_w % s == 0 and img_h % s == 0
+                _sdH, _sdW = img_h // s, img_w // s
+                _x = torch.linspace(0, img_w, steps=_sdW+1)[:-1] + 0.5 * s
+                _y = torch.linspace(0, img_h, steps=_sdH+1)[:-1] + 0.5 * s
+                _gy, _gx = torch.meshgrid(_y, _x)
+                # if s == stride:
+                #     assert (_gy == gy).all() and (_gx == gx).all()
+                assert _gy.shape == _gx.shape == (_sdH, _sdW)
+                anch_wh = torch.ones(_sdH*_sdW, 2) * self.anchors_all[li]
+                anch_bbs = torch.cat(
+                    [_gx.reshape(-1,1), _gy.reshape(-1,1), anch_wh], dim=1)
+                all_anchor_bbs.append(anch_bbs)
+
         assert isinstance(labels, list)
         valid_gt_num = 0
         TargetConf = torch.zeros(nB, nA, nH, nW, 1)
+        if self.conf_target == 'zero-one':
+            IgnoredMask = torch.zeros(nB, nA, nH, nW, dtype=torch.bool)
         loss_xy  = 0
         loss_wh  = 0
         loss_cls = 0
@@ -99,12 +133,6 @@ class DetectLayer(nn.Module):
             gt_bboxes = im_labels.bboxes
             gt_cls_idxs = im_labels.cats
             assert gt_bboxes.shape[1] == 4 # TODO:
-
-            # calculate iou between ground truth and anchor boxes
-            # gt_00wh = torch.zeros(num_gt, 4)
-            # gt_00wh[:, 2:4] = gt_bboxes[:, 2:4]
-            # anchor_ious = bboxes_iou(gt_00wh, self.anch_00wh_all, xyxy=False)
-            # best_n_all = torch.argmax(anchor_ious, dim=1)
 
             for gi, (gt_bb, gt_cidx) in enumerate(zip(gt_bboxes, gt_cls_idxs)):
                 # --------------- find positive samples
@@ -148,25 +176,46 @@ class DetectLayer(nn.Module):
                     _tgt_cls = torch.zeros_like(_t_cls)
                     _tgt_cls[..., gt_cidx] = 1
                     loss_cls = loss_cls + bce_logits(_t_cls, _tgt_cls)
+                
+                # regression target for confidence score
+                if self.conf_target == 'zero-one':
+                    TargetConf[b, ta, tj, ti] = 1
 
             # loss for confidence score
-            pred_ious = bboxes_iou(p_bbox[b], gt_bboxes, xyxy=False)
+            if self.bbox_format == 'cxcywh':
+                pred_ious = bboxes_iou(p_bbox[b], gt_bboxes, xyxy=False)
+            elif self.bbox_format == 'cxcywhd':
+                raise NotImplementedError()
             iou_with_gt, _ = pred_ious.max(dim=1)
-            iou_with_gt = iou_with_gt.view(nA, nH, nW, 1)
-            TargetConf[b] = iou_with_gt
+            if self.conf_target == 'IoU':
+                TargetConf[b] = iou_with_gt.view(nA, nH, nW, 1)
+            elif self.conf_target == 'zero-one':
+                if self.bbox_format == 'cxcywh':
+                    IgnoredMask[b] = (iou_with_gt > self.negative_thres).view(nA,nH,nW)
+                elif self.bbox_format == 'cxcywhd':
+                    raise NotImplementedError()
 
         # move the tagerts to GPU
         TargetConf = TargetConf.to(device=device)
+        ignored_num = 0
+        if self.conf_target == 'IoU':
+            loss_conf = bce_logits(conf_logits, TargetConf, reduction='sum')
+        elif self.conf_target == 'zero-one':
+            IgnoredMask = IgnoredMask.to(device=device)
+            _pos_mask = TargetConf.squeeze(-1).bool()
+            _penalty = _pos_mask | (~IgnoredMask)
+            loss_conf = bce_logits(conf_logits[_penalty], TargetConf[_penalty],
+                                   reduction='sum')
+            ignored_num = (IgnoredMask & (~_pos_mask)).sum().cpu().item()
+        else:
+            raise NotImplementedError()
 
-        # weighted BCE loss for x,y
-        # weighted squared error for w,h
-        loss_conf = bce_logits(conf_logits, TargetConf, reduction='sum')
         loss = loss_xy + loss_wh + loss_conf + loss_cls
         loss = loss / nB
 
         # logging
         ngt = valid_gt_num + 1e-16
-        self.loss_str = f'yolo_{nH}x{nW} total {int(ngt)} objects: ' \
+        self.loss_str = f'yolo_{nH}x{nW} pos/ignore: {int(ngt)}/{ignored_num}: ' \
                         f'xy/gt {loss_xy/ngt:.3f}, wh/gt {loss_wh/ngt:.3f}, ' \
                         f'conf {loss_conf:.3f}, class {loss_cls:.3f}'
         self._assigned_num = valid_gt_num
