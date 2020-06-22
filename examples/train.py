@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--demo_interval',       type=int, default=20)
     parser.add_argument('--demo_images',         type=str, default='debug_kitchen')
     
-    parser.add_argument('--debug_mode',          type=str, default='overfit')
+    parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -118,7 +118,6 @@ def main():
     # validation function for hard example mining
     eval_func_ = eval_info['val_func']
 
-    start_iter = -1
     if args.checkpoint:
         print("Loading checkpoint...", args.checkpoint)
         weights_path = f'{PROJECT_ROOT}/weights/{args.checkpoint}'
@@ -129,8 +128,6 @@ def main():
             print('Cannot load weights. Trying to set strict=False...')
             model.load_state_dict(previous_state['model'], strict=False)
             print('Successfully loaded part of the weights.')
-        start_iter = previous_state.get('iter', -2) + 1
-        print(f'Start from iteration: {start_iter}')
 
     print('Initializing tensorboard SummaryWriter...')
     if args.debug_mode:
@@ -147,8 +144,11 @@ def main():
     # Initialize optimizer
     optimizer = optim.get_optimizer(name=args.optimizer, params=params,
                                     lr=args.lr, cfg=global_cfg)
+    start_iter = -1
     if args.checkpoint and args.optimizer in previous_state:
         optimizer.load_state_dict(previous_state[args.optimizer])
+        start_iter = previous_state.get('iter', -2) + 1
+        print(f'Start from iteration: {start_iter}')
     # Learning rate scheduler
     lr_schedule_func = lambda x: optim.lr_warmup(x, warm_up=warmup_iter)
     from torch.optim.lr_scheduler import LambdaLR
@@ -196,7 +196,10 @@ def main():
             assert not torch.isnan(loss)
             loss.backward()
             # except RuntimeError as e:
-            #     print(e)
+            #     if 'CUDA out of memory' in str(e):
+            #         print(f'CUDA out of memory at imgsize={dataset.img_size},',
+            #               f'batchsize={batch_size}')
+            #     raise e
             #     if 'CUDA out of memory' in str(e):
             #         print(f'CUDA out of memory at imgsize={dataset.img_size},',
             #               f'batchsize={batch_size}')

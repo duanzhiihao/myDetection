@@ -77,7 +77,7 @@ class ImageDataset(Dataset):
             # segmentation mask
             imgInfo = self.imgId2info[ann['image_id']]
             imh, imw = imgInfo['height'], imgInfo['width']
-            if ann['segmentation'] != []:
+            if ann.get('segmentation', []) != []:
                 ann['rle'] = maskUtils.segm2rle(ann.pop('segmentation'), imh, imw)
             self.imgId2anns[ann['image_id']].append(ann)
 

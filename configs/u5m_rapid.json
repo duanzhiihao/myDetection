@@ -4,7 +4,7 @@
     "base": "OneStageBBox",
     
     "general.input_format": "RGB_1",
-    "general.input_divisibility": 32,
+    "general.input_divisibility": 64,
     "general.num_class": 0,
     "general.pred_bbox_format": "cxcywhd",
     "general.bbox_param": 5,
@@ -38,14 +38,17 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": false,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
+    "train.__img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
                         704],
+    "train.img_sizes": [512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088],
     "train.imgsize_to_batch_size": {
         "352": 70,
         "384": 60, "416": 52, "448": 45, "480": 40,
         "512": 36, "544": 32, "576": 28, "608": 25,
-        "640": 22, "672": 20, "704": 18, "736": 17,
-        "768": 16
+        "640": 22, "672": 20, "704": 18, "736": 16,
+        "768": 14, "832": 12,
+        "896": 10, "960": 9,
+        "1024": 8, "1088": 7
     },
     "train.hard_example_mining": null,
     "train.data_augmentation": {
