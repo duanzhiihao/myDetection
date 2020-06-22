@@ -19,7 +19,7 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='ulo5m')
+    parser.add_argument('--model',     type=str, default='u5m_yv3')
     parser.add_argument('--train_set', type=str, default='debug_kitchen')
     parser.add_argument('--val_set',   type=str, default='debug_kitchen')
 
