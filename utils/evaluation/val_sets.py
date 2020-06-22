@@ -67,6 +67,19 @@ def get_valset(valset_name: str):
             'val_func': evaluate_json
         }
         validation_func = lambda x: evaluate_json(x, val_json_path)
+    elif valset_name in {'youtube_val'}:
+        from settings import COSSY_DIR
+        from .cepdof import evaluate_json
+        val_json_path = f'{COSSY_DIR}/annotations/{valset_name}.json'
+        ann_data = json.load(open(val_json_path, 'r'))
+        ann_data.pop('annotations')
+        eval_info = {
+            'image_dir': f'{COSSY_DIR}/frames',
+            'image_info': ann_data,
+            'eval_type': 'cxcywhd',
+            'val_func': evaluate_json
+        }
+        validation_func = lambda x: evaluate_json(x, val_json_path)
 
     # ------------------------ video datasets ------------------------
     elif valset_name in {'Lab1_mot',

@@ -9,7 +9,7 @@ from utils.visualization import _draw_xywha
 from settings import COSSY_DIR
 
 
-json_path = f'{COSSY_DIR}/annotations/HBMW_train.json'
+json_path = f'{COSSY_DIR}/annotations/youtube_val.json'
 img_dir = f'{COSSY_DIR}/frames/'
 # img_dir = '../COCO/val2017/'
 
@@ -20,7 +20,8 @@ for ann in json_data['annotations']:
     img_id = ann['image_id']
     imgid2anns[img_id].append(ann)
 
-for imgInfo in choices(json_data['images'], k=100):
+# for imgInfo in choices(json_data['images'], k=100):
+for imgInfo in json_data['images']:
     fname = imgInfo['file_name']
     img_path = os.path.join(img_dir, fname)
     im = plt.imread(img_path)
@@ -32,8 +33,8 @@ for imgInfo in choices(json_data['images'], k=100):
         assert angle >= -90 and angle < 90
         _draw_xywha(im, x, y, w, h, angle, color=(0,255,0), linewidth=3)
         text = str(ann['person_id'])
-        cv2.putText(im, text, (int(x),int(y)), cv2.FONT_HERSHEY_SIMPLEX, 2,
-                    (255,255,255), 4, cv2.LINE_AA)
+        cv2.putText(im, text, (int(x),int(y)), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (255,255,255), 2, cv2.LINE_AA)
     
     plt.figure()
     plt.imshow(im)
