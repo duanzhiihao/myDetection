@@ -176,7 +176,8 @@ class FCOSLayer(torch.nn.Module):
         _pCls, _tgtCls = cls_logits[PositiveMask], TargetCls[PositiveMask]
         loss_cls = bce_logits(_pCls, _tgtCls, reduction='sum')
         loss = loss_bbox + loss_conf + loss_cls
-        
+        loss = loss / nB
+
         # logging
         pos_num = PositiveMask.sum().cpu().item()
         total_sample_num = nB * nH * nW

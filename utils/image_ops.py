@@ -188,7 +188,7 @@ def format_tensor_img(t_img: torch.FloatTensor, code: str) -> torch.FloatTensor:
     return t_img
 
 
-def img_tensor_to_np(t_img: torch.FloatTensor, encoding: str, out_format: str):
+def tensor_to_np(t_img: torch.FloatTensor, encoding: str, out_format: str):
     '''
     Convert a tensor image to numpy image. 
     This is sort of the inverse operation of format_tensor_img(). \\
@@ -202,7 +202,7 @@ def img_tensor_to_np(t_img: torch.FloatTensor, encoding: str, out_format: str):
     '''
     assert torch.is_tensor(t_img) and t_img.dim() == 3 and t_img.shape[0] == 3
     assert encoding in {'RGB_1', 'RGB_1_norm', 'BGR_255_norm'}
-    assert out_format in {'RGB_1', 'BGR_1', 'BGR_uint8'}
+    assert out_format in {'RGB_1', 'BGR_1', 'BGR_uint8', 'RGB_uint8'}
 
     t_img = t_img.clone()
     # 0. convert everthing to RGB_1
@@ -223,9 +223,15 @@ def img_tensor_to_np(t_img: torch.FloatTensor, encoding: str, out_format: str):
         pass
     elif out_format == 'BGR_1':
         im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+    elif out_format == 'RGB_uint8':
+        im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = (im * 255).astype('uint8')
     elif out_format == 'BGR_uint8':
         im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
         im = (im * 255).astype('uint8')
+    else:
+        raise NotImplementedError()
     return im
 
 

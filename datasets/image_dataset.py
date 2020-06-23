@@ -136,7 +136,6 @@ class ImageDataset(Dataset):
         self.hem_state['APs'][img_idx] = momentum*prev + (1-momentum)*aps
 
     def __len__(self):
-        '''Dummy function'''
         return len(self.img_ids)
 
     def __getitem__(self, index):
@@ -147,7 +146,8 @@ class ImageDataset(Dataset):
         if mosaic:
             raise NotImplementedError()
             pairs = []
-            index = [random.randint(0, len(self.img_ids)-1) for _ in range(4)]
+            _additional = [random.randint(0, len(self.img_ids)-1) for _ in range(3)]
+            indices = [index] + _additional
             for idx in range(index):                
                 img_label_pair = self._load_single_pil(idx, to_square=False)
                 pairs.append(img_label_pair)
