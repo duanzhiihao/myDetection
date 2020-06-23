@@ -13,8 +13,8 @@ class FCOSLayer(torch.nn.Module):
         super().__init__()
         self.anch_min = cfg['model.fcos.anchors'][level_i]
         self.anch_max = cfg['model.fcos.anchors'][level_i+1]
-        self.stride = cfg['model.fpn.out_strides'][level_i]
-        self.n_cls = cfg['general.num_class']
+        self.stride   = cfg['model.fpn.out_strides'][level_i]
+        self.n_cls    = cfg['general.num_class']
 
         self.center_region = 0.5 # positive sample center region
         self.ltrb_setting = 'exp_sl1'

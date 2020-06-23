@@ -22,13 +22,21 @@ class YOLOHead(nn.Module):
         for module, P in zip(self.heads, features):
             preds = module(P)
             nB, _, nH, nW = preds.shape
-            preds = preds.view(nB, self.n_anch, nBp+1+self.n_cls, nH, nW)
+            if self.n_anch > 1:
+                preds = preds.view(nB, self.n_anch, nBp+1+self.n_cls, nH, nW)
+                raw = {
+                    'bbox':  preds[:, :, 0:nBp, :, :].permute(0, 1, 3, 4, 2),
+                    'conf':  preds[:, :, nBp:nBp+1, :, :].permute(0, 1, 3, 4, 2),
+                    'class': preds[:, :, nBp+1:, :, :].permute(0, 1, 3, 4, 2),
+                }
+            elif self.n_anch == 1:
+                preds = preds.view(nB, nBp+1+self.n_cls, nH, nW)
+                raw = {
+                    'bbox':  preds[:, 0:nBp, :, :].permute(0, 2, 3, 1),
+                    'conf':  preds[:, nBp:nBp+1, :, :].permute(0, 2, 3, 1),
+                    'class': preds[:, nBp+1:, :, :].permute(0, 2, 3, 1),
+                }
             
-            raw = {
-                'bbox':  preds[:, :, 0:nBp, :, :].permute(0, 1, 3, 4, 2),
-                'conf':  preds[:, :, nBp:nBp+1, :, :].permute(0, 1, 3, 4, 2),
-                'class': preds[:, :, nBp+1:, :, :].permute(0, 1, 3, 4, 2),
-            }
             all_level_preds.append(raw)
         
         return all_level_preds
