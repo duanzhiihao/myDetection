@@ -56,7 +56,7 @@ for val_name in val_set_names:
 
     csv_dic[val_name] = ap50
 
-with open('./results/results.csv', 'a', newline='') as csvfile:
+with open(f'{PROJECT_ROOT}/results/results.csv', 'a', newline='') as csvfile:
     fields = [k for k in csv_dic.keys()]
     writer = csv.DictWriter(csvfile, fieldnames=fields)
     writer.writerow({})

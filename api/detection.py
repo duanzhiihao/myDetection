@@ -105,7 +105,7 @@ class Detector():
 
             assert imname[-4] == '.'
             img_id = int(imname[:-4]) if imname[:-4].isdigit() else imname[:-4]
-            detection_json += detections.to_json(img_id=img_id)
+            detection_json += detections.to_json(img_id=img_id, eval_type='x1y1wh')
 
         return detection_json
 

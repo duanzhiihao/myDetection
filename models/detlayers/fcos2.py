@@ -17,9 +17,10 @@ class FCOSLayer(torch.nn.Module):
         self.n_cls    = cfg['general.num_class']
 
         self.center_region = 0.5 # positive sample center region
-        self.ltrb_setting = 'exp_sl1'
-        self.ignore_thre = cfg['model.fcos2.ignored_threshold']
-    
+        self.ltrb_setting  = 'exp_sl1'
+        self.ignore_thre   = cfg['model.fcos2.ignored_threshold']
+        self.bb_format     = cfg['general.pred_bbox_format']
+
     def forward(self, raw, img_size, labels=None):
         stride = self.stride
         img_h, img_w = img_size
