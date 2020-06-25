@@ -129,7 +129,7 @@ class ImageDataset(Dataset):
 
         self.hem_state['counts'][index] += 1
         return index
-    
+
     def update_ap(self, img_idx, aps):
         momentum = 0.8
         prev = self.hem_state['APs'][img_idx]
@@ -144,7 +144,6 @@ class ImageDataset(Dataset):
         """
         mosaic = self.aug_setting['mosaic'] if self.aug_setting is not None else None
         if mosaic:
-            raise NotImplementedError()
             pairs = []
             _additional = [random.randint(0, len(self.img_ids)-1) for _ in range(3)]
             indices = [index] + _additional

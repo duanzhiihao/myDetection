@@ -36,7 +36,7 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
+    "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
                         704, 736, 768],
     "train.imgsize_to_batch_size": {
         "352": 62,

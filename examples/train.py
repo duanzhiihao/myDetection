@@ -19,9 +19,9 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='yolov3_80')
-    parser.add_argument('--train_set', type=str, default='wheat1')
-    parser.add_argument('--val_set',   type=str, default='wheat1')
+    parser.add_argument('--model',     type=str, default='u5m_yv3')
+    parser.add_argument('--train_set', type=str, default='COCOval2017')
+    parser.add_argument('--val_set',   type=str, default='COCOval2017')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
@@ -36,9 +36,9 @@ def main():
     parser.add_argument('--eval_interval',       type=int, default=100)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='wheat1')
+    parser.add_argument('--demo_images',         type=str, default='normal')
 
-    parser.add_argument('--debug_mode',          type=str, default='overfit')
+    parser.add_argument('--debug_mode',          type=str, default='local')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -140,10 +140,10 @@ def main():
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in model.named_parameters():
         if v.requires_grad:
-            assert '.conv' in k or '.bn' in k
+            assert ('.conv' in k) or ('.cv' in k) or ('.bn' in k)
             if '.bias' in k:
                 pg2.append(v)  # biases
-            elif '.conv' in k and '.weight' in k:
+            elif ('.bn' not in k) and '.weight' in k:
                 pg1.append(v)  # apply weight decay
             else:
                 pg0.append(v)  # all else
