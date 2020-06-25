@@ -55,7 +55,7 @@ def main():
         global_cfg['train.data_augmentation'] = None
         enable_multiscale = False
         batch_size = 1
-        subdivision = 1
+        accumulate = 1
         num_cpu = 0
         warmup_iter = 40
     elif args.debug_mode == 'local':
@@ -67,7 +67,7 @@ def main():
         global_cfg['train.initial_imgsize'] = initial_size
         batch_size = 2
         super_batchsize = 8
-        subdivision = int(np.ceil(super_batchsize / batch_size))
+        accumulate = int(np.ceil(super_batchsize / batch_size))
         # data augmentation setting
         enable_multiscale = True
         num_cpu = 0
@@ -86,7 +86,7 @@ def main():
         global_cfg['train.initial_imgsize'] = initial_size
         batch_size = AUTO_BATCHSIZE[str(initial_size)]
         super_batchsize = args.super_batchsize
-        subdivision = int(np.ceil(super_batchsize / batch_size))
+        accumulate = int(np.ceil(super_batchsize / batch_size))
         # data augmentation setting
         enable_multiscale = True
         assert 'train.imgsize_to_batch_size' in global_cfg
@@ -183,9 +183,9 @@ def main():
             model.train()
 
         torch.cuda.reset_max_memory_allocated(0)
-        # subdivision loop
+        # accumulate loop
         optimizer.zero_grad()
-        for _ in range(subdivision):
+        for _ in range(accumulate):
             batch = dataset.get_next()
             imgs, labels = batch['images'], batch['labels']
             # for t_im, lbl in zip(imgs, labels):
@@ -224,7 +224,7 @@ def main():
 
         for p in model.parameters():
             if p.grad is not None:
-                p.grad.data.mul_(1.0/subdivision)
+                p.grad.data.mul_(1.0/accumulate)
         optimizer.step()
         scheduler.step()
 
@@ -234,11 +234,11 @@ def main():
             time_used = timer.sec2str(sec_used)
             _ai       = sec_used / (iter_i+1-start_iter)
             avg_iter  = timer.sec2str(_ai)
-            avg_100img   = timer.sec2str(_ai / batch_size / subdivision * 100)
-            avg_epoch = timer.sec2str(_ai / batch_size / subdivision * 118287)
+            avg_100img   = timer.sec2str(_ai / batch_size / accumulate * 100)
+            avg_epoch = timer.sec2str(_ai / batch_size / accumulate * 118287)
             print(f'\nTotal time: {time_used}, 100 imgs: {avg_100img}, ',
                   f'iter: {avg_iter}, COCO epoch: {avg_epoch}')
-            print(f'effective batch size = {batch_size} * {subdivision}')
+            print(f'effective batch size = {batch_size} * {accumulate}')
             max_cuda = torch.cuda.max_memory_allocated(0) / 1024 / 1024 / 1024
             print(f'Max GPU memory usage: {max_cuda:.3f} GB')
             current_lr = scheduler.get_last_lr()[0]
@@ -252,7 +252,7 @@ def main():
             imgsize = np.random.choice(TRAIN_RESOLUTIONS)
             # Set the image size in datasets
             batch_size = AUTO_BATCHSIZE[str(imgsize)]
-            subdivision = int(np.ceil(super_batchsize / batch_size))
+            accumulate = int(np.ceil(super_batchsize / batch_size))
             dataset.img_size = imgsize
             dataset.to_iterator(batch_size=batch_size, shuffle=True,
                                 num_workers=num_cpu, pin_memory=True)
