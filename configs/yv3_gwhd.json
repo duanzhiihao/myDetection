@@ -33,19 +33,19 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [640, 800, 832, 864, 896, 928, 960, 992, 1024],
+    "train.img_sizes": [832, 864, 896, 928, 960, 992, 1024, 1056],
     "train.imgsize_to_batch_size": {
         "640": 10,
-        "800": 6, "832": 6, "864": 5,
-        "896": 5, "928": 4, "960": 4, "992": 4,
-        "1024": 3
+        "800": 8, "832": 6, "864": 6,
+        "896": 5, "928": 5, "960": 4, "992": 4,
+        "1024": 4, "1056": 4
     },
     "train.hard_example_mining": null,
     "train.data_augmentation": {
         "mosaic": false,
         "satpepper_noise_density": 0.01,
-        "brightness": [0.5, 1.5],
-        "contrast": [0.5, 1.5],
+        "brightness": [0.6, 1.4],
+        "contrast": [0.6, 1.4],
         "hue": [-0.1, 0.1],
         "saturation": [0, 2],
         "resize": true,
