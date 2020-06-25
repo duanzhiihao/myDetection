@@ -2,9 +2,11 @@ import numpy as np
 import torch.optim
 
 
-def get_optimizer(name, params, lr, cfg):
-    if name == 'SGDMR':
+def get_optimizer(name, params, lr, global_cfg):
+    if name == 'SGDM':
         optimizer = torch.optim.SGD(params, lr, momentum=0.9)
+    elif name == 'SGDMN':
+        optimizer = torch.optim.SGD(params, lr, momentum=0.937, nesterov=True)
     elif name == 'SGD':
         optimizer = torch.optim.SGD(params, lr=lr)
     elif name == 'AdamW':

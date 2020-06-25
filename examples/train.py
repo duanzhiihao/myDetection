@@ -19,13 +19,13 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='yv3_gwhd')
+    parser.add_argument('--model',     type=str, default='yolov3_80')
     parser.add_argument('--train_set', type=str, default='wheat1')
     parser.add_argument('--val_set',   type=str, default='wheat1')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
-    parser.add_argument('--optimizer',       type=str,   default='SGDMR')
+    parser.add_argument('--optimizer',       type=str,   default='SGDMN')
     parser.add_argument('--lr',              type=float, default=0.0001)
     parser.add_argument('--warmup',          type=int,   default=1000)
 
@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--demo_interval',       type=int, default=20)
     parser.add_argument('--demo_images',         type=str, default='wheat1')
 
-    parser.add_argument('--debug_mode',          type=str, default=None)
+    parser.add_argument('--debug_mode',          type=str, default='overfit')
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -137,13 +137,25 @@ def main():
 
     print(f'Initializing optimizer with lr: {args.lr}')
     # set weight decay only on conv.weight
-    params = []
-    for key, value in model.named_parameters():
-        decay = global_cfg['train.sgd.weight_decay'] if 'conv' in key else 0.0
-        params += [{'params': value, 'weight_decay': decay}]
-    # Initialize optimizer
-    optimizer = optim.get_optimizer(name=args.optimizer, params=params,
-                                    lr=args.lr, cfg=global_cfg)
+    pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+    for k, v in model.named_parameters():
+        if v.requires_grad:
+            assert '.conv' in k or '.bn' in k
+            if '.bias' in k:
+                pg2.append(v)  # biases
+            elif '.conv' in k and '.weight' in k:
+                pg1.append(v)  # apply weight decay
+            else:
+                pg0.append(v)  # all else
+
+    optimizer = optim.get_optimizer(name=args.optimizer, params=pg0, lr=args.lr,
+                                    global_cfg=global_cfg)
+    decay = global_cfg['train.sgd.weight_decay']
+    optimizer.add_param_group({'params': pg1, 'weight_decay': decay})
+    optimizer.add_param_group({'params': pg2})
+    print(f'Optimizer groups: {len(pg1)} conv.weight, {len(pg2)} .bias, {len(pg0)} other')
+    del pg0, pg1, pg2
+
     start_iter = -1
     if args.checkpoint and args.optimizer in previous_state:
         optimizer.load_state_dict(previous_state[args.optimizer])

@@ -3,6 +3,9 @@ import torch.nn as nn
 
 
 class SeparableConv2d(nn.Module):
+    '''
+    Depthwise separable convolution 2D
+    '''
     def __init__(self, in_ch, out_ch, kernel_size, stride, padding):
         super().__init__()
         self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size, stride,
@@ -52,9 +55,11 @@ class Swish(nn.Module):
 
 class DarkBlock(nn.Module):
     '''
-    basic residual block in Darknet53
-    in_out: input and output channels
-    hidden: channels in the block
+    Residual block in Darknet53
+
+    Args:
+        in_out: input and output channels
+        hidden: channels in the block
     '''
     def __init__(self, in_out, hidden):
         super().__init__()
@@ -65,7 +70,6 @@ class DarkBlock(nn.Module):
         residual = x
         x = self.cbl_0(x)
         x = self.cbl_1(x)
-
         return x + residual
 
 
