@@ -19,9 +19,9 @@ from settings import PROJECT_ROOT
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model',     type=str, default='u5m_rapid')
-    parser.add_argument('--train_set', type=str, default='HBMW_train')
-    parser.add_argument('--val_set',   type=str, default='youtube_val')
+    parser.add_argument('--model',     type=str, default='yv3_gwhd')
+    parser.add_argument('--train_set', type=str, default='wheat1')
+    parser.add_argument('--val_set',   type=str, default='wheat1')
 
     parser.add_argument('--super_batchsize', type=int,   default=32)
     parser.add_argument('--initial_imgsize', type=int,   default=None)
@@ -33,12 +33,12 @@ def main():
                         default='')
 
     parser.add_argument('--print_interval',      type=int, default=20)
-    parser.add_argument('--eval_interval',       type=int, default=200)
+    parser.add_argument('--eval_interval',       type=int, default=100)
     parser.add_argument('--checkpoint_interval', type=int, default=2000)
     parser.add_argument('--demo_interval',       type=int, default=20)
-    parser.add_argument('--demo_images',         type=str, default='youtube_val')
-    
-    parser.add_argument('--debug_mode',          type=str, default='local')
+    parser.add_argument('--demo_images',         type=str, default='wheat1')
+
+    parser.add_argument('--debug_mode',          type=str, default=None)
     args = parser.parse_args()
     assert torch.cuda.is_available()
     print('Initialing model...')
@@ -188,9 +188,9 @@ def main():
         for _ in range(subdivision):
             batch = dataset.get_next()
             imgs, labels = batch['images'], batch['labels']
-            for t_im, lbl in zip(imgs, labels):
-                np_im = image_ops.tensor_to_np(t_im, model.input_format, 'RGB_uint8')
-                lbl.draw_on_np(np_im, class_map='COCO', imshow=True)
+            # for t_im, lbl in zip(imgs, labels):
+            #     np_im = image_ops.tensor_to_np(t_im, model.input_format, 'RGB_uint8')
+            #     lbl.draw_on_np(np_im, class_map='COCO', imshow=True)
             imgs = imgs.cuda()
             # try:
             dts, loss = model(imgs, labels)

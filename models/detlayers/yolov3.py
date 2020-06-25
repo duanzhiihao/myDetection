@@ -55,8 +55,11 @@ class YOLOLayer(nn.Module):
         # Logistic activation for categories
         if self.n_cls > 0:
             p_cls = torch.sigmoid(cls_logits.detach())
-        cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
-        confs = p_conf * cls_score
+            cls_score, cls_idx = torch.max(p_cls, dim=-1, keepdim=True)
+            confs = p_conf * cls_score
+        else:
+            cls_idx = torch.zeros(nB, nA, nH, nW, dtype=torch.int64)
+            confs = p_conf
         preds = {
             'bbox': p_xywh,
             'class_idx': cls_idx.view(nB, nA*nH*nW).cpu(),

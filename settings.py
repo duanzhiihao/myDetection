@@ -16,3 +16,6 @@ COSSY_DIR = '/home/duanzh/Projects/Datasets/COSSY'
 
 # ImageNet dataaset
 ILSVRC_DIR = '/home/duanzh/Projects/Datasets/ILSVRC'
+
+# Global Wheat Head Detection dataset
+GWHD_DIR = '/home/duanzh/Projects/Datasets/GWHD'

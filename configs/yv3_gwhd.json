@@ -1,0 +1,62 @@
+{
+    "__doc": "YOLO version 3",
+
+    "base": "OneStageBBox",
+    
+    "general.input_format": "RGB_1",
+    "general.input_divisibility": 32,
+    "general.num_class": 0,
+    "general.pred_bbox_format": "cxcywh",
+    "general.bbox_param": 4,
+
+    "model.backbone.name": "dark53",
+    "model.backbone.num_levels": 3,
+    "model.backbone.out_channels": "PLACEHOLDER",
+    "model.backbone.out_strides": "PLACEHOLDER",
+
+    "model.fpn.name": "yolov3",
+    "model.fpn.out_channels": "PLACEHOLDER",
+    "model.fpn.out_strides": "PLACEHOLDER",
+
+    "model.rpn.name": "yolov3",
+    
+    "model.pred_layer": "YOLO",
+
+    "model.yolo.num_anchor_per_level": 3,
+    "model.yolo.anchors": [
+        [10, 13], [16, 30], [33, 23],
+        [30, 61], [62, 45], [59, 119],
+        [116, 90], [156, 198], [373, 326]
+    ],
+    "model.yolo.anchor_indices": [[0,1,2], [3,4,5], [6,7,8]],
+    "model.yolo.anchor.negative_threshold": 0.7,
+
+    "train.sgd.weight_decay": 0.0005,
+    "train.check_gt_assignment": true,
+    "train.img_sizes": [640, 800, 832, 864, 896, 928, 960, 992, 1024],
+    "train.imgsize_to_batch_size": {
+        "640": 10,
+        "800": 6, "832": 6, "864": 5,
+        "896": 5, "928": 4, "960": 4, "992": 4,
+        "1024": 3
+    },
+    "train.hard_example_mining": null,
+    "train.data_augmentation": {
+        "mosaic": false,
+        "satpepper_noise_density": 0.01,
+        "brightness": [0.5, 1.5],
+        "contrast": [0.5, 1.5],
+        "hue": [-0.1, 0.1],
+        "saturation": [0, 2],
+        "resize": true,
+        "horizontal_flip": true,
+        "vertical_flip": false,
+        "rotation": false
+    },
+
+    "test.preprocessing": "resize_pad_divisible",
+    "test.default_input_size": 1024,
+    "test.default_conf_thres": 0.5,
+    "test.ap_conf_thres": 0.005,
+    "test.nms_thres": 0.45
+}

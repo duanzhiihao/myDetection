@@ -51,6 +51,20 @@ def get_valset(valset_name: str):
         }
         validation_func = lambda x: coco_evaluate_bbox(x, val_json_path)
 
+    elif valset_name == 'GWHDval':
+        from settings import GWHD_DIR
+        from .coco import coco_evaluate_bbox
+        val_json_path = f'{GWHD_DIR}/annotations/val.json'
+        ann_data = json.load(open(val_json_path, 'r'))
+        ann_data.pop('annotations')
+        eval_info = {
+            'image_dir': f'{GWHD_DIR}/train',
+            'image_info': ann_data,
+            'eval_type': 'x1y1wh',
+            'val_func': coco_evaluate_bbox
+        }
+        validation_func = lambda x: coco_evaluate_bbox(x, val_json_path)
+
     elif valset_name in {'Lunch1', 'Lunch2', 'Lunch3', 'Edge_cases',
                          'High_activity', 'All_off', 'IRfilter', 'IRill',
                          'Meeting1', 'Meeting2', 'Lab1', 'Lab2',
@@ -100,7 +114,8 @@ def get_valset(valset_name: str):
         validation_func = lambda x: evaluate_json(x, val_json_path.replace('_mot',''))
 
     # ------------------------ datasets for debugging ------------------------
-    elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3', 'imagenet_debug1'}:
+    elif valset_name in {'debug_zebra', 'debug_kitchen', 'debug3',
+                         'imagenet_debug1', 'wheat1'}:
         from settings import PROJECT_ROOT
         from .coco import coco_evaluate_bbox
         val_json_path = f'{PROJECT_ROOT}/datasets/debug/{valset_name}.json'

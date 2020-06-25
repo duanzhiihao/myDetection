@@ -65,6 +65,20 @@ def get_trainingset(cfg: dict):
         from .image_dataset import ImageDataset
         return ImageDataset(training_set_cfg, cfg)
 
+    elif dataset_name == 'GWHDtrain':
+        # ImageNet dataset
+        from settings import GWHD_DIR
+        training_set_cfg = {
+            'img_dir': f'{GWHD_DIR}/train',
+            'ann_path': f'{GWHD_DIR}/annotations/train.json',
+            'ann_bbox_format': 'x1y1wh',
+        }
+        # These datasets are not designed for rotation augmentation
+        if cfg['train.data_augmentation'] is not None:
+            assert cfg['train.data_augmentation']['rotation'] == False
+        from .image_dataset import ImageDataset
+        return ImageDataset(training_set_cfg, cfg)
+
     # ------------------------------------------------------------------------
     # ----------------------------- video datasets ---------------------------
     elif dataset_name in {'HBMWR_mot_train'}:
@@ -85,7 +99,7 @@ def get_trainingset(cfg: dict):
     # ------------------------------------------------------------------------
     # ------------------------ datasets for debugging ------------------------
     elif dataset_name in {'debug_zebra', 'debug_kitchen', 'debug3',
-                          'imagenet_debug1'}:
+                          'imagenet_debug1', 'wheat1'}:
         from settings import PROJECT_ROOT
         training_set_cfg = {
             'img_dir': f'{PROJECT_ROOT}/images/{dataset_name}/',

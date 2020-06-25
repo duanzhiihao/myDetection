@@ -7,14 +7,15 @@ import cv2
 import matplotlib.pyplot as plt
 
 from utils.visualization import _draw_xywha
-from settings import COCO_DIR, ILSVRC_DIR
+from settings import COCO_DIR, ILSVRC_DIR, GWHD_DIR
 
 # json_path = f'{COCO_DIR}/annotations/instances_train2017.json'
 # img_dir = f'{COCO_DIR}/train2017/'
 # img_dir = '../COCO/val2017/'
-json_path = f'{ILSVRC_DIR}/Annotations/DET_30_and_VID_every15.json'
-img_dir = f'{ILSVRC_DIR}/Data'
-
+# json_path = f'{ILSVRC_DIR}/Annotations/DET_30_and_VID_every15.json'
+# img_dir = f'{ILSVRC_DIR}/Data'
+json_path = f'{GWHD_DIR}/annotations/val.json'
+img_dir = f'{GWHD_DIR}/train'
 
 json_data = json.load(open(json_path, 'r'))
 
