@@ -144,10 +144,11 @@ class ImageDataset(Dataset):
         """
         mosaic = self.aug_setting['mosaic'] if self.aug_setting is not None else None
         if mosaic:
+            assert self.HEM is None
             pairs = []
             _additional = [random.randint(0, len(self.img_ids)-1) for _ in range(3)]
             indices = [index] + _additional
-            for idx in range(index):                
+            for idx in indices:                
                 img_label_pair = self._load_single_pil(idx, to_square=False)
                 pairs.append(img_label_pair)
             img_label_pair = augUtils.mosaic(pairs, self.img_size)

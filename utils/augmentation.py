@@ -13,23 +13,25 @@ from .structures import ImageObjects
 from .bbox_ops import cxcywh_to_x1y1x2y2
 
 
-def mosaic(img_label_pairs, target_size:int, hori_ratio=0.4, verti_ratio=0.4):
+def mosaic(img_label_pairs, target_size:int):
     '''
     Mosaic augmentation as described in YOLOv4: https://arxiv.org/abs/2004.10934
     '''
     assert len(img_label_pairs) == 4
-    pil_imgs = [p[0] for p in img_label_pairs]
-    labels = [p[1] for p in img_label_pairs]
-    imgIds = [p[2] for p in img_label_pairs]
-    
-    new_im = np.zeros((target_size,target_size,3), dtype='float32')
+    np_imgs = [cv2.cvtColor(np.array(p[0]), cv2.COLOR_RGB2BGR) \
+               for p in img_label_pairs]
+    labels  = [p[1] for p in img_label_pairs]
+    imgIds  = [p[2] for p in img_label_pairs]
 
-    w1 = round(target_size*hori_ratio)
-    h1 = round(target_size*verti_ratio)
-    
+    f = 0.1 # factor
+    # mosaic center x and center y
+    mcx = int(uniform(target_size * (0.5-f), target_size * (0.5+f)))
+    mcy = int(uniform(target_size * (0.5-f), target_size * (0.5+f)))
+
+    new_im = np.zeros((target_size,target_size,3), dtype='float32')
     # top-left image
-    im, labels = _crop_img_labels(pil_imgs[0], labels[0], (h1,w1))
-    new_im[0:h1, 0:w1, :] = im
+    im, labels = _crop_img_labels(np_imgs[0], labels[0], (mcy,mcx))
+    new_im[0:mcx, 0:mcy, :] = im
     raise NotImplementedError()
 
     import matplotlib.pyplot as plt
@@ -44,6 +46,7 @@ def _crop_img_labels(im, labels, target_hw):
     Crop image and labels for mosaic augmentation
     '''
     if isinstance(im, PIL.Image.Image):
+        raise NotImplementedError()
         im = np.array(im, dtype='float32') / 255
     assert im.ndim == 3 and im.shape[2] == 3
 
@@ -63,17 +66,32 @@ def _crop_img_labels(im, labels, target_hw):
     im = im[hstart:hstart+tgt_h, wstart:wstart+tgt_w, :]
 
     # modify labels
-    assert isinstance(labels, ImageObjects)
+    labels: ImageObjects
     assert labels._bb_format in {'cxcywh', 'cxcywhd'}
-    # rescaling
-    bboxes = labels.bboxes
-    bboxes[:, 0:4] *= ratio
-    bboxes[:, 0] -= wstart
-    bboxes[:, 1] -= hstart
-    # convert to x1y1x2y2
-    bboxes = cxcywh_to_x1y1x2y2(bboxes)
-    bboxes.clamp_(min=0)
-    bboxes[:, 0].clamp_(max=tgt_w)
+    if labels.masks is None:
+        raise NotImplementedError()
+        # bounding box only
+        bboxes = labels.bboxes
+        bboxes[:, 0:4] *= ratio
+        bboxes[:, 0] -= wstart
+        bboxes[:, 1] -= hstart
+        # convert to x1y1x2y2
+        bboxes = cxcywh_to_x1y1x2y2(bboxes)
+        bboxes.clamp_(min=0)
+        bboxes[:, 0].clamp_(max=tgt_w)
+    else:
+        new_masks = torch.zeros(len(labels), tgt_h, tgt_w)
+        for i, mask in enumerate(labels.masks):
+            npm = mask.numpy().astype('uint8')
+            # plt.imshow(npm, cmap='gray'); plt.show()
+            npm = cv2.resize(npm, (rw,rh), interpolation=cv2.INTER_NEAREST)
+            npm = npm.astype('bool')
+            # plt.imshow(npm, cmap='gray'); plt.show()
+            mask = torch.from_numpy(npm)
+            mask = mask[hstart:hstart+tgt_h, wstart:wstart+tgt_w]
+            new_masks[i] = mask
+        labels.masks = new_masks
+        labels.mask_to_bbox_()
     # need mask
     raise NotImplementedError()
 
@@ -361,10 +379,16 @@ def random_gaussian_filter(img):
 
 
 def uniform(a, b):
+    '''
+    Sample a real number between a and b according to a uniform distribution
+    '''
+    assert a <= b
     return a + torch.rand(1).item() * (b-a)
+
 
 def normal(mean, std):
     return mean + torch.randn(1).item() * std
+
 
 if __name__ == "__main__":
     from PIL import Image

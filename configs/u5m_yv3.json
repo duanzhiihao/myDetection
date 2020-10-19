@@ -47,7 +47,7 @@
     },
     "train.hard_example_mining": null,
     "train.data_augmentation": {
-        "mosaic": false,
+        "mosaic": true,
         "satpepper_noise_density": 0.01,
         "brightness": [0.5, 1.5],
         "contrast": [0.5, 1.5],

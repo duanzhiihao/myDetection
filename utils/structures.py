@@ -37,13 +37,13 @@ class ImageObjects():
         if isinstance(idx, int):
             b = self.bboxes[idx:idx+1,:]
             c = self.cats[idx:idx+1]
-            m = self.masks[idx:idx+1,:,:] if self.masks is not None else None
-            s = self.scores[idx:idx+1] if self.scores is not None else None
+            m = self.masks[idx:idx+1,:,:] if self.masks  is not None else None
+            s = self.scores[idx:idx+1]    if self.scores is not None else None
             return ImageObjects(b, c, m, s, self._bb_format, self.img_hw)
         b = self.bboxes[idx,:]
         c = self.cats[idx]
-        m = self.masks[idx,:,:] if self.masks is not None else None
-        s = self.scores[idx] if self.scores is not None else None
+        m = self.masks[idx,:,:] if self.masks  is not None else None
+        s = self.scores[idx]    if self.scores is not None else None
         return ImageObjects(b, c, m, s, self._bb_format, self.img_hw)
     
     def __len__(self):
@@ -52,24 +52,19 @@ class ImageObjects():
     def cpu_(self):
         '''Move all attributes to CPU in-place'''
         self.bboxes = self.bboxes.cpu()
-        self.cats = self.cats.cpu()
+        self.cats   = self.cats.cpu()
         self.scores = self.scores.cpu() if self.scores is not None else None
-        self.masks = self.masks.cpu() if self.masks is not None else None
+        self.masks  = self.masks.cpu()  if self.masks  is not None else None
     
-    def clone(self):
+    def mask_to_bbox_(self):
         '''
-        Return a clone of self
+        Update bounding boxes according to the masks
         '''
-        raise DeprecationWarning()
-        # new = ImageObjects(
-        #     bboxes=self.bboxes.clone(),
-        #     cats=self.cats.clone(),
-        #     segms=self._rles,
-        #     scores=self.scores.clone() if self.scores is not None else self.scores,
-        #     bb_format=self._bb_format,
-        #     img_hw=self.img_hw
-        # )
-        # return new
+        assert self.masks is not None
+        assert self._bb_format == 'cxcywh'
+        for mask in self.masks:
+            indices = torch.nonzero(mask)
+
 
     def sort_by_score_(self, descending=True):
         '''Sort the bounding boxes by scores in-place'''
@@ -77,7 +72,7 @@ class ImageObjects():
         assert self.masks is None, 'sorting with masks is not currently supported'
         idxs = torch.argsort(self.scores, descending=descending)
         self.bboxes = self.bboxes[idxs, :]
-        self.cats = self.cats[idxs]
+        self.cats   = self.cats[idxs]
         self.scores = self.scores[idxs]
     
     def category_filter_(self, categories) -> None:
@@ -98,6 +93,7 @@ class ImageObjects():
         '''
         Confidence threshold + NMS
         '''
+        assert self.masks is None
         self.cpu_()
         dts = self[self.scores >= conf_thres]
         if len(dts) > 512:

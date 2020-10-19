@@ -127,11 +127,13 @@ class Detector():
 
         if kwargs.get('return_img', False):
             np_img = np.array(img)
-            detections.draw_on_np(np_img, class_map='COCO', print_dt=False)
+            detections.draw_on_np(np_img, class_map='COCO', print_dt=False,
+                                  **kwargs)
             return np_img
         if kwargs.get('show_img', False):
             np_img = np.array(img)
-            detections.draw_on_np(np_img, class_map='COCO', print_dt=True)
+            detections.draw_on_np(np_img, class_map='COCO', print_dt=True,
+                                  **kwargs)
             plt.figure(figsize=(8,8))
             plt.imshow(np_img)
             plt.show()
