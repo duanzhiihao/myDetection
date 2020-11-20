@@ -1,7 +1,7 @@
 {
-    "__doc": "YOLO version 3 with hard example mining",
+    "__doc": "detection from features",
 
-    "base": "OneStageBBox",
+    "base": "VCMDetect",
     
     "general.input_format": "RGB_1",
     "general.input_divisibility": 32,
@@ -9,20 +9,23 @@
     "general.pred_bbox_format": "cxcywh",
     "general.bbox_param": 4,
 
-    "model.backbone.name": "dark53",
+    "model.backbone.name": "ultralytics",
     "model.backbone.num_levels": 3,
     "model.backbone.out_channels": "PLACEHOLDER",
     "model.backbone.out_strides": "PLACEHOLDER",
+    "model.ultralytics.first": "Focus",
+    "model.ultralytics.depth_muliple": 0.67,
+    "model.ultralytics.channel_muliple": 0.75,
 
-    "model.fpn.name": "yolov3",
+    "model.fpn.name": "ultralytics",
     "model.fpn.out_channels": "PLACEHOLDER",
     "model.fpn.out_strides": "PLACEHOLDER",
 
     "model.rpn.name": "yolov3",
+    "model.yolo.num_anchor_per_level": 3,
     
     "model.pred_layer": "YOLO",
 
-    "model.yolo.num_anchor_per_level": 3,
     "model.yolo.anchors": [
         [10, 13], [16, 30], [33, 23],
         [30, 61], [62, 45], [59, 119],
@@ -33,17 +36,19 @@
 
     "train.sgd.weight_decay": 0.0005,
     "train.check_gt_assignment": true,
-    "train.img_sizes": [352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 768],
+    "train.img_sizes": [384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
+                        704, 736, 768],
     "train.imgsize_to_batch_size": {
-        "352": 32,
-        "384": 26, "416": 23, "448": 19, "480": 17,
-        "512": 15, "544": 13, "576": 11, "608": 10,
-        "640": 9, "672": 8, "704": 7, "768": 6
+        "352": 62,
+        "384": 52, "416": 46, "448": 40, "480": 36,
+        "512": 32, "544": 28, "576": 25, "608": 22,
+        "640": 20, "672": 18, "704": 16, "736": 15,
+        "768": 14
     },
-    "train.hard_example_mining": "probability",
+    "train.hard_example_mining": null,
     "train.data_augmentation": {
-        "mosaic": false,
-        "satpepper_noise_density": 0.02,
+        "mosaic": true,
+        "satpepper_noise_density": 0.01,
         "brightness": [0.5, 1.5],
         "contrast": [0.5, 1.5],
         "hue": [-0.1, 0.1],

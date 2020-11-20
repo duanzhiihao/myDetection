@@ -9,7 +9,7 @@ import os
 PROJECT_ROOT = os.path.dirname(__file__)
 
 # COCO dataset: http://cocodataset.org/#home
-COCO_DIR = '/home/duanzh/Projects/Datasets/COCO'
+COCO_DIR = 'C:/Projects/Datasets/COCO'
 
 # MW-R, HABBOF, and CEPDOF dataset: http://vip.bu.edu/projects/vsns/cossy/datasets/
 COSSY_DIR = '/home/duanzh/Projects/Datasets/COSSY'
